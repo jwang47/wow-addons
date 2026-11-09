@@ -359,6 +359,9 @@ your saved Key Bindings.
 - A secure button's modified attribute needs its button part:
   `shift-action1` (or `shift-action*`). A bare `shift-action` is never read,
   so Shift+key fired the unmodified action.
+- Health (and sometimes power) is secret, but `AbbreviateLargeNumbers` takes
+  secret values and the result can be joined into a string for `SetText`.
+  Wrap it in `pcall` and fall back to the bare value.
 - Do not rely on modified attributes for a Shift+key binding. The game reads
   Shift again when it runs the click (on key up, unless
   `ActionButtonUseKeyDown` is on), so a Shift let go early fires the plain

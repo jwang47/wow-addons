@@ -22,8 +22,8 @@ the same, and a test checks that every `.toc` version has a section here.
   need Alt). `/glance take all` puts
   every key with another command (except Tab, the bag keys and the character pane) on the bar. In edit mode the
   bar can be dragged to another place (`/glance reset` puts it back).
-- Small player and target bars under your character, and a cast bar below
-  them. They hide Blizzard's player, target and cast frames
+- Small player and target bars under your character (health and mana as
+  numbers), and a cast bar below them. They hide Blizzard's player, target and cast frames
   (`/glance blizzard on` brings those back).
 - A square minimap in the top-right corner: mouse-wheel zoom, the zone,
   coordinates and clock under it, and the addon buttons in one drawer.

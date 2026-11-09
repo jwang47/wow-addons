@@ -3,7 +3,7 @@
 -- bars (no maths on them), so the newer clients' hidden numbers still work.
 local addonName, ns = ...
 
-local W, HP_H, MP_H = 170, 9, 5
+local W, HP_H, MP_H = 170, 13, 9
 local FONT = "GameFontHighlightSmall"
 local frames = {}
 ns.units = { frames = frames }
@@ -15,8 +15,25 @@ local function bar(parent, h)
   b.bg = b:CreateTexture(nil, "BACKGROUND")
   b.bg:SetAllPoints()
   b.bg:SetColorTexture(0, 0, 0, 0.45)
+  b.text = b:CreateFontString(nil, "OVERLAY", FONT)
+  b.text:SetPoint("CENTER", 0, 0)
+  if b.text.SetFont and STANDARD_TEXT_FONT then b.text:SetFont(STANDARD_TEXT_FONT, h >= 12 and 10 or 8, "OUTLINE") end
   return b
 end
+
+-- "1,234 / 1,500". The values may be secret: the game's number formatters
+-- and string joins take them, maths does not. Anything else falls back to
+-- the bare current value, then to no text.
+local function num(v)
+  local f = AbbreviateLargeNumbers or tostring
+  local ok, s = pcall(f, v)
+  return ok and s or nil
+end
+local function setNumbers(b, cur, max)
+  if pcall(function() b.text:SetText(num(cur) .. " / " .. num(max)) end) then return end
+  if not pcall(function() b.text:SetText(num(cur)) end) then b.text:SetText("") end
+end
+ns.units.setNumbers = setNumbers
 
 local function classColor(unit)
   local _, class = UnitClass(unit)
@@ -52,12 +69,16 @@ local function update(f)
   local lvl = UnitLevel(u)
   local known = ns.plain(lvl)
   if known and known <= 0 then f.level:SetText("??") else f.level:SetText(lvl) end
-  f.hp:SetMinMaxValues(0, UnitHealthMax(u))
-  f.hp:SetValue(UnitHealth(u))
+  local hmax, h = UnitHealthMax(u), UnitHealth(u)
+  f.hp:SetMinMaxValues(0, hmax)
+  f.hp:SetValue(h)
+  setNumbers(f.hp, h, hmax)
   f.hp:SetStatusBarColor(ns.units.healthColor(u))
   local maxp = UnitPowerMax(u)
   f.mp:SetMinMaxValues(0, maxp)
-  f.mp:SetValue(UnitPower(u))
+  local p = UnitPower(u)
+  f.mp:SetValue(p)
+  setNumbers(f.mp, p, maxp)
   f.mp:SetStatusBarColor(powerColor(u))
   local m = ns.plain(maxp)
   f.mp:SetShown(m == nil or m > 0)   -- a hidden maximum: keep the bar

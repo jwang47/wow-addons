@@ -296,6 +296,12 @@ fire("UNIT_MAXPOWER", "player")
 fire("PLAYER_TARGET_CHANGED")
 check("secret power and level are fine", #chat == before, chat[#chat])
 check("power bar kept", _G.GlancePlayer.mp.shown)
+check("health numbers", _G.GlancePlayer.hp.text.text == "50 / 100", _G.GlancePlayer.hp.text.text)
+-- A formatter that takes secrets (as the game's does) still prints them.
+AbbreviateLargeNumbers = function(v) return rawequal(v, SECRET) and "?" or tostring(v) end
+fire("UNIT_MAXPOWER", "player")
+check("secret mana numbers", _G.GlancePlayer.mp.text.text == "30 / ?", _G.GlancePlayer.mp.text.text)
+AbbreviateLargeNumbers = nil
 UnitCastingInfo = function() return "Frostbolt", "", 1, SECRET, SECRET end
 UnitCastingDuration = function() return "duration" end
 local timerSet
