@@ -168,7 +168,7 @@ end
 function Scan.worn() return worn end
 
 ---------------------------------------------------------------------------
--- Candidates: the Auctionator scan and your bags
+-- Candidates: the Auctionator scan, your bags and the dungeon drops
 ---------------------------------------------------------------------------
 -- cache[id] = { name, loc, value, unusable, reqLevel } or false (not gear)
 local cache = {}
@@ -232,6 +232,32 @@ local function auctionatorIDs(into)
   end
 end
 
+-- Where a dungeon item drops: { name, short, min, max, boss } from
+-- ns.DUNGEONS (Dungeons.lua), or nil. The first boss listed wins.
+local drops
+function Scan.dropOf(id)
+  if not drops then
+    drops = {}
+    for _, d in ipairs(ns.DUNGEONS or {}) do
+      for i = 5, #d do
+        local b = d[i]
+        for j = 2, #b do
+          drops[b[j]] = drops[b[j]] or { name = d[1], short = d[2], min = d[3], max = d[4], boss = b[1] }
+        end
+      end
+    end
+  end
+  return drops[id]
+end
+
+-- Off with /uf dungeons off. An item on the AH stays an AH row (it gets a
+-- "drops in" note); one in your bags is a bags row.
+local function dungeonIDs(into)
+  if ns.db().opts.dungeons == false then return end
+  Scan.dropOf(0)
+  for id in pairs(drops) do into[id] = into[id] or "dungeon" end
+end
+
 local function bagIDs(into)
   for id, src in pairs(into) do if src == "bags" then into[id] = nil end end
   for bag = 0, rawget(_G, "NUM_BAG_SLOTS") or 4 do
@@ -290,6 +316,7 @@ function Scan.run(onStep, onDone)
   if state.busy then return end
   local sources = {}
   auctionatorIDs(sources)
+  dungeonIDs(sources)
   bagIDs(sources)
   local ids = {}
   local db = useStore()
@@ -354,6 +381,7 @@ end
 function Scan.refresh()
   local sources = {}
   auctionatorIDs(sources)
+  dungeonIDs(sources)
   bagIDs(sources)
   for id, src in pairs(sources) do if src == "bags" then Scan.item(id) end end
   Scan.readWorn()
@@ -371,7 +399,8 @@ function Scan.rows(sources)
       local p = src == "AH" and (call(price, "UpgradeFinder", id)
         or call(api("Auctionator.API.v1.GetAuctionPriceByItemLink"), "UpgradeFinder", "item:" .. id)) or nil
       table.insert(rows, { id = id, name = c.name, loc = c.loc, gain = c.value - (base or 0), price = p,
-        reqLevel = c.reqLevel, unusable = c.unusable, source = src, note = note, value = c.value })
+        reqLevel = c.reqLevel, unusable = c.unusable, source = src, note = note, value = c.value,
+        drop = Scan.dropOf(id) })
     end
   end
   Scan.lastSources = sources

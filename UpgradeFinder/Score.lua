@@ -183,6 +183,7 @@ end
 
 -- Filters and sorts candidate rows. A row is { id, name, loc, gain, price,
 -- reqLevel, unusable, source }. opts: group (S.GROUPS entry), level,
+-- from (only this source: "AH", "dungeon" or "bags"),
 -- ahead (levels above yours still shown), money, affordable, sort ("gain" or
 -- "pergold"), minGain.
 function S.rank(rows, opts)
@@ -193,6 +194,7 @@ function S.rank(rows, opts)
       and (r.reqLevel or 0) <= level + ahead
       and (not opts.group or opts.group[1] == "All" or opts.group[r.loc])
       and (not opts.affordable or r.source ~= "AH" or (r.price ~= nil and r.price <= (opts.money or 0)))
+      and (not opts.from or r.source == opts.from)
     if ok then
       r.perGold = (r.price and r.price > 0) and r.gain / (r.price / 10000) or nil
       table.insert(out, r)
@@ -203,9 +205,11 @@ function S.rank(rows, opts)
     local an, bn = (a.reqLevel or 0) <= level, (b.reqLevel or 0) <= level
     if an ~= bn then return an end
     if byGold then
-      -- Owned items cost nothing; an AH item with no price goes last.
-      local ag = a.perGold or (a.source == "AH" and 0 or math.huge)
-      local bg = b.perGold or (b.source == "AH" and 0 or math.huge)
+      -- Owned items cost nothing, dungeon drops no gold (after the owned
+      -- ones); an AH item with no price goes last.
+      local function free(r) return r.source == "AH" and 0 or r.source == "dungeon" and 1e9 or math.huge end
+      local ag = a.perGold or free(a)
+      local bg = b.perGold or free(b)
       if ag ~= bg then return ag > bg end
     end
     if a.gain ~= b.gain then return a.gain > b.gain end
