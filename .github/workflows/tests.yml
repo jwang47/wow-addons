@@ -53,6 +53,8 @@ jobs:
           cmd /c mklink /J (Join-Path $client2 'Interface\AddOns\LootValue') $dev | Out-Null
           $out = powershell -NoProfile -ExecutionPolicy Bypass -File update.ps1 -Client $client2 -Manifest $manifest | Out-String
           Write-Host $out
+          if ($LASTEXITCODE -ne 1) { throw "a skipped addon must give exit code 1" }
           if ($out -notmatch 'is a link') { throw "link not reported" }
           if (-not (Test-Path (Join-Path $dev 'keep.txt'))) { throw "the link target was changed" }
           if (-not (Test-Path (Join-Path $client2 'Interface\AddOns\Omni\Omni.toc'))) { throw "Omni not installed next to the link" }
+          exit 0
