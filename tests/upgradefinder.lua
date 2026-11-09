@@ -17,6 +17,7 @@ local function widget(name)
   function w:SetText(t) self.text = t end
   function w:GetText() return self.text end
   function w:RegisterEvent(e) self.events = self.events or {} self.events[e] = true end
+  function w:UnregisterEvent(e) if self.events then self.events[e] = nil end end
   function w:CreateTexture() return widget() end
   function w:CreateFontString() return widget() end
   return setmetatable(w, { __index = function(_, k)
@@ -93,7 +94,7 @@ C_Item = {
   GetItemInfoInstant = function(x)
     local id = tonumber(tostring(x):match("(%d+)"))
     if id == 110 and passes < 1 then return nil end -- the game has not seen it yet
-    return id, nil, nil, ITEMS[id] and ITEMS[id].loc
+    return id, nil, nil, ITEMS[id] and ITEMS[id].loc, nil, ITEMS[id] and ITEMS[id].class
   end,
   RequestLoadItemDataByID = function(id) table.insert(calls, "load " .. id) end,
   -- 109 arrives on the second look after it was asked for.
@@ -149,7 +150,7 @@ ns.DUNGEONS = {
   { "Shadowfang Keep", "SFK", 11, 30, { "Arugal", 111 } },
 }
 
-for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Stats.lua", "Calib.lua", "UI.lua", "Weights.lua" }) do
+for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Stats.lua", "Calib.lua", "Spells.lua", "Build.lua", "UI.lua", "Weights.lua", "BuildUI.lua" }) do
   assert(loadfile(root .. "UpgradeFinder/" .. file))("UpgradeFinder", ns)
 end
 local S = ns.score
@@ -511,6 +512,12 @@ IsShiftKeyDown = function() return true end
 wui.presets[1].scripts.OnClick(wui.presets[1], "RightButton")
 IsShiftKeyDown = nil
 check("shift-right-click deletes", UpgradeFinderDB.presets[ns.class()]["big-int"] == nil and not wui.presets[1].shown)
+ns.savePreset("spare")
+ns.paintWeights()
+check("each preset has a delete button", wui.presets[1].preset == "spare" and wui.presets[1].del.shown)
+wui.presets[1].del.scripts.OnClick(wui.presets[1].del)
+check("the x button deletes the preset", UpgradeFinderDB.presets[ns.class()].spare == nil
+  and not wui.presets[1].shown and not wui.presets[1].del.shown)
 SlashCmdList.UPGRADEFINDER("weight reset")
 
 -- Slot column -------------------------------------------------------------------
@@ -603,6 +610,19 @@ check("eHP from health and armor", ehp and ehp[2] == "+208 (+15.6%)" and ehp[3] 
 
 -- Calibration (Calib.lua) ----------------------------------------------------
 local Cal = ns.calib
+check("calib: the combat log is not registered by default (Forever forbids it)",
+  not (Cal.frame.events or {}).COMBAT_LOG_EVENT_UNFILTERED and not Cal.logOn())
+SlashCmdList.UPGRADEFINDER("calib log")
+check("/uf calib log turns it on", Cal.logOn() and Cal.frame.events.COMBAT_LOG_EVENT_UNFILTERED == true)
+ns.handlers.ADDON_ACTION_FORBIDDEN("UpgradeFinder", "UNKNOWN()")
+check("a forbidden call turns the combat log off", not Cal.logOn() and UpgradeFinderDB.blocked[1].fn == "UNKNOWN()")
+SlashCmdList.UPGRADEFINDER("calib log")
+SlashCmdList.UPGRADEFINDER("calib log")
+check("/uf calib log again turns it off", not Cal.logOn())
+ns.db().opts.combatLog = true -- saved by a 0.1.6 test build
+Cal.handlers.PLAYER_LOGIN()
+check("a saved combat log setting is cleared at login, not registered",
+  not Cal.logOn() and ns.db().opts.combatLog == nil and not Cal.frame.events.COMBAT_LOG_EVENT_UNFILTERED)
 Cal.reset()
 local snaps = Cal.store().snaps
 -- Level 24: 24 Int per 1% crit, 10 health per Sta (+ 50), 15 mana per Int.
@@ -659,6 +679,145 @@ check("calib: the same snapshot is not saved twice", Cal.snap() == false and #Ca
 UnitStat, GetSpellCritChance, UnitHealthMax = nil, nil, nil
 Cal.reset()
 check("/uf calib reset clears", #Cal.store().snaps == 0 and next(Cal.store().spells) == nil)
+
+-- Spells from the action bars (Spells.lua) ----------------------------------
+local SPL = ns.spells
+local dl, dd = SPL.parseText("Launches a bolt of frost at the enemy, causing 79 to 87 Frost damage and slowing movement.")
+check("spell text: direct range", dl == 83 and dd == nil)
+local _, dot, dur = SPL.parseText("Corrupts the target, causing 222 Shadow damage over 18 sec.")
+check("spell text: damage over time", dot == 222 and dur == 18)
+check("spell text: single number", SPL.parseText("Blasts the enemy for 60 Fire damage.") == 60)
+check("spell text: no damage", SPL.parseText("Increases your Intellect by 10.") == nil)
+local BAR = { [1] = 116, [2] = 2136, [3] = 99, [5] = 205 }
+local SPELLS = {
+  [116] = { "Frostbolt", 2500, "causing 79 to 87 Frost damage", 0, 50 },
+  [205] = { "Frostbolt", 2200, "causing 40 to 46 Frost damage", 0, 30 }, -- a lower rank
+  [2136] = { "Fire Blast", 0, "Blasts the enemy for 60 to 72 Fire damage.", 8000, 60 },
+  [99] = { "Frost Armor", 0, "Increases armor.", 0, 60 },
+}
+GetActionInfo = function(slot) if BAR[slot] then return "spell", BAR[slot] end end
+GetSpellInfo = function(id) local t = SPELLS[id] if t then return t[1], nil, nil, t[2] end end
+GetSpellDescription = function(id) return SPELLS[id] and SPELLS[id][3] end
+GetSpellBaseCooldown = function(id) return SPELLS[id] and SPELLS[id][4] end
+GetSpellPowerCost = function(id) return SPELLS[id] and { { type = 0, cost = SPELLS[id][5] } } end
+local bars = SPL.calibrate(SPL.fromBars())
+check("bars: the damage spells, one per name, highest rank", #bars == 2 and bars[1].name == "Fire Blast"
+  and bars[2].name == "Frostbolt" and bars[2].id == 116)
+check("bars: cast time and cooldown", bars[2].cast == 2.5 and bars[1].cast == 1.5 and bars[1].cd == 8)
+-- Frostbolt: 83 + 2.5/3.5 x 0 = 83 per 2.5 s = 33.2/s (filler).
+-- Fire Blast: 66 + 1.5/3.5 x 0 = 66 every 8 s; uses 1.5/8 of the time.
+local rot = SPL.rotation(bars, 0, 0, 1)
+check("rotation: filler plus cooldown", rot and math.abs(rot.dps - (66 / 8 + (1 - 1.5 / 8) * 83 / 2.5)) < 1e-6)
+check("rotation: shares add up", math.abs(rot.parts[1][3] + rot.parts[2][3] - 1) < 1e-9 and rot.parts[1][1].name == "Frostbolt")
+check("rotation: mana per second", math.abs(rot.mps - (60 / 8 + (1 - 1.5 / 8) * 50 / 2.5)) < 1e-6)
+local more = SPL.rotation(bars, 50, 0, 1)
+check("rotation: more spell damage, more DPS", more.dps > rot.dps)
+local ch = SPL.change(50, 0, { sp = 0, spcrit = 0 })
+check("bars: DPS change", ch and math.abs(ch - (more.dps / rot.dps - 1)) < 1e-6)
+off = St.derive({ sp = 50 }, { class = "MAGE", level = 24, sp = 0, spcrit = 0,
+  barsFn = function(...) return (SPL.change(...)) end }, mw, "INVTYPE_HEAD")
+check("derive uses the bars", find(off, "Est. DPS")[2] == string.format("%+.1f%%", (more.dps / rot.dps - 1) * 100))
+
+-- Build (Build.lua, BuildUI.lua) ---------------------------------------------
+local Bd = ns.build
+Bd.reset()
+WORN[1] = 100
+check("build: starts as what you wear", Bd.items()[1] == "item:100" and Bd.items()[11] == "item:200")
+Bd.set(1, "item:101")
+local sh = Bd.sheet(Bd.items())
+check("build: the sheet sees the change", sh.diff.int == 3 and sh.diff.sta == 4 and sh.loading == 0)
+local function srow(label) for _, r in ipairs(sh.rows) do if r[1] == label then return r end end end
+check("build: sheet rows for a caster", srow("eHP (physical)") ~= nil and srow("DPS (your bars)") ~= nil)
+check("build: health row now and with", srow("Health") and srow("Health")[4] == "+40")
+Bd.save("hood")
+Bd.reset()
+check("build: saved and reset", Bd.names()[1] == "hood" and Bd.items()[1] == "item:100")
+check("build: load", Bd.load("hood") and Bd.items()[1] == "item:101")
+Bd.clear(11)
+check("build: an empty slot", Bd.items()[11] == nil)
+Bd.unset(11)
+check("build: back to worn", Bd.items()[11] == "item:200")
+local vs = Bd.sheet(Bd.items(), Bd.get("hood"))
+check("build: compare with a saved build (same: no change)", next(vs.diff) == nil)
+-- Dropping an item: it must fit the slot.
+GetCursorInfo = function() return "item", 109, "item:109" end
+ClearCursor = function() end
+Bd.reset()
+check("build: drop a neck item on the head slot is refused", Bd.dropOn(1) == true and Bd.work[1] == nil)
+check("build: drop it on the neck slot", Bd.dropOn(2) == true and Bd.work[2] == "item:109")
+GetCursorInfo = nil
+-- An Upgrades row (Alt-click) goes to the slot it replaces.
+check("build: row to build", ns.rowToBuild({ id = 103, loc = "INVTYPE_HEAD" }) and Bd.work[1] == "item:103")
+local okPaint = pcall(ns.paintBuild)
+check("build: the window paints", okPaint and ns.buildFrame and ns.buildFrame:IsShown())
+SlashCmdList.UPGRADEFINDER("build")
+check("/uf build opens it", ns.buildFrame:IsShown())
+Bd.delete("hood")
+check("build: delete", #Bd.names() == 0)
+Bd.reset()
+GetActionInfo, GetSpellInfo, GetSpellDescription, GetSpellBaseCooldown, GetSpellPowerCost = nil, nil, nil, nil, nil
+
+-- Recipes: a pattern scores as the item it makes ------------------------------
+local Sc = ns.scan
+ITEMS[114] = { loc = "", class = 9, lines = { "Pattern: Frost Circlet", "Frost Circlet", "Binds when picked up",
+  "Head", "+9 Intellect", "Requires Level 20", "Use: Teaches you how to craft Frost Circlet.",
+  "Bolt of Silk Cloth (8), Fine Thread (4), Bleach", { "Requires Tailoring (125)", red = true } } }
+ITEMS[115] = { loc = "", class = 9, lines = { "Plans: Iron Helm", "Iron Helm", "Head", { "Plate", red = true },
+  "+8 Strength", { "Requires Blacksmithing (100)", red = true } } }
+ITEMS[116] = { loc = "", class = 9, lines = { "Recipe: Fish Stew", "Use: Teaches you how to cook Fish Stew." } }
+ITEMS[117] = { loc = "INVTYPE_CHEST", lines = { "Silk Robe", "Chest", "+4 Intellect" } }
+ITEMS[118] = { loc = "", class = 9, lines = { "Pattern: Silk Robe", "Silk Robe", "Chest", "+4 Intellect",
+  "Use: Teaches you how to craft Silk Robe.", "Fine Thread (2)", "Requires Tailoring (60)" } }
+-- Reagents by name (C_Item.GetItemInfo), priced from the AH or the vendor.
+local NAMES = { ["Bolt of Silk Cloth"] = 900, ["Fine Thread"] = 901, ["Silk Robe"] = 117 }
+C_Item.GetItemInfo = function(name) local id = NAMES[name] if id then return name, "item:" .. id end end
+local ahPrice = Auctionator.API.v1.GetAuctionPriceByItemID
+Auctionator.API.v1.GetAuctionPriceByItemID = function(c, id)
+  return ({ [900] = 5000, [901] = 300, [117] = 20000 })[id] or ahPrice(c, id) end
+Auctionator.API.v1.GetVendorPriceByItemID = function(_, id) return id == 901 and 100 or nil end
+Sc.item(114) Sc.item(115) Sc.item(116) Sc.item(118)
+local c114 = Sc.cache[114]
+check("recipe: scores the item it makes", c114 and c114.name == "Frost Circlet" and c114.loc == "INVTYPE_HEAD"
+  and c114.value > 0 and c114.recipe == "Pattern: Frost Circlet" and c114.craft == "Tailoring (125)")
+check("recipe: a missing profession is not unusable", c114 and c114.unusable == false and c114.reqLevel == 20)
+check("recipe: plate you cannot wear is unusable", Sc.cache[115] and Sc.cache[115].unusable == true)
+check("recipe: no gear inside is skipped", Sc.cache[116] == false)
+local rr = Sc.rows({ [114] = "AH" })
+check("recipe: the row carries the pattern", rr[1] and rr[1].recipe == "Pattern: Frost Circlet" and rr[1].gain > 0)
+local cost = rr[1].cost
+-- Pattern 0 (no AH price) + 8 x 50s + 4 x 1s (vendor, cheaper than the AH) + Bleach unknown.
+check("recipe: reagents read from the tooltip", c114.reagents and #c114.reagents == 3
+  and c114.reagents[1][1] == "Bolt of Silk Cloth" and c114.reagents[1][2] == 8 and c114.reagents[3][2] == 1)
+check("recipe: craft cost from AH and vendor prices", cost and cost.total == 40400 and cost.missing == 1
+  and cost.parts[2][4] == "vendor" and rr[1].price == 40400)
+check("recipe: a bind on pickup item cannot be bought made", cost.bop and cost.buy == nil)
+local rb = Sc.rows({ [118] = "AH" })[1]
+check("recipe: buy the made item instead", rb and rb.cost.buy == 20000 and rb.cost.total == 200 and not rb.cost.bop)
+
+-- Row tooltip: one stat per line, label left, number right -------------------
+local doubles, singles = {}, {}
+local gt = GameTooltip
+local oldAdd, oldDouble = gt.AddLine, gt.AddDoubleLine
+gt.AddLine = function(_, l) table.insert(singles, l) end
+gt.AddDoubleLine = function(_, l, r) table.insert(doubles, { l, r }) end
+ns.showDetails({ data = rr[1] })
+gt.AddLine, gt.AddDoubleLine = oldAdd, oldDouble
+local function hasDouble(l) for _, d in ipairs(doubles) do if d[1]:match(l) then return d end end end
+local function hasSingle(l) for _, t in ipairs(singles) do if t == l then return true end end end
+check("tooltip: an Upgrade line and a Crafted line", hasDouble("^Upgrade %+") ~= nil
+  and hasSingle("Crafted: Pattern: Frost Circlet (Tailoring (125))"))
+local intLine = hasDouble("^  Intellect$")
+check("tooltip: one stat per line, the item number then the change", hasSingle("Stats: this item (change vs worn)")
+  and intLine and intLine[2]:match("^%+9  %(%+%d+%)$") ~= nil)
+local sl = ns.stats.statList({ frost = 4, sp = -8 }, { frost = 14, sta = 5 })
+local function sline(l) for _, e in ipairs(sl) do if e[1] == l then return e end end end
+check("stat list: own number, then the change", sline("Frost damage")[2] == "+14  (+4)" and sline("Frost damage")[3] == true
+  and sline("Spell damage")[2] == "none  (-8)" and sline("Spell damage")[3] == false
+  and sline("Stamina")[2] == "+5  (same)" and sline("Stamina")[3] == nil)
+check("tooltip: no run-on Changes line", not hasSingle("Changes:"))
+local cl, bl = hasDouble("^Craft$"), hasDouble("^Buy it made$")
+check("tooltip: craft cost and buy line", cl and cl[2] == "4g 04s +?" and bl and bl[2] == "binds on pickup"
+  and hasDouble("^  Fine Thread x4$")[2] == "4s 00c (vendor)")
 
 print(failures == 0 and "all UpgradeFinder tests passed" or (failures .. " UpgradeFinder test(s) failed"))
 os.exit(failures == 0 and 0 or 1)

@@ -90,8 +90,9 @@ end
 local REQ_LEVEL = "^" .. (type(rawget(_G, "ITEM_MIN_LEVEL")) == "string" and ITEM_MIN_LEVEL or "Requires Level %d")
   :gsub("%%d", "(%%d+)")
 
--- Lines, unusable (a red line other than the level), required level.
--- nil while the game still loads the item ("Retrieving item information").
+-- Lines, unusable (a red line other than the level), required level, and
+-- the red lines themselves. nil while the game still loads the item
+-- ("Retrieving item information").
 function Scan.read(setter)
   if not scanner then
     scanner = CreateFrame("GameTooltip", TT, nil, "GameTooltipTemplate")
@@ -99,17 +100,20 @@ function Scan.read(setter)
   scanner:SetOwner(rawget(_G, "WorldFrame") or UIParent, "ANCHOR_NONE")
   scanner:ClearLines()
   setter(scanner)
-  local lines, unusable, req = {}, false, nil
+  local lines, unusable, req, red = {}, false, nil, {}
   for i = 1, scanner:NumLines() do
     local left = _G[TT .. "TextLeft" .. i]
     local t = left and left:GetText()
     if t then table.insert(lines, t) end
     local lvl = t and tonumber(t:match(REQ_LEVEL))
     if lvl then req = lvl
-    elseif isRed(left) or isRed(_G[TT .. "TextRight" .. i]) then unusable = true end
+    elseif isRed(left) or isRed(_G[TT .. "TextRight" .. i]) then
+      unusable = true
+      table.insert(red, t or "")
+    end
   end
   if #lines < 2 then return nil end
-  return lines, unusable, req
+  return lines, unusable, req, red
 end
 
 ---------------------------------------------------------------------------
@@ -170,7 +174,8 @@ function Scan.worn() return worn end
 ---------------------------------------------------------------------------
 -- Candidates: the Auctionator scan, your bags and the dungeon drops
 ---------------------------------------------------------------------------
--- cache[id] = { name, loc, value, unusable, reqLevel } or false (not gear)
+-- cache[id] = { name, loc, value, unusable, reqLevel, craft } or false (not
+-- gear). craft: the profession line of a recipe ("Requires Tailoring (125)").
 local cache = {}
 Scan.cache = cache
 local state = { busy = false, pending = 0, done = 0, total = 0 }
@@ -184,7 +189,7 @@ function Scan.forget() for k in pairs(cache) do cache[k] = nil end end
 -- thousands of tooltips again. They are kept while the weights are the
 -- same: the key holds the weight set, VERSION (bump it when scoring
 -- changes), and for a mage with MageMentor a fingerprint of its weights.
-Scan.VERSION = 2
+Scan.VERSION = 4 -- 3: recipes score as the item they make; 4: their reagents
 Scan.SKIP_FOR = 24 * 3600 -- items that never loaded are skipped this long
 local PROBE = { "int", "spi", "sta", "sp", "frost", "fire", "arcane", "crit", "hit", "mp5", "armor" }
 function Scan.cacheKey()
@@ -279,12 +284,85 @@ local function cached(id)
   return call(f, id) and true or false
 end
 
+-- A recipe (item class 9) shows the item it makes inside its own tooltip:
+-- the name, the slot line ("Head    Cloth"), the stats. We score that.
+Scan.RECIPE_CLASS = 9
+local slotText -- "Head" -> INVTYPE_HEAD, from the client's own strings
+local ENGLISH = { Head = "INVTYPE_HEAD", Neck = "INVTYPE_NECK", Shoulder = "INVTYPE_SHOULDER",
+  Chest = "INVTYPE_CHEST", Waist = "INVTYPE_WAIST", Legs = "INVTYPE_LEGS", Feet = "INVTYPE_FEET",
+  Wrist = "INVTYPE_WRIST", Hands = "INVTYPE_HAND", Finger = "INVTYPE_FINGER", Trinket = "INVTYPE_TRINKET",
+  Back = "INVTYPE_CLOAK", ["One-Hand"] = "INVTYPE_WEAPON", ["Main Hand"] = "INVTYPE_WEAPONMAINHAND",
+  ["Two-Hand"] = "INVTYPE_2HWEAPON", ["Held In Off-hand"] = "INVTYPE_HOLDABLE",
+  ["Off Hand"] = "INVTYPE_SHIELD", Ranged = "INVTYPE_RANGED", Thrown = "INVTYPE_THROWN",
+  Relic = "INVTYPE_RELIC" }
+local function slotOf(line)
+  if not slotText then
+    slotText = {}
+    for text, loc in pairs(ENGLISH) do slotText[text] = loc end
+    for loc in pairs(S.SLOTS) do
+      local t = rawget(_G, loc)
+      if type(t) == "string" and not slotText[t] then slotText[t] = loc end
+    end
+  end
+  return slotText[line]
+end
+Scan.slotOf = slotOf
+
+local PROFESSION = "^Requires (.+) %((%d+)%)$"
+local function recipe(id)
+  local lines, unusable, req, red = Scan.read(function(tt) tt:SetHyperlink("item:" .. id) end)
+  if not lines then return false end
+  local loc
+  for i = 2, #lines do
+    loc = slotOf(lines[i])
+    if loc then break end
+    if lines[i] == rawget(_G, "RETRIEVING_ITEM_INFO") or lines[i]:match("^Retrieving item") then return false end
+  end
+  if not loc then cache[id] = false return true end
+  -- A red profession line only means you cannot craft it yourself yet.
+  local craft
+  for _, line in ipairs(lines) do
+    if line:match(PROFESSION) and not line:match("^Requires Level") then craft = line end
+  end
+  unusable = false
+  for _, line in ipairs(red) do
+    if not line:match(PROFESSION) then unusable = true end
+  end
+  local made = lines[1]:match("^[^:]+: (.+)$") or lines[2]
+  -- Reagents: the line after "Use: Teaches ...", such as "Bolt of Silk
+  -- Cloth (8), Fine Thread (4)". A reagent without a count is one.
+  local reagents, bop = {}, false
+  for i, line in ipairs(lines) do
+    if line == rawget(_G, "ITEM_BIND_ON_PICKUP") or line == "Binds when picked up" then bop = true end
+    if line:match("^Use: Teaches") and lines[i + 1] and not lines[i + 1]:match(PROFESSION) then
+      for part in (lines[i + 1] .. ","):gmatch("%s*([^,]+),") do
+        local name, n = part:match("^(.-)%s*%((%d+)%)$")
+        table.insert(reagents, { name or part, tonumber(n) or 1 })
+      end
+    end
+  end
+  local body = {}
+  for i = 2, #lines do table.insert(body, lines[i]) end
+  cache[id] = { name = made, recipe = lines[1], loc = loc, value = ns.valueOf(body, Scan.w), unusable = unusable,
+    reqLevel = req, craft = craft and craft:gsub("^Requires ", "") or nil, reagents = reagents, bop = bop }
+  return true
+end
+
 -- One item: fills cache[id]; returns false if it is still loading.
 function Scan.item(id)
   if cache[id] ~= nil then return true end
   local loc, known = equipLoc(id)
   if not known then return false end -- not seen yet: ask and look again
-  if not loc or not S.SLOTS[loc] then cache[id] = false return true end
+  if not loc or not S.SLOTS[loc] then
+    local instant = api("C_Item.GetItemInfoInstant") or rawget(_G, "GetItemInfoInstant")
+    local classID = select(6, call(instant, id))
+    if classID == Scan.RECIPE_CLASS then
+      if not cached(id) then return false end
+      return recipe(id)
+    end
+    cache[id] = false
+    return true
+  end
   if not cached(id) then return false end
   local lines, unusable, req = Scan.read(function(tt) tt:SetHyperlink("item:" .. id) end)
   if not lines then return false end
@@ -388,6 +466,42 @@ function Scan.refresh()
   return Scan.rows(sources)
 end
 
+-- The price of one item by name or id: the AH price from Auctionator, or
+-- the vendor's price when that is lower (thread, dye). nil: not known.
+-- The name lookup works only for items the client has seen.
+local function linkOf(name)
+  local info = api("C_Item.GetItemInfo") or rawget(_G, "GetItemInfo")
+  local _, link = call(info, name)
+  return link
+end
+function Scan.priceOf(item)
+  local v1 = "Auctionator.API.v1."
+  local link = type(item) == "number" and ("item:" .. item) or linkOf(item)
+  if not link then return nil end
+  local id = tonumber(link:match("item:(%d+)"))
+  local ah = call(api(v1 .. "GetAuctionPriceByItemID"), "UpgradeFinder", id)
+    or call(api(v1 .. "GetAuctionPriceByItemLink"), "UpgradeFinder", link)
+  local vendor = call(api(v1 .. "GetVendorPriceByItemID"), "UpgradeFinder", id)
+  if vendor and vendor > 0 and (not ah or vendor < ah) then return vendor, "vendor" end
+  return ah, ah and "AH" or nil
+end
+
+-- What a recipe row costs to craft (the pattern, if it has an AH price,
+-- plus the reagents) and to buy the made item instead (nil for a bind on
+-- pickup item, or with no AH price).
+-- { total, pattern, reagents, parts = { {name, count, each, from} }, missing, buy, bop }
+function Scan.craftCost(c, patternPrice)
+  local out = { pattern = patternPrice, reagents = 0, parts = {}, missing = 0, bop = c.bop }
+  for _, r in ipairs(c.reagents or {}) do
+    local each, from = Scan.priceOf(r[1])
+    table.insert(out.parts, { r[1], r[2], each, from })
+    if each then out.reagents = out.reagents + each * r[2] else out.missing = out.missing + 1 end
+  end
+  out.total = (patternPrice or 0) + out.reagents
+  if not c.bop then out.buy = Scan.priceOf(c.name) end
+  return out
+end
+
 -- Rows for S.rank from the cache, with gains against what you wear now.
 function Scan.rows(sources)
   local rows = {}
@@ -398,9 +512,12 @@ function Scan.rows(sources)
       local base, note = S.replaced(c.loc, worn.value, worn.twoHander, worn.dualWield)
       local p = src == "AH" and (call(price, "UpgradeFinder", id)
         or call(api("Auctionator.API.v1.GetAuctionPriceByItemLink"), "UpgradeFinder", "item:" .. id)) or nil
-      table.insert(rows, { id = id, name = c.name, loc = c.loc, gain = c.value - (base or 0), price = p,
+      -- A recipe row costs the pattern plus the reagents.
+      local cost = c.recipe and Scan.craftCost(c, p) or nil
+      if cost then p = cost.total > 0 and cost.total or nil end
+      table.insert(rows, { id = id, name = c.name, loc = c.loc, gain = c.value - (base or 0), price = p, cost = cost,
         reqLevel = c.reqLevel, unusable = c.unusable, source = src, note = note, value = c.value,
-        drop = Scan.dropOf(id) })
+        drop = Scan.dropOf(id), recipe = c.recipe, craft = c.craft })
     end
   end
   Scan.lastSources = sources

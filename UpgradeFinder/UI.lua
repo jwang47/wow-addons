@@ -78,13 +78,15 @@ function ns.paint()
       row.icon:SetTexture(call(api("C_Item.GetItemIconByID"), r.id) or 134400)
       -- Free elsewhere (quest, dungeon, vendor): a short tag after the name.
       local tag = r.source ~= "dungeon" and ns.where.tag(ns.where.of(r.id)) or nil
+      if r.recipe then tag = "craft" end -- a pattern: the row is the item it makes
       row.name:SetText(tag and (r.name .. "  |cff8cc7ff" .. tag .. "|r") or r.name)
       row.name:SetTextColor(qualityColor(r.id))
       local gain = string.format("+%.1f", r.gain)
       if (r.reqLevel or 0) > level then gain = "|cff9d9d9d" .. gain .. " @" .. r.reqLevel .. "|r" end
       row.slot:SetText(S.groupName(r.loc) or "")
       row.gain:SetText(gain)
-      row.price:SetText(r.source == "AH" and (r.price and ns.money(r.price) or "|cff9d9d9d?|r")
+      row.price:SetText(r.cost and ("|cffffd100" .. ns.money(r.cost.total) .. (r.cost.missing > 0 and "+" or "") .. "|r")
+        or r.source == "AH" and (r.price and ns.money(r.price) or "|cff9d9d9d?|r")
         or r.source == "dungeon" and r.drop and ("|cff8cc7ff" .. r.drop.short .. "|r")
         or "|cff40ff40" .. r.source .. "|r")
     else
@@ -127,16 +129,50 @@ local function showDetails(row)
   if not (r and tt) then return end
   tt:SetOwner(row, "ANCHOR_RIGHT")
   tt:SetHyperlink("item:" .. r.id)
+  -- One entry per line: the label on the left, the number on the right.
+  local function section(title, list)
+    if #list == 0 then return end
+    tt:AddLine(title, 1, 0.82, 0)
+    for _, e in ipairs(list) do
+      local r_, g_, b_ = 0.25, 1, 0.25
+      if e[3] == false then r_, g_, b_ = 1, 0.38, 0.25 elseif e[3] == nil then r_, g_, b_ = 0.7, 0.7, 0.7 end
+      tt:AddDoubleLine("  " .. e[1], e[2], 0.9, 0.9, 0.9, r_, g_, b_)
+    end
+  end
   tt:AddLine(" ")
-  tt:AddLine(string.format("Upgrades: +%.1f  (score %.1f vs %.1f worn)", r.gain, r.value, r.value - r.gain), 0.25, 1, 0.25)
+  tt:AddDoubleLine(string.format("Upgrade +%.1f", r.gain), string.format("score %.1f vs %.1f worn", r.value, r.value - r.gain),
+    0.25, 1, 0.25, 0.6, 0.6, 0.6)
+  if r.recipe then tt:AddLine("Crafted: " .. r.recipe .. (r.craft and (" (" .. r.craft .. ")") or ""), 1, 0.82, 0) end
+  -- Craft or buy: the pattern and reagents against the made item on the AH.
+  local cost = r.cost
+  if cost then
+    local unknown = "|cff9d9d9d?|r"
+    tt:AddLine(" ")
+    tt:AddDoubleLine("Craft", ns.money(cost.total) .. (cost.missing > 0 and " +?" or ""), 1, 0.82, 0, 1, 1, 1)
+    tt:AddDoubleLine("  Pattern", cost.pattern and ns.money(cost.pattern) or unknown, 0.9, 0.9, 0.9, 1, 1, 1)
+    for _, p in ipairs(cost.parts) do
+      tt:AddDoubleLine("  " .. p[1] .. " x" .. p[2], p[3] and (ns.money(p[3] * p[2]) .. (p[4] == "vendor" and " (vendor)" or ""))
+        or unknown, 0.9, 0.9, 0.9, 1, 1, 1)
+    end
+    if cost.bop then
+      tt:AddDoubleLine("Buy it made", "binds on pickup", 1, 0.82, 0, 0.6, 0.6, 0.6)
+    elseif cost.buy then
+      local cheaper = cost.buy < cost.total
+      tt:AddDoubleLine("Buy it made", ns.money(cost.buy) .. (cheaper and "  cheaper" or ""), 1, 0.82, 0,
+        cheaper and 0.25 or 1, 1, cheaper and 0.25 or 1)
+    else
+      tt:AddDoubleLine("Buy it made", "not on the AH", 1, 0.82, 0, 0.6, 0.6, 0.6)
+    end
+  end
   if r.note then tt:AddLine(r.note, 1, 0.82, 0) end
   -- What it changes (Stats.lua): stats, then offense and defense.
-  local ok, d, off, def = pcall(ns.stats.forRow, r)
+  local ok, d, off, def, new = pcall(ns.stats.forRow, r)
   if ok and d and next(d) then
     tt:AddLine(" ")
-    tt:AddLine("Changes: " .. ns.stats.statLine(d), 1, 0.82, 0, true)
-    if #off > 0 then tt:AddLine("Offense: " .. ns.stats.join(off), 1, 0.82, 0, true) end
-    if #def > 0 then tt:AddLine("Defense: " .. ns.stats.join(def), 1, 0.82, 0, true) end
+    section("Stats: this item (change vs worn)", ns.stats.statList(d, new))
+    section("Offense (change)", off)
+    section("Defense (change)", def)
+    tt:AddLine(" ")
   end
   -- The "Get it:" lines come from the item tooltip hook (Where.lua).
   local where = ns.where.of(r.id)
@@ -153,12 +189,16 @@ local function showDetails(row)
   tt:AddLine(r.source == "AH" and "Click: search the AH   Shift-click: link"
     or r.source == "dungeon" and "Dungeon drop   Shift-click: link"
     or "In your bags   Shift-click: link", 0.6, 0.6, 0.6)
+  tt:AddLine("Alt-click: try it in the Build window", 0.6, 0.6, 0.6)
   tt:Show()
 end
+
+ns.showDetails = showDetails
 
 local function click(row)
   local r = row.data
   if not r then return end
+  if call(rawget(_G, "IsAltKeyDown")) then ns.rowToBuild(r) return end
   if IsShiftKeyDown and IsShiftKeyDown() then
     local _, link = call(api("C_Item.GetItemInfo"), r.id)
     if link and not call(rawget(_G, "ChatEdit_InsertLink"), link) then call(rawget(_G, "ChatFrame_OpenChat"), link) end
@@ -228,6 +268,12 @@ local function build()
   wbtn:SetText("Weights")
   wbtn:SetScript("OnClick", function() ns.toggleWeights() end)
   ns.weightsButton = wbtn
+  local bbtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  bbtn:SetSize(54, 18)
+  bbtn:SetPoint("RIGHT", wbtn, "LEFT", -4, 0)
+  bbtn:SetText("Build")
+  bbtn:SetScript("OnClick", function() ns.toggleBuild() end)
+  ns.buildButton = bbtn
 
   -- Five toggle buttons in one row: slot, level, sort, price, source.
   local x = 10
@@ -339,7 +385,8 @@ local HELP = {
   "/uf reset - forget the saved item scores (they are kept between sessions)",
   "/uf where - turn the \"Get it:\" lines on item tooltips on or off (needs Questie)",
   "/uf dungeons - turn the dungeon drops in the list on or off (the From button filters them)",
-  "/uf calib - the Forever formulas measured from your client (crit per Int and Agi, your spells); /uf calib reset",
+  "/uf build - the Build window: try items in each slot, save builds, compare them (Alt-click a row to add it)",
+  "/uf calib - the Forever formulas measured from your client (crit per Int and Agi, your spells); /uf calib reset; /uf calib log turns on the combat log (Forever blocks it)",
 }
 local function copy(t) local c = {} for k, v in pairs(t or {}) do c[k] = v end return c end
 
@@ -446,6 +493,11 @@ function ns.slash(msg)
     local o = ns.db().opts
     o.where = o.where == false
     say("\"Get it:\" lines on item tooltips " .. (o.where and "on" or "off"))
+  elseif cmd == "build" then
+    ns.toggleBuild(true)
+  elseif cmd == "calib" and a == "log" then
+    ns.calib.setLog(not ns.calib.logOn())
+    say("combat log for spell calibration " .. (ns.calib.logOn() and "on (if the game blocks it, turn it off again)" or "off"))
   elseif cmd == "calib" and a == "reset" then
     ns.calib.reset()
     say("calibration data for your class cleared")
@@ -515,7 +567,25 @@ local handlers = {
   CHARACTER_POINTS_CHANGED = function() ns.specCheck() end,
   PLAYER_TALENT_UPDATE = function() ns.specCheck() end,
   PLAYER_LEVEL_UP = function() if frame and frame:IsShown() then ns.apply() end end,
+  -- The game stopped one of our calls: say which, and keep the last few
+  -- (UpgradeFinderDB.blocked) so a bug report can name it.
+  ADDON_ACTION_BLOCKED = function(addon, fn) ns.blocked(addon, fn, "blocked") end,
+  ADDON_ACTION_FORBIDDEN = function(addon, fn) ns.blocked(addon, fn, "forbidden") end,
 }
+function ns.blocked(addon, fn, kind)
+  if addon ~= "UpgradeFinder" then return end
+  local db = ns.db()
+  db.blocked = db.blocked or {}
+  local stack = call(rawget(_G, "debugstack"), 3, 6, 0)
+  table.insert(db.blocked, { fn = tostring(fn), kind = kind, time = call(rawget(_G, "time")), stack = stack })
+  while #db.blocked > 5 do table.remove(db.blocked, 1) end
+  say(kind .. ": " .. tostring(fn) .. " (please send this line)")
+  -- On Forever the combat log is what gets forbidden: turn it off for good.
+  if ns.calib and ns.calib.logOn() then
+    ns.calib.setLog(false)
+    say("combat log turned off again: this client does not allow it")
+  end
+end
 ns.handlers = handlers
 for ev in pairs(handlers) do pcall(events.RegisterEvent, events, ev) end -- unknown events throw
 events:SetScript("OnEvent", function(_, ev, ...)

@@ -35,7 +35,8 @@ function ns.paintWeights()
     if n then
       b:SetText(n == active and ("|cffffd100" .. n .. "|r") or n)
       b:Show()
-    else b:Hide() end
+      b.del:Show()
+    else b:Hide() b.del:Hide() end
   end
   local more = #names - PRESETS
   ui.more:SetText(more > 0 and (more .. " more: /uf presets, /uf load NAME") or "")
@@ -139,7 +140,7 @@ local function build()
   y = y - 26
   for i = 1, PRESETS do
     local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    b:SetSize(132, 20)
+    b:SetSize(110, 20)
     b:SetPoint("TOPLEFT", panel, "TOPLEFT", 14 + ((i - 1) % 2) * 140, y - math.floor((i - 1) / 2) * 22)
     b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     b:SetScript("OnClick", function(self, button)
@@ -156,7 +157,26 @@ local function build()
       ns.loadPreset(n)
       ns.reweigh("weights: preset \"" .. n .. "\"")
     end)
+    -- The x beside each preset deletes it.
+    local x = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    x:SetSize(20, 20)
+    x:SetPoint("LEFT", b, "RIGHT", 2, 0)
+    x:SetText("x")
+    x:SetScript("OnClick", function()
+      local n = b.preset
+      if not n then return end
+      ns.deletePreset(n)
+      ns.say("deleted preset \"" .. n .. "\" (/uf save " .. n .. " makes it again)")
+      ns.paintWeights()
+    end)
+    x:SetScript("OnEnter", function(self)
+      local tt = rawget(_G, "GameTooltip")
+      if tt and b.preset then tt:SetOwner(self, "ANCHOR_RIGHT") tt:SetText("Delete \"" .. b.preset .. "\"") tt:Show() end
+    end)
+    x:SetScript("OnLeave", function() local tt = rawget(_G, "GameTooltip") if tt then tt:Hide() end end)
+    b.del = x
     b:Hide()
+    x:Hide()
     ui.presets[i] = b
   end
   y = y - math.ceil(PRESETS / 2) * 22 - 4
@@ -170,7 +190,7 @@ local function build()
   help:SetPoint("TOPLEFT", ui.note, "BOTTOMLEFT", 0, -4)
   help:SetWidth(272)
   help:SetJustifyH("LEFT")
-  help:SetText("Click a preset to load it; shift-right-click deletes it.")
+  help:SetText("Click a preset to load it; x deletes it.")
   ns.weightsUI, ns.weightsBoxes = ui, boxes
 end
 

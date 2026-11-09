@@ -130,7 +130,13 @@ beats what you wear, biggest gain first. Each row is one line (icon, name,
 slot, `+gain`, then the price, "bags", or the dungeon's short name such as
 `DM` or `BRD`); hover a row for the item tooltip plus the score you wear, the
 gain per gold and what it replaces. Click searches the AH (when it is open;
-for a dungeon drop it names the boss in chat), Shift-click links it.
+for a dungeon drop it names the boss in chat), Shift-click links it. A pattern, plan or other recipe on the AH shows
+as the gear it makes, tagged "craft" (its tooltip names the profession;
+Scan.lua reads the made item's slot and stats from the recipe tooltip). Its
+price is the craft cost: the pattern plus the reagents (from the line after
+"Use: Teaches"), each at its Auctionator price or the vendor price when
+lower; a "+" marks a reagent with no price. The tooltip lists the parts and
+the price to buy the made item on the AH instead.
 
 - Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
@@ -160,6 +166,25 @@ for a dungeon drop it names the boss in chat), Shift-click links it.
   totals from the game where it gives them (`GetSpellBonusDamage`,
   `GetSpellCritChance`, `UnitAttackPower`, `UnitArmor`). The numbers are
   estimates for comparing items, not a combat simulator.
+- Build window (`UpgradeFinder/Build.lua`, `BuildUI.lua`): a gear planner
+  like Path of Building. The working build starts as what you wear (item
+  links, so enchants stay); drop an item on a slot (`GetCursorInfo`; it must
+  fit the slot) or Alt-click an Upgrades row (it goes to the slot it would
+  replace; a two-hander empties the off hand). The sheet sums the parsed
+  stats of all 18 slots and runs `Stats.derive` on the difference, then
+  shows now, build and change. Builds save per class in
+  `UpgradeFinderDB.builds[class][name]` (slot -> link); Compare uses a saved
+  build as the base instead of what you wear.
+- Action bar DPS (`UpgradeFinder/Spells.lua`): `GetActionInfo` over the 120
+  action slots finds your spells; `GetSpellDescription` gives the damage
+  ("79 to 87 Frost damage", "222 Shadow damage over 18 sec"), `GetSpellInfo`
+  the cast time, `GetSpellBaseCooldown` the cooldown, `GetSpellPowerCost`
+  the mana. One rank per spell name (the strongest). Coefficient: measured
+  (Calib.lua) or cast time / 3.5 s, duration / 15 s for damage over time.
+  Rotation: a spell with a cooldown longer than its cast goes whenever ready
+  if it beats the filler per second of casting; the filler (best damage per
+  cast second) fills the rest. Order for a caster's Est. DPS: your logged
+  spells, then the bars, then the generic cast.
 - Calibration (`UpgradeFinder/Calib.lua`): when your gear, level or stats
   change (1 s after the last event), it saves a snapshot to
   `UpgradeFinderDB.calib[class].snaps`: level, Int, Agi, Sta (`UnitStat`),
@@ -167,7 +192,7 @@ for a dungeon drop it names the boss in chat), Shift-click links it.
   mana, armor. Within one level, a least-squares slope over at least 4
   points of spread gives Int per 1% spell crit, Agi per 1% crit, health per
   Sta and mana per Int; another level uses the nearest measured one (crit
-  ratios scaled by level). From `COMBAT_LOG_EVENT_UNFILTERED` (your own
+  ratios scaled by level). With `/uf calib log` on (Forever forbids it, see the client notes), from `COMBAT_LOG_EVENT_UNFILTERED` (your own
   `SPELL_DAMAGE` and `SPELL_MISSED` only) each spell ID keeps running sums:
   hits, crits, misses, damage, and non-crit unresisted hits against your
   spell damage then. After 20 such hits a spell joins the DPS model: its
@@ -190,7 +215,7 @@ for a dungeon drop it names the boss in chat), Shift-click links it.
   opens a panel beside the window (`UpgradeFinder/Weights.lua`): a box per
   stat, gold when it differs from the default (empty it for the default);
   a name box with **Save** and **Defaults**; and a button per preset (click
-  loads it, shift-right-click deletes it). In chat, `/uf weight STAT N` changes a weight for
+  loads it, the x beside it deletes it). In chat, `/uf weight STAT N` changes a weight for
   your current spec (an unknown stat is refused), `/uf weight STAT default`
   undoes one, `/uf weight reset` goes back to the defaults, and `/uf weights`
   lists them. `/uf save NAME` keeps the weights in use as a preset for your
@@ -235,6 +260,16 @@ for a dungeon drop it names the boss in chat), Shift-click links it.
   `npcDrops`, `vendors`, `objectDrops`, `itemDrops`.
 
 ## Forever client notes
+
+- Addons may not use the combat log: registering for
+  `COMBAT_LOG_EVENT_UNFILTERED` brings up "blocked from an action only
+  available to the Blizzard UI" right after login. UpgradeFinder leaves it
+  off (`/uf calib log` turns it on for this session only, for a client that allows it; confirmed
+  in game on 2026-11-09: `forbidden: UNKNOWN()`, and a forbidden call turns
+  it off again) and takes
+  spell damage from the action bars instead. UpgradeFinder also says in
+  chat which call the game blocked (`ADDON_ACTION_BLOCKED`/`_FORBIDDEN`)
+  and keeps the last five in `UpgradeFinderDB.blocked`.
 
 - There is no global `GetItemInfo`; use `C_Item.GetItemInfo` or
   `C_Item.GetItemInfoInstant`. `/api search <name>` in chat lists what

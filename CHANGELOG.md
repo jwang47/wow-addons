@@ -5,6 +5,37 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## UpgradeFinder 0.1.6
+
+- A **Build** window (the Build button on Upgrades, or `/uf build`), in the
+  style of Path of Building: your 18 slots on the left and a sheet on the
+  right with your totals now, with the build, and the change: health,
+  mana, armor, eHP, spell damage or attack power, crit, and for a caster
+  DPS, mana per second and time to OOM. Drop an item from your bags on a
+  slot, or Alt-click an Upgrades row; right-click a slot goes back to what
+  you wear, shift-right-click leaves it empty.
+- Save builds by name, load them (the Builds button), and compare the build
+  with what you wear or with any saved build (the Compare button).
+- The combat log is off by default: the Forever client forbids it to
+  addons (a "blocked" pop-up at login). `/uf calib log` turns it on for this session only (never saved). A
+  blocked call is now named in chat.
+- Caster DPS from your action bars: each damage spell on a bar gives its
+  damage (from the spell text, or your measured hits), cast time, cooldown
+  and mana. Cooldown spells go whenever ready, the best filler the rest of
+  the time. The window shows the rotation; row tooltips use it for Est. DPS
+  until the combat log has enough hits.
+- Patterns, plans and other recipes on the AH now show as the item they
+  make (tagged "craft"), scored like any other item. A missing profession
+  does not hide them; the tooltip names it.
+- Craft or buy: a recipe row's price is the pattern plus the reagents
+  (AH price, or the vendor's when lower). Its tooltip lists each reagent
+  and the made item's AH price, marked "cheaper" when buying it made
+  costs less, or "binds on pickup" when you can only craft it.
+- The row tooltip is easier to read: one stat per line, the name on the
+  left; on the right the item's own number, then the change against what
+  you wear in brackets ("+14  (+4)"). Offense and Defense show changes.
+- Each weight preset has an x button that deletes it.
+
 ## UpgradeFinder 0.1.5
 
 - Calibration: UpgradeFinder measures the Forever formulas from your own

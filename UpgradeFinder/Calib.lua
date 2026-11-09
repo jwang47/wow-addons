@@ -6,7 +6,8 @@
 --    mana, armor). Within one level, the slope of crit against Intellect
 --    gives the Int per 1% spell crit (gear crit lines are taken out first);
 --    the same for Agility, Stamina (health) and Intellect (mana).
--- 2. Your spells. From the combat log (your own damage only), each spell ID
+-- 2. Your spells (only with /uf calib log on: Forever forbids addons the
+--    combat log). From the combat log (your own damage only), each spell ID
 --    keeps running sums: hits and crits, damage, and non-crit damage against
 --    your spell damage at that moment. That gives the average hit, the crit
 --    rate, each spell's share of your damage and, once your spell damage has
@@ -251,7 +252,25 @@ local handlers = {
   end,
 }
 C.handlers = handlers
-for ev in pairs(handlers) do pcall(frame.RegisterEvent, frame, ev) end
+-- The Forever client forbids addons the combat log: registering for it
+-- brings up "blocked from an action only available to the Blizzard UI" at
+-- login. So it is off unless you turn it on (/uf calib log), for a client
+-- that allows it.
+for ev in pairs(handlers) do
+  if ev ~= "COMBAT_LOG_EVENT_UNFILTERED" then pcall(frame.RegisterEvent, frame, ev) end
+end
+-- On for this session only: it is never saved, so a client that forbids
+-- it cannot bring the pop-up back at the next login. (0.1.6 test builds
+-- saved it in opts.combatLog; that value is cleared here.)
+local logOn = false
+function C.logOn() return logOn end
+function C.setLog(on)
+  logOn = on and true or false
+  if on then pcall(frame.RegisterEvent, frame, "COMBAT_LOG_EVENT_UNFILTERED")
+  else pcall(frame.UnregisterEvent, frame, "COMBAT_LOG_EVENT_UNFILTERED") end
+end
+handlers.PLAYER_LOGIN = function() ns.db().opts.combatLog = nil end
+pcall(frame.RegisterEvent, frame, "PLAYER_LOGIN")
 frame:SetScript("OnEvent", function(_, ev, ...) pcall(handlers[ev], ...) end)
 
 -- /uf calib: what has been measured.
@@ -276,7 +295,9 @@ function C.report()
   table.insert(out, string.format("%d snapshots saved. Swap gear with different Int or Agi to measure more.",
     #C.store(class).snaps))
   local m = C.model()
-  if #m == 0 then
+  if not C.logOn() then
+    table.insert(out, "Spells: the combat log is off (Forever forbids it to addons). The DPS uses your action bars.")
+  elseif #m == 0 then
     table.insert(out, "Spells: none with " .. C.MIN_HITS .. " normal hits yet. Fight, and they appear here.")
   end
   for i = 1, math.min(5, #m) do
