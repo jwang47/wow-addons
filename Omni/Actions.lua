@@ -282,6 +282,43 @@ function A.run(e, alt)
   return false
 end
 
+-- How old Auctionator's price for an item is: whole days, nil if never
+-- seen or older than 21 days (GetAuctionAgeByItemID).
+function A.ahAge(id)
+  local days = call(api("Auctionator.API.v1.GetAuctionAgeByItemID"), "Omni", id)
+  if type(days) ~= "number" then return nil end
+  return days == 0 and "today" or (days .. "d old")
+end
+
+-- "5m", "3h", "2d": how long ago a time() stamp was.
+function A.ago(stamp)
+  local now = call(rawget(_G, "time"))
+  if type(stamp) ~= "number" or type(now) ~= "number" then return nil end
+  local s = math.max(0, now - stamp)
+  if s < 60 then return "just now" end
+  if s < 3600 then return math.floor(s / 60) .. "m ago" end
+  if s < 86400 then return math.floor(s / 3600) .. "h ago" end
+  return math.floor(s / 86400) .. "d ago"
+end
+
+-- The last Auctionator scan: a full scan or a browse scan, whichever is newer.
+function A.lastScan()
+  local st = api("Auctionator.SavedState")
+  if type(st) ~= "table" then return nil end
+  local t = math.max(tonumber(st.TimeOfLastGetAllScan) or 0, tonumber(st.TimeOfLastBrowseScan) or 0,
+    tonumber(st.TimeOfLastReplicateScan) or 0)
+  return t > 0 and t or nil
+end
+
+-- "AH scan 3h ago": LootValue's own text when it is loaded, so the wording
+-- matches its tooltip line; else the same from A.lastScan.
+function A.scanText()
+  local lv = call(api("LootValue.scanText"))
+  if type(lv) == "string" then return lv end
+  local ago = A.ago(A.lastScan())
+  return ago and ("AH scan " .. ago) or nil
+end
+
 -- The right-hand text of a row, worked out only for rows on screen.
 function A.detail(e)
   local k = e.kind
@@ -291,7 +328,10 @@ function A.detail(e)
       if e.where and e.where[w] then table.insert(parts, w .. " " .. e.where[w]) end
     end
     local price = call(api("Auctionator.API.v1.GetAuctionPriceByItemID"), "Omni", e.id)
-    if type(price) == "number" and price > 0 then table.insert(parts, "AH " .. ns.money(price)) end
+    if type(price) == "number" and price > 0 then
+      local age = A.ahAge(e.id)
+      table.insert(parts, "AH " .. ns.money(price) .. (age and ("  |cff9d9d9d" .. age .. "|r") or ""))
+    end
     if #parts == 0 and e.questie then table.insert(parts, "quest item") end
     return table.concat(parts, "  ")
   elseif k == "place" then
@@ -332,6 +372,16 @@ function A.tooltip(tt, e)
   local k = e.kind
   if k == "item" and tt.SetHyperlink then
     tt:SetHyperlink("item:" .. e.id)
+    local price = call(api("Auctionator.API.v1.GetAuctionPriceByItemID"), "Omni", e.id)
+    if type(price) == "number" and price > 0 then
+      -- nil age: unknown (no age API, or not seen in 21 days); say only what we know.
+      local parts = {}
+      local age = A.ahAge(e.id)
+      if age then table.insert(parts, "AH price seen " .. age) end
+      local scan = A.scanText()
+      if scan then table.insert(parts, scan) end
+      if #parts > 0 then tt:AddLine(table.concat(parts, "; "), 0.6, 0.6, 0.6) end
+    end
   elseif k == "spell" and tt.SetSpellByID then
     tt:SetSpellByID(e.spellID)
   else
