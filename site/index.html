@@ -22,7 +22,9 @@
     radial-gradient(900px 500px at -10% 30%, rgba(105,204,240,.06), transparent 60%), var(--bg); }
   a { color: var(--gold2); }
   .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
-  header { padding: 72px 0 40px; display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: center; }
+  header { padding: 72px 0 32px; text-align: center; }
+  header .lead { margin-left: auto; margin-right: auto; }
+  header .cta { justify-content: center; }
   h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: .01em; margin: 0; }
   h1 { font-size: 52px; line-height: 1.05; }
   h1 em { font-style: normal; color: var(--gold); }
@@ -39,8 +41,10 @@
   .req b { color: var(--warn); }
 
   /* A real game screenshot of Omni (WoW Forever, 2026-11-09). */
-  .shot { display: block; width: 100%; max-width: 560px; height: auto; border-radius: 8px;
-    border: 2px solid #7a6440; box-shadow: 0 30px 80px rgba(0,0,0,.55); }
+  .shot { display: block; width: 100%; height: auto; margin: 18px auto 4px; border-radius: 8px;
+    border: 2px solid #7a6440; box-shadow: 0 24px 60px rgba(0,0,0,.5); }
+  .shot.omni { max-width: 620px; }
+  .shot.lv { max-width: 700px; }
 
   section { padding: 56px 0; border-top: 1px solid var(--line); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
@@ -81,8 +85,8 @@
     .grid2, ol.steps { grid-template-columns: 1fr; }
   }
 
-  .addons { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 8px 0 28px; }
-  .addon { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .addons { display: grid; grid-template-columns: 1fr; gap: 20px; margin: 8px 0 28px; }
+  .addon { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px 24px; text-align: center; }
   .addon h2 { font-size: 24px; }
   .addon p { margin: 4px 0 0; color: var(--dim); font-size: 15.5px; }
   details { border-top: 1px solid var(--line); padding: 14px 2px; }
@@ -96,7 +100,6 @@
   details ul { margin: 6px 0 0; padding-left: 18px; }
   details li { margin: 4px 0; }
   details .tt { margin: 10px 0 4px; }
-  @media (max-width: 860px) { .addons { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -113,14 +116,16 @@
         Install that first.</span></div>
     </div>
 
-    <img class="shot" src="omni-dusk.jpg" width="844" height="759"
-      alt="Omni in game: searching dusk lists Duskwood, items with their AH prices, and Questie NPCs">
   </header>
 
   <div class="addons">
     <div class="addon"><h2>Omni</h2><p>Press <kbd>Ctrl</kbd>+<kbd>Space</kbd> and search your items, places, people, spells,
-      NPCs and quests.</p></div>
-    <div class="addon"><h2>LootValue</h2><p>One line on each item tooltip: vendor it, sell it on the AH, or disenchant it.</p></div>
+      NPCs and quests.</p>
+      <img class="shot omni" src="omni-dusk.jpg" width="844" height="759"
+        alt="Omni in game: searching dusk lists Duskwood, items with their AH prices, and Questie NPCs"></div>
+    <div class="addon"><h2>LootValue</h2><p>One line on each item tooltip: vendor it, sell it on the AH, or disenchant it.</p>
+      <img class="shot lv" src="lootvalue-tooltip.jpg" width="841" height="285"
+        alt="LootValue in game: an item tooltip with the line LootValue: what to do, the other options and the AH scan age"></div>
   </div>
 
   <details>
