@@ -526,7 +526,20 @@ local handlers = {
   CHARACTER_POINTS_CHANGED = function() ns.specCheck() end,
   PLAYER_TALENT_UPDATE = function() ns.specCheck() end,
   PLAYER_LEVEL_UP = function() if frame and frame:IsShown() then ns.apply() end end,
+  -- The game stopped one of our calls: say which, and keep the last few
+  -- (UpgradeFinderDB.blocked) so a bug report can name it.
+  ADDON_ACTION_BLOCKED = function(addon, fn) ns.blocked(addon, fn, "blocked") end,
+  ADDON_ACTION_FORBIDDEN = function(addon, fn) ns.blocked(addon, fn, "forbidden") end,
 }
+function ns.blocked(addon, fn, kind)
+  if addon ~= "UpgradeFinder" then return end
+  local db = ns.db()
+  db.blocked = db.blocked or {}
+  local stack = call(rawget(_G, "debugstack"), 3, 6, 0)
+  table.insert(db.blocked, { fn = tostring(fn), kind = kind, time = call(rawget(_G, "time")), stack = stack })
+  while #db.blocked > 5 do table.remove(db.blocked, 1) end
+  say(kind .. ": " .. tostring(fn) .. " (please send this line)")
+end
 ns.handlers = handlers
 for ev in pairs(handlers) do pcall(events.RegisterEvent, events, ev) end -- unknown events throw
 events:SetScript("OnEvent", function(_, ev, ...)
