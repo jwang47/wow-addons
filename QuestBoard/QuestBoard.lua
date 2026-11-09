@@ -18,7 +18,8 @@ local defaults = {
   collapsed = {},
   combatAlpha = 0.35,
   hideTrackers = false,
-  locked = false,        -- /qb lock: no dragging  -- hide the game's quest tracker (and Questie's)
+  locked = false,        -- /qb lock: no dragging
+  compact = false,       -- /qb compact: one line per quest, no "what to do" line  -- hide the game's quest tracker (and Questie's)
   point = nil,           -- saved position { point, x, y }
 }
 
@@ -42,10 +43,36 @@ local state = nil        -- last collect() result
 
 local function rgb(name) local c = D.COLORS[name] or D.COLORS.yellow return c[1], c[2], c[3] end
 
--- Right-hand text of a row: progress, XP/min (pick-ups), distance.
+-- What to do for a quest, in a few words: the open objective and where
+-- (Questie's nearest mob, object or NPC for it), or who takes it in.
+function ns.todo(e)
+  if e.kind == "turnin" then return e.target and ("Hand in to " .. e.target) or "Hand it in" end
+  if e.kind == "pickup" then return e.target and ("Get it from " .. e.target) or nil end
+  local o = e.left and e.left[1]
+  local text = o and o.text
+  if text and text ~= "" then
+    if e.target and not text:find(e.target, 1, true) then text = text .. "  (" .. e.target .. ")" end
+    return text
+  end
+  return e.target and ("Go to " .. e.target) or nil
+end
+
+-- The one thing to do next: a quest you are on now, else the nearest
+-- hand-in, else the nearest quest in your log.
+function ns.nextStep(st)
+  if not st then return nil end
+  local e = st.active[1] or st.turnin[1] or st.log[1]
+  if not e then return nil end
+  local todo = ns.todo(e)
+  if e.kind == "turnin" then todo = "Hand in " .. e.name .. (e.target and (" to " .. e.target) or "") end
+  return todo and (todo .. (e.dist and ("  " .. D.yards(e.dist)) or "")), e
+end
+
+-- Right-hand text of a row: progress, XP/min (pick-ups), distance. The
+-- progress is in the "what to do" line unless the board is compact.
 function ns.meta(e)
   local parts = {}
-  if e.kind == "log" then
+  if e.kind == "log" and ns.db and ns.db.compact then
     local p = D.progress(e)
     if p ~= "" then table.insert(parts, p) end
   end
@@ -224,21 +251,27 @@ local function makeRow(i)
   r:SetHeight(ROW_H)
   r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   r.lvl = r:CreateFontString(nil, "OVERLAY", FONT)
-  r.lvl:SetPoint("LEFT", 0, 0)
+  r.lvl:SetPoint("TOPLEFT", 0, -1)
   r.lvl:SetWidth(20)
   r.lvl:SetJustifyH("RIGHT")
   r.arrow = r:CreateTexture(nil, "OVERLAY")
   r.arrow:SetTexture("Interface\\Minimap\\MinimapArrow")
   r.arrow:SetSize(14, 14)
-  r.arrow:SetPoint("RIGHT", 0, 0)
+  r.arrow:SetPoint("TOPRIGHT", 0, 0)
   r.meta = r:CreateFontString(nil, "OVERLAY", FONT_DIM)
-  r.meta:SetPoint("RIGHT", -16, 0)
+  r.meta:SetPoint("TOPRIGHT", -16, -1)
   r.meta:SetJustifyH("RIGHT")
   r.name = r:CreateFontString(nil, "OVERLAY", FONT)
   r.name:SetPoint("LEFT", r.lvl, "RIGHT", 6, 0)
   r.name:SetPoint("RIGHT", r.meta, "LEFT", -6, 0)
   r.name:SetJustifyH("LEFT")
   if r.name.SetWordWrap then r.name:SetWordWrap(false) end
+  -- The "what to do" line under the name.
+  r.sub = r:CreateFontString(nil, "OVERLAY", FONT_DIM)
+  r.sub:SetPoint("TOPLEFT", 26, -ROW_H + 1)
+  r.sub:SetPoint("TOPRIGHT", -16, -ROW_H + 1)
+  r.sub:SetJustifyH("LEFT")
+  if r.sub.SetWordWrap then r.sub:SetWordWrap(false) end
   r.hl = r:CreateTexture(nil, "BACKGROUND")
   r.hl:SetAllPoints()
   r.hl:SetColorTexture(1, 1, 1, 0.06)
@@ -285,6 +318,17 @@ function ns.render()
   panel.title:SetText("Quests")
   panel.sub:SetText(state and (state.questie and ("level " .. level) or "level " .. level .. "  (no Questie: log only)") or "")
   y = y - HEAD_H
+  local nextText = ns.nextStep(state)
+  if nextText then
+    panel.next:SetText("Next: " .. nextText)
+    panel.next:ClearAllPoints()
+    panel.next:SetPoint("TOPLEFT", PAD, y)
+    panel.next:SetPoint("TOPRIGHT", -PAD, y)
+    panel.next:Show()
+    y = y - ROW_H - 2
+  else
+    panel.next:Hide()
+  end
   for _, kind in ipairs(ORDER) do
     local list = state and state[kind] or {}
     local h = heads[kind] or makeHead(kind)
@@ -314,9 +358,12 @@ function ns.render()
           r.name:SetText(e.name)
           if e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55) else r.name:SetTextColor(0.92, 0.92, 0.92) end
           r.meta:SetText(ns.meta(e))
+          local todo = (not ns.db.compact) and e.kind ~= "pickup" and ns.todo(e)
+          r.sub:SetText(todo or "")
+          r:SetHeight(todo and ROW_H * 2 - 2 or ROW_H)
           updateArrow(r)
           r:Show()
-          y = y - ROW_H
+          y = y - (todo and ROW_H * 2 - 2 or ROW_H)
         end
       end
       y = y - 4
@@ -388,6 +435,10 @@ local function build()
   panel.title:SetPoint("TOPLEFT", PAD, -PAD)
   panel.sub = panel:CreateFontString(nil, "OVERLAY", FONT_DIM)
   panel.sub:SetPoint("TOPRIGHT", -PAD, -PAD)
+  panel.next = panel:CreateFontString(nil, "OVERLAY", FONT)
+  panel.next:SetJustifyH("LEFT")
+  panel.next:SetTextColor(1, 0.85, 0.35)
+  if panel.next.SetWordWrap then panel.next:SetWordWrap(false) end
   local p = ns.db.point
   if p then panel:SetPoint(p[1], UIParent, p[1], p[2], p[3])
   else panel:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -260) end
@@ -513,6 +564,7 @@ end)
 local help = {
   "/qb - show or hide the board. Drag it anywhere to move it.",
   "/qb lock - stop dragging (again to undo)",
+  "/qb compact - one line per quest, without the what-to-do line (again to undo)",
   "Click a group name to fold it; right-click it to sort by nearest or best XP.",
   "/qb range N - pick-ups at most N levels over you (now %d)",
   "/qb rows N - rows per group (now %d)",
@@ -550,6 +602,9 @@ SlashCmdList.QUESTBOARD = function(text)
   elseif cmd == "far" and (rest == "on" or rest == "off") then
     ns.far(rest == "on")
     return
+  elseif cmd == "compact" then
+    ns.db.compact = not ns.db.compact
+    return ns.render()
   elseif cmd == "lock" then
     ns.db.locked = not ns.db.locked
     say(ns.db.locked and "locked: dragging does not move the board" or "unlocked: drag the board to move it")

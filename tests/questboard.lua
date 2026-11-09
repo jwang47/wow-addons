@@ -183,7 +183,14 @@ for _, e in ipairs(out.pickup) do if e.id == 201 then e201 = e end end
 local secs = 150 / 7 + 30 + 90 + 60
 check("XP per minute estimate", math.abs(e201.rate - 2000 / (secs / 60)) < 0.01)
 check("row meta for a pick-up", ns.meta(e201):match("^~%d+ xp/m  150 yd$") ~= nil)
-check("row meta for a log quest", ns.meta(out.log[2]) == "3/6  900 yd")
+check("row meta for a log quest", ns.meta(out.log[2]) == "900 yd")
+check("what to do: the objective", ns.todo(out.log[2]) == "Underbelly Whelp Scale: 3/6")
+check("what to do: and where, when the name is not in it",
+  ns.todo({ kind = "log", left = { { text = "Gnoll Paw: 2/8" } }, target = "Redridge Mystic" }) == "Gnoll Paw: 2/8  (Redridge Mystic)")
+check("what to do: who takes it in", ns.todo(out.turnin[1]) == "Hand in to Wiley")
+check("what to do: where to get it", ns.todo(e201) == "Get it from Marshal")
+local nextText = ns.nextStep(out)
+check("next step: the nearest hand-in", nextText == "Hand in Murloc Poachers to Wiley  300 yd")
 
 -- Active: a quest whose count went up in the last 5 minutes moves to the top.
 D.seen, D.activeAt = {}, {}
@@ -227,6 +234,11 @@ for _, f in ipairs(frames) do
 end
 check("rows drawn for every quest", shownRows == 5)
 check("first row is the turn-in", firstRow.entry.id == 127 and firstRow.name.text == "Murloc Poachers")
+check("row shows what to do", firstRow.sub.text == "Hand in to Wiley")
+check("board shows the next step", QuestBoardFrame.next.text == "Next: Hand in Murloc Poachers to Wiley  300 yd")
+SlashCmdList.QUESTBOARD("compact")
+check("/qb compact drops the what-to-do line", firstRow.sub.text == "")
+SlashCmdList.QUESTBOARD("compact")
 check("arrow turns with facing", firstRow.arrow.shown and firstRow.arrow.rotation == 0.5)
 P.facing = 0.2
 firstRow.scripts.OnUpdate = nil

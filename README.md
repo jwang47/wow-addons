@@ -273,6 +273,12 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
 | In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
 | Pick up | quests Questie shows as available ("!") that give XP and are at most 3 levels over you (`/qb range N`) | best estimated XP per minute (right-click the group: nearest) |
 
+- The top line says what to do next: the open objective of a quest you
+  are on now (Active), else the nearest hand-in, else the nearest quest.
+  Under each quest a dim line says what to do: the open objective and
+  Questie's nearest mob, object or NPC for it ("Underbelly Whelp Scale:
+  3/6 (Underbelly Whelp)"), or who takes it in. `/qb compact` drops that
+  line.
 - The level number is in the quest log colours (grey, green, yellow,
   orange, red). Each row shows the distance and an arrow that turns with
   you.
