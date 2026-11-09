@@ -45,7 +45,12 @@ function Find-Client {
 
 function Get-Text([string]$src) {
   if ($src -match '^https?://') {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $src -Headers @{ 'Cache-Control' = 'no-cache' }).Content
+    # GitHub serves release files as application/octet-stream, so .Content
+    # is a byte[]. Decode it here: a byte[] returned from a function unrolls
+    # into object[], and a later -is [byte[]] test would miss it.
+    $c = (Invoke-WebRequest -UseBasicParsing -Uri $src -Headers @{ 'Cache-Control' = 'no-cache' }).Content
+    if ($c -is [byte[]]) { $c = [Text.Encoding]::UTF8.GetString($c) }
+    return [string]$c
   }
   return Get-Content $src -Raw
 }
@@ -63,7 +68,6 @@ New-Item -ItemType Directory -Force $addons | Out-Null
 Write-Host "WoW folder: $Client"
 
 $text = Get-Text $Manifest
-if ($text -is [byte[]]) { $text = [Text.Encoding]::UTF8.GetString($text) }
 $m = $text | ConvertFrom-Json
 if ($m.schema -ne 1) { throw "Unknown addons.json schema: $($m.schema). Download update.cmd again." }
 $base = if ($Manifest -match '^https?://') { $null } else { Split-Path -Parent (Resolve-Path $Manifest) }
