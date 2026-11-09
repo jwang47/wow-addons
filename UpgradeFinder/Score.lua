@@ -104,6 +104,11 @@ S.SPECS = {
     [3] = { "Restoration", HEAL } },
 }
 
+-- Every stat a weight can name: the stats in the tables above.
+S.STATS = {}
+for _, t in pairs(S.WEIGHTS) do for k in pairs(t) do S.STATS[k] = true end end
+for _, specs in pairs(S.SPECS) do for _, s in pairs(specs) do for k in pairs(s[2]) do S.STATS[k] = true end end end
+
 -- Spec name for a class and talent tab, or nil (class weights).
 function S.specName(class, tab)
   local s = S.SPECS[class] and S.SPECS[class][tab or 0]

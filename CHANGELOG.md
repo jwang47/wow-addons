@@ -5,6 +5,19 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## UpgradeFinder 0.1.2
+
+- A **Weights** panel (the Weights button on the window, or `/uf config`):
+  one box per stat (gold when changed from the default; empty a box for the
+  default), a preset name box with Save and Defaults, and a button per
+  preset (click loads, shift-right-click deletes).
+- Weight presets: `/uf save NAME` keeps your weights, `/uf load NAME` brings
+  them back, `/uf presets` lists them and `/uf delete NAME` removes one.
+- `/uf weight STAT default` undoes one stat; `/uf weight reset` goes back to
+  the defaults for your spec. An unknown stat name is refused, with the list.
+- A weight change scores the items again at once when the window is open;
+  the title shows the preset name or "custom".
+
 ## UpgradeFinder 0.1.1
 
 - Each row shows the item's slot (Chest, Ring, Ranged...) between the name

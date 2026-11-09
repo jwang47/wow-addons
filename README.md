@@ -140,8 +140,18 @@ Shift-click links it.
   simple leveling weights for their spec (`UpgradeFinder/Score.lua`): the
   talent tree with the most points picks them (for example a Protection
   warrior gets tank weights, a Holy priest healer weights; below level 10
-  the class row applies). The window title shows the spec. `/uf weight STAT N`
-  changes a weight for your current spec and `/uf weights` lists them. A new
+  the class row applies). The window title shows the spec and the weights in
+  use (a preset name or "custom"). The **Weights** button (or `/uf config`)
+  opens a panel beside the window (`UpgradeFinder/Weights.lua`): a box per
+  stat, gold when it differs from the default (empty it for the default);
+  a name box with **Save** and **Defaults**; and a button per preset (click
+  loads it, shift-right-click deletes it). In chat, `/uf weight STAT N` changes a weight for
+  your current spec (an unknown stat is refused), `/uf weight STAT default`
+  undoes one, `/uf weight reset` goes back to the defaults, and `/uf weights`
+  lists them. `/uf save NAME` keeps the weights in use as a preset for your
+  class (`UpgradeFinderDB.presets`); `/uf load NAME`, `/uf presets` and
+  `/uf delete NAME` use them. The weights are part of the saved-score key, so
+  a change scores the items again (at once when the window is open). A new
   talent point that changes your spec starts a new scan.
 - It reads every item ID in Auctionator's price database (gear can be keyed
   `g:ID:level`; the first number is the ID) through a hidden tooltip, 60 a

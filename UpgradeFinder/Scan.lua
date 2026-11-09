@@ -25,7 +25,9 @@ ns.api = api
 function ns.db()
   if type(UpgradeFinderDB) ~= "table" then UpgradeFinderDB = {} end
   local db = UpgradeFinderDB
-  db.weights = db.weights or {}   -- [class] = { stat = weight } overrides
+  db.weights = db.weights or {}   -- [weight key] = { stat = weight } overrides
+  db.presets = db.presets or {}   -- [class][name] = { stat = weight }, from /uf save
+  db.active = db.active or {}     -- [weight key] = the preset name loaded there
   db.opts = db.opts or { ahead = 0, sort = "gain", affordable = false, group = 1 }
   return db
 end
@@ -186,7 +188,12 @@ Scan.VERSION = 2
 Scan.SKIP_FOR = 24 * 3600 -- items that never loaded are skipped this long
 local PROBE = { "int", "spi", "sta", "sp", "frost", "fire", "arcane", "crit", "hit", "mp5", "armor" }
 function Scan.cacheKey()
-  local key = ns.weightKey() .. "#v" .. Scan.VERSION
+  -- The weights themselves are in the key, so a changed weight or a loaded
+  -- preset scores the items again.
+  local w, parts0 = ns.weights(), {}
+  for k, v in pairs(w) do table.insert(parts0, k .. "=" .. v) end
+  table.sort(parts0)
+  local key = ns.weightKey() .. "#v" .. Scan.VERSION .. "#w" .. table.concat(parts0, ",")
   local mm = rawget(_G, "MageMentorAPI")
   if ns.class() == "MAGE" and type(mm) == "table" and type(mm.score) == "function" then
     local parts = {}
