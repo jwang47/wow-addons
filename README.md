@@ -300,7 +300,7 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   tracking. `/glance map 250` sets its size (120 to 400), or drag the gold
   corner in `/glance edit`. The zone, coordinates and clock are under it, and the
   LibDBIcon addon buttons (Questie, Details and the rest) are in one
-  drawer behind the Addons tab.
+  drawer behind the Addons tab. The Bags tab beside it opens your bags.
 - **Old bars**: `/glance bars hide` hides Bartender4's action bars 1-10,
   Blizzard's bottom bars, the gryphon art and the old XP bar, and draws a
   thin XP line along the bottom edge. The bag bar, micro menu, pet and

@@ -319,6 +319,11 @@ check("chat side buttons hidden", not ChatFrame1ButtonFrame.shown and not ChatFr
 check("tabs hide without the mouse", CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA == 0)
 check("edit box restyled", ChatFrame1EditBox.glanceBg ~= nil)
 
+local bagsOpened
+function ToggleAllBags() bagsOpened = true end
+ns.minimap.bags.scripts.OnClick()
+check("bags button", bagsOpened)
+
 -- Resizing the minimap.
 SlashCmdList.GLANCE("map 260")
 check("map size saved", ns.db.mapSize == 260)

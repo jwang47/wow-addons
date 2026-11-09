@@ -209,6 +209,12 @@ ns.module("minimap", function()
 
   mm.tab = chip(holder, "Addons")
   mm.tab:SetPoint("TOPLEFT", zone, "BOTTOMLEFT", 0, -2)
+  -- Bags: opens every bag (Baganator when it is loaded takes this over).
+  mm.bags = chip(holder, "Bags")
+  mm.bags:SetPoint("LEFT", mm.tab, "RIGHT", 4, 0)
+  mm.bags:SetScript("OnClick", function()
+    if ToggleAllBags then ToggleAllBags() elseif OpenAllBags then OpenAllBags() end
+  end)
   mm.drawer = CreateFrame("Frame", "GlanceAddonDrawer", holder)
   mm.drawer:SetPoint("TOPRIGHT", holder, "BOTTOMRIGHT", 0, -44)
   mm.drawer.bg = mm.drawer:CreateTexture(nil, "BACKGROUND")
