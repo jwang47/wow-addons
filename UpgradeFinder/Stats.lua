@@ -105,6 +105,7 @@ function St.context(class, w)
     if calib[k] then ctx[k] = calib[k][1] end
   end
   if ns.calib then ctx.dpsFn = ns.calib.dpsChange end
+  if ns.spells then ctx.barsFn = function(...) return (ns.spells.change(...)) end end
   return ctx
 end
 
@@ -136,7 +137,7 @@ end
 function St.derive(d, ctx, w, loc)
   local class, level = ctx.class, ctx.level or 60
   local role = St.role(class, w)
-  local off, def = {}, {}
+  local off, def, n = {}, {}, {}
   local function add(list, label, v, pct)
     if v and math.abs(v) >= (pct and 0.05 or 0.5) then table.insert(list, { label, fmt(v, pct), v > 0 }) end
   end
@@ -152,6 +153,7 @@ function St.derive(d, ctx, w, loc)
     local school = St.school(w or {})
     local power = heal and ((d.heal or 0) + (d.sp or 0)) or ((d.sp or 0) + (school and d[school] or 0))
     local crit = (d.spcrit or 0) + intCrit
+    n.power, n.crit, n.hit = power, crit, d.sphit or 0
     add(off, heal and "Healing" or "Spell damage", power)
     add(off, "Spell crit", crit, true)
     add(off, "Spell hit", d.sphit, true)
@@ -165,6 +167,8 @@ function St.derive(d, ctx, w, loc)
     est = after / before - 1
     -- Your own spells (Calib.lua), once enough hits are logged.
     local measured = not heal and ctx.dpsFn and ctx.dpsFn(power, crit / 100, ctx.sp)
+    -- Else the spells on your action bars (Spells.lua).
+    if not measured and not heal and ctx.barsFn then measured = ctx.barsFn(power, crit / 100, ctx) end
     if measured then est = (1 + measured) * math.min(0.99, h0 + (d.sphit or 0) / 100) / h0 - 1 end
   else
     local ranged = role == "ranged"
@@ -172,6 +176,7 @@ function St.derive(d, ctx, w, loc)
     local ap = (d.ap or 0) + St.apFrom(class, d, ranged)
     local crit = (d.crit or 0) + agiCrit
     local weapon = (ranged and RANGED or MELEE)[loc or ""] or false
+    n.ap, n.crit, n.hit = ap, crit, d.hit or 0
     add(off, "Attack power", ap)
     add(off, "Crit", crit, true)
     add(off, "Hit", d.hit, true)
@@ -184,6 +189,7 @@ function St.derive(d, ctx, w, loc)
       * math.min(1, 0.95 + (d.hit or 0) / 100)
     est = after / before - 1
   end
+  n.est = est
   if est and math.abs(est) >= 0.0005 then
     table.insert(off, { (role == "healer" and "Est. healing" or "Est. DPS"), fmt(est * 100, true), est > 0 })
   end
@@ -200,14 +206,18 @@ function St.derive(d, ctx, w, loc)
   local hpNow = ctx.health or (level * 15 + 40)
   local ehp0 = hpNow / (1 - St.reduction(armorNow, level))
   local ehp1 = (hpNow + hp) / (1 - St.reduction(armorNow + armor, level))
+  n.hp, n.armor, n.hpNow, n.armorNow, n.ehp0, n.ehp1 = hp, armor, hpNow, armorNow, ehp0, ehp1
   if math.abs(ehp1 - ehp0) >= 0.5 then
     table.insert(def, { "eHP", fmt(ehp1 - ehp0) .. string.format(" (%+.1f%%)", (ehp1 / ehp0 - 1) * 100), ehp1 > ehp0 })
   end
   add(def, "Defense", d.def)
   add(def, "Block", d.block)
-  if class ~= "WARRIOR" and class ~= "ROGUE" then add(def, "Mana", (d.int or 0) * (ctx.manaPerInt or 15)) end
+  if class ~= "WARRIOR" and class ~= "ROGUE" then
+    n.mana = (d.int or 0) * (ctx.manaPerInt or 15)
+    add(def, "Mana", n.mana)
+  end
   add(def, "Mp5", d.mp5)
-  return off, def, role
+  return off, def, role, n
 end
 
 -- "Label +N  Label +N%" with green gains and red losses.

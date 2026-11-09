@@ -149,7 +149,7 @@ ns.DUNGEONS = {
   { "Shadowfang Keep", "SFK", 11, 30, { "Arugal", 111 } },
 }
 
-for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Stats.lua", "Calib.lua", "UI.lua", "Weights.lua" }) do
+for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Stats.lua", "Calib.lua", "Spells.lua", "Build.lua", "UI.lua", "Weights.lua", "BuildUI.lua" }) do
   assert(loadfile(root .. "UpgradeFinder/" .. file))("UpgradeFinder", ns)
 end
 local S = ns.score
@@ -659,6 +659,83 @@ check("calib: the same snapshot is not saved twice", Cal.snap() == false and #Ca
 UnitStat, GetSpellCritChance, UnitHealthMax = nil, nil, nil
 Cal.reset()
 check("/uf calib reset clears", #Cal.store().snaps == 0 and next(Cal.store().spells) == nil)
+
+-- Spells from the action bars (Spells.lua) ----------------------------------
+local SPL = ns.spells
+local dl, dd = SPL.parseText("Launches a bolt of frost at the enemy, causing 79 to 87 Frost damage and slowing movement.")
+check("spell text: direct range", dl == 83 and dd == nil)
+local _, dot, dur = SPL.parseText("Corrupts the target, causing 222 Shadow damage over 18 sec.")
+check("spell text: damage over time", dot == 222 and dur == 18)
+check("spell text: single number", SPL.parseText("Blasts the enemy for 60 Fire damage.") == 60)
+check("spell text: no damage", SPL.parseText("Increases your Intellect by 10.") == nil)
+local BAR = { [1] = 116, [2] = 2136, [3] = 99, [5] = 205 }
+local SPELLS = {
+  [116] = { "Frostbolt", 2500, "causing 79 to 87 Frost damage", 0, 50 },
+  [205] = { "Frostbolt", 2200, "causing 40 to 46 Frost damage", 0, 30 }, -- a lower rank
+  [2136] = { "Fire Blast", 0, "Blasts the enemy for 60 to 72 Fire damage.", 8000, 60 },
+  [99] = { "Frost Armor", 0, "Increases armor.", 0, 60 },
+}
+GetActionInfo = function(slot) if BAR[slot] then return "spell", BAR[slot] end end
+GetSpellInfo = function(id) local t = SPELLS[id] if t then return t[1], nil, nil, t[2] end end
+GetSpellDescription = function(id) return SPELLS[id] and SPELLS[id][3] end
+GetSpellBaseCooldown = function(id) return SPELLS[id] and SPELLS[id][4] end
+GetSpellPowerCost = function(id) return SPELLS[id] and { { type = 0, cost = SPELLS[id][5] } } end
+local bars = SPL.calibrate(SPL.fromBars())
+check("bars: the damage spells, one per name, highest rank", #bars == 2 and bars[1].name == "Fire Blast"
+  and bars[2].name == "Frostbolt" and bars[2].id == 116)
+check("bars: cast time and cooldown", bars[2].cast == 2.5 and bars[1].cast == 1.5 and bars[1].cd == 8)
+-- Frostbolt: 83 + 2.5/3.5 x 0 = 83 per 2.5 s = 33.2/s (filler).
+-- Fire Blast: 66 + 1.5/3.5 x 0 = 66 every 8 s; uses 1.5/8 of the time.
+local rot = SPL.rotation(bars, 0, 0, 1)
+check("rotation: filler plus cooldown", rot and math.abs(rot.dps - (66 / 8 + (1 - 1.5 / 8) * 83 / 2.5)) < 1e-6)
+check("rotation: shares add up", math.abs(rot.parts[1][3] + rot.parts[2][3] - 1) < 1e-9 and rot.parts[1][1].name == "Frostbolt")
+check("rotation: mana per second", math.abs(rot.mps - (60 / 8 + (1 - 1.5 / 8) * 50 / 2.5)) < 1e-6)
+local more = SPL.rotation(bars, 50, 0, 1)
+check("rotation: more spell damage, more DPS", more.dps > rot.dps)
+local ch = SPL.change(50, 0, { sp = 0, spcrit = 0 })
+check("bars: DPS change", ch and math.abs(ch - (more.dps / rot.dps - 1)) < 1e-6)
+off = St.derive({ sp = 50 }, { class = "MAGE", level = 24, sp = 0, spcrit = 0,
+  barsFn = function(...) return (SPL.change(...)) end }, mw, "INVTYPE_HEAD")
+check("derive uses the bars", find(off, "Est. DPS")[2] == string.format("%+.1f%%", (more.dps / rot.dps - 1) * 100))
+
+-- Build (Build.lua, BuildUI.lua) ---------------------------------------------
+local Bd = ns.build
+Bd.reset()
+WORN[1] = 100
+check("build: starts as what you wear", Bd.items()[1] == "item:100" and Bd.items()[11] == "item:200")
+Bd.set(1, "item:101")
+local sh = Bd.sheet(Bd.items())
+check("build: the sheet sees the change", sh.diff.int == 3 and sh.diff.sta == 4 and sh.loading == 0)
+local function srow(label) for _, r in ipairs(sh.rows) do if r[1] == label then return r end end end
+check("build: sheet rows for a caster", srow("eHP (physical)") ~= nil and srow("DPS (your bars)") ~= nil)
+check("build: health row now and with", srow("Health") and srow("Health")[4] == "+40")
+Bd.save("hood")
+Bd.reset()
+check("build: saved and reset", Bd.names()[1] == "hood" and Bd.items()[1] == "item:100")
+check("build: load", Bd.load("hood") and Bd.items()[1] == "item:101")
+Bd.clear(11)
+check("build: an empty slot", Bd.items()[11] == nil)
+Bd.unset(11)
+check("build: back to worn", Bd.items()[11] == "item:200")
+local vs = Bd.sheet(Bd.items(), Bd.get("hood"))
+check("build: compare with a saved build (same: no change)", next(vs.diff) == nil)
+-- Dropping an item: it must fit the slot.
+GetCursorInfo = function() return "item", 109, "item:109" end
+ClearCursor = function() end
+Bd.reset()
+check("build: drop a neck item on the head slot is refused", Bd.dropOn(1) == true and Bd.work[1] == nil)
+check("build: drop it on the neck slot", Bd.dropOn(2) == true and Bd.work[2] == "item:109")
+GetCursorInfo = nil
+-- An Upgrades row (Alt-click) goes to the slot it replaces.
+check("build: row to build", ns.rowToBuild({ id = 103, loc = "INVTYPE_HEAD" }) and Bd.work[1] == "item:103")
+local okPaint = pcall(ns.paintBuild)
+check("build: the window paints", okPaint and ns.buildFrame and ns.buildFrame:IsShown())
+SlashCmdList.UPGRADEFINDER("build")
+check("/uf build opens it", ns.buildFrame:IsShown())
+Bd.delete("hood")
+check("build: delete", #Bd.names() == 0)
+Bd.reset()
+GetActionInfo, GetSpellInfo, GetSpellDescription, GetSpellBaseCooldown, GetSpellPowerCost = nil, nil, nil, nil, nil
 
 print(failures == 0 and "all UpgradeFinder tests passed" or (failures .. " UpgradeFinder test(s) failed"))
 os.exit(failures == 0 and 0 or 1)

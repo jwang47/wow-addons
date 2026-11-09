@@ -5,6 +5,23 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## UpgradeFinder 0.1.6
+
+- A **Build** window (the Build button on Upgrades, or `/uf build`), in the
+  style of Path of Building: your 18 slots on the left and a sheet on the
+  right with your totals now, with the build, and the change: health,
+  mana, armor, eHP, spell damage or attack power, crit, and for a caster
+  DPS, mana per second and time to OOM. Drop an item from your bags on a
+  slot, or Alt-click an Upgrades row; right-click a slot goes back to what
+  you wear, shift-right-click leaves it empty.
+- Save builds by name, load them (the Builds button), and compare the build
+  with what you wear or with any saved build (the Compare button).
+- Caster DPS from your action bars: each damage spell on a bar gives its
+  damage (from the spell text, or your measured hits), cast time, cooldown
+  and mana. Cooldown spells go whenever ready, the best filler the rest of
+  the time. The window shows the rotation; row tooltips use it for Est. DPS
+  until the combat log has enough hits.
+
 ## UpgradeFinder 0.1.5
 
 - Calibration: UpgradeFinder measures the Forever formulas from your own

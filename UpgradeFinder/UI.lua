@@ -153,12 +153,14 @@ local function showDetails(row)
   tt:AddLine(r.source == "AH" and "Click: search the AH   Shift-click: link"
     or r.source == "dungeon" and "Dungeon drop   Shift-click: link"
     or "In your bags   Shift-click: link", 0.6, 0.6, 0.6)
+  tt:AddLine("Alt-click: try it in the Build window", 0.6, 0.6, 0.6)
   tt:Show()
 end
 
 local function click(row)
   local r = row.data
   if not r then return end
+  if call(rawget(_G, "IsAltKeyDown")) then ns.rowToBuild(r) return end
   if IsShiftKeyDown and IsShiftKeyDown() then
     local _, link = call(api("C_Item.GetItemInfo"), r.id)
     if link and not call(rawget(_G, "ChatEdit_InsertLink"), link) then call(rawget(_G, "ChatFrame_OpenChat"), link) end
@@ -228,6 +230,12 @@ local function build()
   wbtn:SetText("Weights")
   wbtn:SetScript("OnClick", function() ns.toggleWeights() end)
   ns.weightsButton = wbtn
+  local bbtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  bbtn:SetSize(54, 18)
+  bbtn:SetPoint("RIGHT", wbtn, "LEFT", -4, 0)
+  bbtn:SetText("Build")
+  bbtn:SetScript("OnClick", function() ns.toggleBuild() end)
+  ns.buildButton = bbtn
 
   -- Five toggle buttons in one row: slot, level, sort, price, source.
   local x = 10
@@ -339,6 +347,7 @@ local HELP = {
   "/uf reset - forget the saved item scores (they are kept between sessions)",
   "/uf where - turn the \"Get it:\" lines on item tooltips on or off (needs Questie)",
   "/uf dungeons - turn the dungeon drops in the list on or off (the From button filters them)",
+  "/uf build - the Build window: try items in each slot, save builds, compare them (Alt-click a row to add it)",
   "/uf calib - the Forever formulas measured from your client (crit per Int and Agi, your spells); /uf calib reset",
 }
 local function copy(t) local c = {} for k, v in pairs(t or {}) do c[k] = v end return c end
@@ -446,6 +455,8 @@ function ns.slash(msg)
     local o = ns.db().opts
     o.where = o.where == false
     say("\"Get it:\" lines on item tooltips " .. (o.where and "on" or "off"))
+  elseif cmd == "build" then
+    ns.toggleBuild(true)
   elseif cmd == "calib" and a == "reset" then
     ns.calib.reset()
     say("calibration data for your class cleared")

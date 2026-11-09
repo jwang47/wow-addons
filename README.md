@@ -160,6 +160,25 @@ for a dungeon drop it names the boss in chat), Shift-click links it.
   totals from the game where it gives them (`GetSpellBonusDamage`,
   `GetSpellCritChance`, `UnitAttackPower`, `UnitArmor`). The numbers are
   estimates for comparing items, not a combat simulator.
+- Build window (`UpgradeFinder/Build.lua`, `BuildUI.lua`): a gear planner
+  like Path of Building. The working build starts as what you wear (item
+  links, so enchants stay); drop an item on a slot (`GetCursorInfo`; it must
+  fit the slot) or Alt-click an Upgrades row (it goes to the slot it would
+  replace; a two-hander empties the off hand). The sheet sums the parsed
+  stats of all 18 slots and runs `Stats.derive` on the difference, then
+  shows now, build and change. Builds save per class in
+  `UpgradeFinderDB.builds[class][name]` (slot -> link); Compare uses a saved
+  build as the base instead of what you wear.
+- Action bar DPS (`UpgradeFinder/Spells.lua`): `GetActionInfo` over the 120
+  action slots finds your spells; `GetSpellDescription` gives the damage
+  ("79 to 87 Frost damage", "222 Shadow damage over 18 sec"), `GetSpellInfo`
+  the cast time, `GetSpellBaseCooldown` the cooldown, `GetSpellPowerCost`
+  the mana. One rank per spell name (the strongest). Coefficient: measured
+  (Calib.lua) or cast time / 3.5 s, duration / 15 s for damage over time.
+  Rotation: a spell with a cooldown longer than its cast goes whenever ready
+  if it beats the filler per second of casting; the filler (best damage per
+  cast second) fills the rest. Order for a caster's Est. DPS: your logged
+  spells, then the bars, then the generic cast.
 - Calibration (`UpgradeFinder/Calib.lua`): when your gear, level or stats
   change (1 s after the last event), it saves a snapshot to
   `UpgradeFinderDB.calib[class].snaps`: level, Int, Agi, Sta (`UnitStat`),
