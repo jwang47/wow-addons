@@ -129,7 +129,7 @@ QuestieLoader = { ImportModule = function(_, name)
 end }
 C_Map = { GetAreaInfo = function(a) return AREAS[a] end }
 
-for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "UI.lua" }) do
+for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "UI.lua", "Weights.lua" }) do
   assert(loadfile(root .. "UpgradeFinder/" .. file))("UpgradeFinder", ns)
 end
 local S = ns.score
@@ -463,6 +463,35 @@ check("one stat back to its default", ns.weights().int == S.weightsFor(ns.class(
 uf("delete leveling")
 check("delete removes the preset", UpgradeFinderDB.presets[ns.class()].leveling == nil)
 uf("weight reset")
+
+-- Weights panel ------------------------------------------------------------------
+ns.toggleWeights(true)
+local boxes, wui = ns.weightsBoxes, ns.weightsUI
+check("the panel has a box per stat", boxes and boxes.int and boxes.frost and boxes.mp5)
+local intDefault = S.weightsFor(ns.class(), nil, ns.talentTab()).int or 0
+check("a box shows the weight in use", tonumber(boxes.int:GetText()) == intDefault)
+boxes.int:SetText("3")
+boxes.int.scripts.OnEnterPressed(boxes.int)
+check("Enter in a box sets the weight", ns.weights().int == 3 and ns.weightsName() == "custom")
+wui.name:SetText("Big Int")
+wui.save.scripts.OnClick(wui.save)
+check("Save makes a preset (name lower case, no spaces)", UpgradeFinderDB.presets[ns.class()]["big-int"] ~= nil
+  and ns.weightsName() == "big-int")
+check("the preset gets a button", wui.presets[1].preset == "big-int" and wui.presets[1].shown)
+wui.reset.scripts.OnClick(wui.reset)
+check("Defaults goes back", ns.weightsName() == nil and tonumber(boxes.int:GetText()) == intDefault)
+wui.presets[1].scripts.OnClick(wui.presets[1], "LeftButton")
+check("clicking a preset loads it", ns.weights().int == 3 and ns.weightsName() == "big-int")
+boxes.int:SetText("")
+boxes.int.scripts.OnEditFocusLost(boxes.int)
+check("an empty box is the default again", ns.weights().int == intDefault)
+wui.presets[1].scripts.OnClick(wui.presets[1], "RightButton")
+check("a plain right-click does not delete", UpgradeFinderDB.presets[ns.class()]["big-int"] ~= nil)
+IsShiftKeyDown = function() return true end
+wui.presets[1].scripts.OnClick(wui.presets[1], "RightButton")
+IsShiftKeyDown = nil
+check("shift-right-click deletes", UpgradeFinderDB.presets[ns.class()]["big-int"] == nil and not wui.presets[1].shown)
+SlashCmdList.UPGRADEFINDER("weight reset")
 
 -- Slot column -------------------------------------------------------------------
 check("slot name for a ring", S.groupName("INVTYPE_FINGER") == "Ring")

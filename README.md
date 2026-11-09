@@ -141,7 +141,11 @@ Shift-click links it.
   talent tree with the most points picks them (for example a Protection
   warrior gets tank weights, a Holy priest healer weights; below level 10
   the class row applies). The window title shows the spec and the weights in
-  use (a preset name or "custom"). `/uf weight STAT N` changes a weight for
+  use (a preset name or "custom"). The **Weights** button (or `/uf config`)
+  opens a panel beside the window (`UpgradeFinder/Weights.lua`): a box per
+  stat, gold when it differs from the default (empty it for the default);
+  a name box with **Save** and **Defaults**; and a button per preset (click
+  loads it, shift-right-click deletes it). In chat, `/uf weight STAT N` changes a weight for
   your current spec (an unknown stat is refused), `/uf weight STAT default`
   undoes one, `/uf weight reset` goes back to the defaults, and `/uf weights`
   lists them. `/uf save NAME` keeps the weights in use as a preset for your

@@ -7,6 +7,10 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## UpgradeFinder 0.1.2
 
+- A **Weights** panel (the Weights button on the window, or `/uf config`):
+  one box per stat (gold when changed from the default; empty a box for the
+  default), a preset name box with Save and Defaults, and a button per
+  preset (click loads, shift-right-click deletes).
 - Weight presets: `/uf save NAME` keeps your weights, `/uf load NAME` brings
   them back, `/uf presets` lists them and `/uf delete NAME` removes one.
 - `/uf weight STAT default` undoes one stat; `/uf weight reset` goes back to

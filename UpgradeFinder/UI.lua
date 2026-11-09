@@ -164,6 +164,7 @@ ns.cycle = cycle
 
 local function build()
   frame = CreateFrame("Frame", "UpgradeFinderFrame", UIParent, rawget(_G, "BackdropTemplateMixin") and "BackdropTemplate" or nil)
+  ns.frame = frame
   frame:SetSize(W, 92 + ROWS * ROW_H)
   frame:SetPoint("CENTER", UIParent, "CENTER", 260, 40)
   frame:SetFrameStrata("HIGH")
@@ -194,6 +195,12 @@ local function build()
   again:SetText("Rescan")
   -- Keeps the saved scores; tries the items that did not load again.
   again:SetScript("OnClick", function() ns.db().missing = {} ns.rescan() end)
+  local wbtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  wbtn:SetSize(64, 18)
+  wbtn:SetPoint("RIGHT", again, "LEFT", -4, 0)
+  wbtn:SetText("Weights")
+  wbtn:SetScript("OnClick", function() ns.toggleWeights() end)
+  ns.weightsButton = wbtn
 
   -- Four toggle buttons in one row: slot, level, sort, price.
   local x = 10
@@ -298,6 +305,7 @@ end
 ---------------------------------------------------------------------------
 local HELP = {
   "/uf - open the list (also a button on the Auction House)",
+  "/uf config - the Weights panel (also the Weights button on the window)",
   "/uf weights - your stat weights; /uf weight STAT N to change one, /uf weight STAT default to undo it",
   "/uf weight reset - back to the default weights for your spec",
   "/uf save NAME - save your weights as a preset; /uf load NAME, /uf presets, /uf delete NAME",
@@ -313,56 +321,94 @@ function ns.weightsName()
   if next(db.weights[key] or {}) then return "custom" end
 end
 
--- New weights: score the items again (the weights are in the cache key).
-local function reweigh(text)
-  say(text)
+-- New weights: score the items again (the weights are in the cache key),
+-- and show them in the Weights panel.
+function ns.reweigh(text)
+  if text then say(text) end
   if frame and frame:IsShown() then ns.rescan() else view.all = {} end -- closed: the next open scans
+  if ns.paintWeights then ns.paintWeights() end
 end
 
-local function statList()
+function ns.statList()
   local s = {}
   for k in pairs(S.STATS) do table.insert(s, k) end
   table.sort(s)
-  return table.concat(s, " ")
+  return s
+end
+
+-- Weights and presets. The slash commands and the Weights panel both use these.
+-- value nil = back to the default for that stat.
+function ns.setWeight(stat, value)
+  local db, key = ns.db(), ns.weightKey()
+  if not S.STATS[stat] then return false end
+  if value == nil then
+    local w = db.weights[key]
+    if w then w[stat] = nil if not next(w) then db.weights[key] = nil end end
+  else
+    db.weights[key] = db.weights[key] or {}
+    db.weights[key][stat] = value
+  end
+  db.active[key] = nil
+  return true
+end
+function ns.resetWeights()
+  local db, key = ns.db(), ns.weightKey()
+  db.weights[key], db.active[key] = nil, nil
+end
+function ns.presetNames()
+  local names = {}
+  for n in pairs(ns.db().presets[ns.class()] or {}) do table.insert(names, n) end
+  table.sort(names)
+  return names
+end
+function ns.savePreset(name)
+  local db, key, class = ns.db(), ns.weightKey()
+  db.presets[class] = db.presets[class] or {}
+  db.presets[class][name] = copy(ns.weights())
+  db.active[key] = name
+end
+function ns.loadPreset(name)
+  local db, key, class = ns.db(), ns.weightKey()
+  local p = (db.presets[class] or {})[name]
+  if not p then return false end
+  db.weights[key], db.active[key] = copy(p), name
+  return true
+end
+function ns.deletePreset(name)
+  local db, _, class = ns.db(), ns.weightKey()
+  if not (db.presets[class] or {})[name] then return false end
+  db.presets[class][name] = nil
+  for k, n in pairs(db.active) do if n == name and k:match("^[^:]+") == class then db.active[k] = "custom" end end
+  return true
 end
 
 function ns.slash(msg)
   msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
   local cmd, a, b = msg:match("^(%S*)%s*(%S*)%s*(%S*)")
   local key, class, spec = ns.weightKey()
-  if cmd == "help" then for _, l in ipairs(HELP) do say(l) end say("Stats: " .. statList())
-  elseif cmd == "weights" then
+  if cmd == "help" then for _, l in ipairs(HELP) do say(l) end say("Stats: " .. table.concat(ns.statList(), " "))
+  elseif cmd == "weights" and a == "" then
     local parts = {}
     for k, v in pairs(ns.weights()) do table.insert(parts, k .. " " .. v) end
     table.sort(parts)
-    say(class:lower() .. (spec and (" (" .. spec .. ")") or "") .. ": " .. table.concat(parts, ", "))
-    local name = ns.weightsName()
-    say(class:lower() .. (spec and (" (" .. spec .. ")") or "") .. " weights: " .. (name or "default"))
+    say(class:lower() .. (spec and (" (" .. spec .. ")") or "") .. ", " .. (ns.weightsName() or "default") .. ": "
+      .. table.concat(parts, ", "))
     if class == "MAGE" and rawget(_G, "MageMentorAPI") then say("(MageMentor's weights are used for a mage: /mm weight)") end
   elseif cmd == "presets" then
-    local names, db = {}, ns.db()
-    for n in pairs(db.presets[class] or {}) do table.insert(names, n .. (n == db.active[key] and " (in use)" or "")) end
-    table.sort(names)
+    local names, active = ns.presetNames(), ns.db().active[key]
+    for i, n in ipairs(names) do if n == active then names[i] = n .. " (in use)" end end
     say(#names > 0 and ("presets for " .. class:lower() .. ": " .. table.concat(names, ", ")) or "no presets yet: /uf save NAME")
   elseif cmd == "save" and a ~= "" then
-    local db = ns.db()
-    db.presets[class] = db.presets[class] or {}
-    db.presets[class][a] = copy(ns.weights())
-    db.active[key] = a
+    ns.savePreset(a)
     say("saved your weights as \"" .. a .. "\"; /uf load " .. a .. " brings them back")
+    if ns.paintWeights then ns.paintWeights() end
   elseif cmd == "load" and a ~= "" then
-    local db = ns.db()
-    local p = (db.presets[class] or {})[a]
-    if not p then say("no preset \"" .. a .. "\" (/uf presets lists them)") return end
-    db.weights[key] = copy(p)
-    db.active[key] = a
-    reweigh("weights: preset \"" .. a .. "\"")
+    if not ns.loadPreset(a) then say("no preset \"" .. a .. "\" (/uf presets lists them)") return end
+    ns.reweigh("weights: preset \"" .. a .. "\"")
   elseif cmd == "delete" and a ~= "" then
-    local db = ns.db()
-    if not (db.presets[class] or {})[a] then say("no preset \"" .. a .. "\"") return end
-    db.presets[class][a] = nil
-    for k, n in pairs(db.active) do if n == a and k:match("^[^:]+") == class then db.active[k] = "custom" end end
+    if not ns.deletePreset(a) then say("no preset \"" .. a .. "\"") return end
     say("deleted preset \"" .. a .. "\" (the weights in use stay)")
+    if ns.paintWeights then ns.paintWeights() end
   elseif cmd == "reset" then
     Scan.forget()
     ns.db().missing = {}
@@ -372,21 +418,18 @@ function ns.slash(msg)
     o.where = o.where == false
     say("\"Get it:\" lines on item tooltips " .. (o.where and "on" or "off"))
   elseif cmd == "weight" and a == "reset" then
-    ns.db().weights[key] = nil
-    ns.db().active[key] = nil
-    reweigh("weights back to the default for " .. (spec or class:lower()))
+    ns.resetWeights()
+    ns.reweigh("weights back to the default for " .. (spec or class:lower()))
   elseif cmd == "weight" and a ~= "" and not S.STATS[a] then
-    say("unknown stat \"" .. a .. "\". Stats: " .. statList())
+    say("unknown stat \"" .. a .. "\". Stats: " .. table.concat(ns.statList(), " "))
   elseif cmd == "weight" and b == "default" then
-    local w = ns.db().weights[key]
-    if w then w[a] = nil if not next(w) then ns.db().weights[key] = nil end end
-    ns.db().active[key] = nil
-    reweigh(a .. " back to its default (" .. tostring(ns.weights()[a] or 0) .. ")")
+    ns.setWeight(a, nil)
+    ns.reweigh(a .. " back to its default (" .. tostring(ns.weights()[a] or 0) .. ")")
   elseif cmd == "weight" and tonumber(b) then
-    ns.db().weights[key] = ns.db().weights[key] or {}
-    ns.db().weights[key][a] = tonumber(b)
-    ns.db().active[key] = nil
-    reweigh(a .. " = " .. b)
+    ns.setWeight(a, tonumber(b))
+    ns.reweigh(a .. " = " .. b)
+  elseif cmd == "config" then
+    ns.open() ns.toggleWeights(true)
   else ns.toggle() end
 end
 SLASH_UPGRADEFINDER1 = "/uf"

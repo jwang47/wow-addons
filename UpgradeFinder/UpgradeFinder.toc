@@ -10,3 +10,4 @@ Score.lua
 Scan.lua
 Where.lua
 UI.lua
+Weights.lua
