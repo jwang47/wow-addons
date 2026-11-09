@@ -89,6 +89,7 @@ local function chip(parent, text)
   b:SetWidth(64)
   return b
 end
+mm.chip = chip
 
 function mm.setSize(size)
   size = math.floor(math.max(MIN, math.min(MAX, size)) + 0.5)
@@ -223,7 +224,7 @@ ns.module("minimap", function()
   mm.tab = chip(holder, "Addons")
   mm.tab:SetPoint("TOPLEFT", zone, "BOTTOMLEFT", 0, -2)
   mm.drawer = CreateFrame("Frame", "GlanceAddonDrawer", holder)
-  mm.drawer:SetPoint("TOPRIGHT", holder, "BOTTOMRIGHT", 0, -44)
+  mm.drawer:SetPoint("TOPRIGHT", holder, "BOTTOMRIGHT", 0, -62)
   mm.drawer.bg = mm.drawer:CreateTexture(nil, "BACKGROUND")
   mm.drawer.bg:SetAllPoints()
   mm.drawer.bg:SetColorTexture(0, 0, 0, 0.55)

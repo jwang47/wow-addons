@@ -11,5 +11,6 @@ Keys.lua
 KeyBar.lua
 Units.lua
 Minimap.lua
+Alerts.lua
 Chat.lua
 Bars.lua

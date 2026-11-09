@@ -305,7 +305,9 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   tracking. Drag the gold corner at its bottom left (it shows when the
   mouse is over the map) to resize it, or type `/glance map 250` (120 to 400). The zone, coordinates and clock are under it, and the
   LibDBIcon addon buttons (Questie, Details and the rest) are in one
-  drawer behind the Addons tab.
+  drawer behind the Addons tab. Amber chips under it show what you can spend
+  or fix: unspent talent points, Legacy points, keys with an old spell rank
+  and full bags. Click one to open that window; it hides when done.
 - **Old bars**: `/glance bars hide` hides Bartender4's bottom action bars
   (1, 2 and 5-10; the right-edge bars 3 and 4 stay),
   Blizzard's bottom bars, the gryphon art and the old XP bar, and draws a

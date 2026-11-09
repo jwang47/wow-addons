@@ -361,6 +361,28 @@ placed = nil
 SlashCmdList.GLANCE("ranks")
 check("ranks places the best rank", cursorSpell == 205 and placed == 1)
 
+-- Alerts under the minimap.
+local A = ns.alerts
+UnitCharacterPoints = function() return 0 end
+A.refresh()
+check("no alerts when nothing to do", not A.chips.talents.shown and not A.chips.legacy.shown)
+UnitCharacterPoints = function() return 2 end
+Constants = { LegacyConsts = { LEGACY_REWARD_TRACK_FACTION_ID = 2802, LEGACY_TREE_PROFESSIONS_ID = 1187 } }
+C_MajorFactions = { GetCurrentRenownLevel = function() return 3 end }
+C_Traits = { GetConfigIDByTreeID = function() return 9 end,
+  GetTreeCurrencyInfo = function() return { { quantity = 5 } } end }
+C_Container = { GetContainerNumFreeSlots = function() return 0 end }
+GetActionInfo = function() end
+A.refresh()
+check("talent alert", A.chips.talents.shown and A.chips.talents.text.text == "Talents 2")
+check("legacy alert", A.chips.legacy.shown and A.chips.legacy.text.text == "Legacy 5")
+check("bags full alert", A.chips.bags.shown)
+check("no rank alert after /glance ranks", not A.chips.ranks.shown)
+local opened
+ToggleLegacySystemUI = function() opened = "legacy" end
+A.chips.legacy.scripts.OnClick()
+check("legacy chip opens the Legacy window", opened == "legacy")
+
 -- Resizing the minimap.
 SlashCmdList.GLANCE("map 260")
 check("map size saved", ns.db.mapSize == 260)
