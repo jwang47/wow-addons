@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: Omni
+## Notes: One search box for your items, places, people, spells, MageMentor commands and Questie NPCs and quests. Ctrl+Space or /omni.
+## Author: jwang47
+## Version: 0.1.0
+## SavedVariables: OmniDB
+## OptionalDeps: Auctionator, Questie, MageMentor
+
+Match.lua
+Sources.lua
+Actions.lua
+Omni.lua

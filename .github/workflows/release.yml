@@ -1,0 +1,19 @@
+# A pushed tag "release-YYYY-MM-DD" makes a GitHub release with one zip per
+# addon (<Addon>-<version>.zip, the same bytes as on dl.jwhex.dev) and the
+# CHANGELOG.md as notes. Pushing the tag publishes: it needs Jiahua's OK.
+name: release
+on:
+  push:
+    tags: ["release-*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest tests/test_publish_addons.py
+      - run: python3 tools/publish_addons.py build
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" logs/wow-addons/release/*.zip --title "$GITHUB_REF_NAME" --notes-file CHANGELOG.md

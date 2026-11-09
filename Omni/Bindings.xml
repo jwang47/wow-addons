@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="OMNI_TOGGLE" header="OMNI" category="ADDONS">
+    Omni_Toggle()
+  </Binding>
+</Bindings>

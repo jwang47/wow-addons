@@ -1,0 +1,16 @@
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
+      - run: lua5.1 tests/lootvalue.lua
+      - run: lua5.1 tests/omni.lua
+      - run: python3 -m unittest tests/test_publish_addons.py
