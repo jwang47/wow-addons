@@ -94,6 +94,7 @@ AuctionHouseFrame = { IsShown = function() return ahShown end }
 Auctionator = { Database = { db = { ["4338"] = {}, ["99999"] = {}, ["g:14047:20"] = {} } },
   API = { v1 = {
     GetAuctionPriceByItemID = function(_, id) return ({ [4306] = 2500, [4338] = 12000 })[id] end,
+    GetAuctionAgeByItemID = function(_, id) return ({ [4338] = 3 })[id] end,
     MultiSearchExact = function(caller, names) log("ahsearch", caller, names[1]) end,
   } } }
 MageMentorDB = { itemNames = { [1179] = "Ice Cold Milk" } }
@@ -359,6 +360,38 @@ box:SetText("silk")
 local g = ns.search("silk")
 check("silk finds the item", names(g, "item") == "Silk Cloth")
 check("detail shows where and AH", strip(ns.actions.detail(g[1].entries[1])) == "bags 12  bank 20  AH 25s 0c")
+do
+  local A = ns.actions
+  local saved = time
+  time = function() return 100000 end
+  Auctionator.SavedState = { TimeOfLastBrowseScan = 100000 - 7200 }
+  check("AH age: days old", A.ahAge(4338) == "3d old" and A.ahAge(4306) == nil)
+  Auctionator.API.v1.GetAuctionAgeByItemID = function(_, id) return id == 4306 and 0 or nil end
+  check("AH age in the row", strip(A.detail(g[1].entries[1])) == "bags 12  bank 20  AH 25s 0c  today")
+  check("last scan: the newer stamp", A.lastScan() == 92800 and A.ago(A.lastScan()) == "2h ago")
+  Auctionator.SavedState.TimeOfLastGetAllScan = 100000 - 120
+  check("last scan: a newer full scan wins", A.ago(A.lastScan()) == "2m ago")
+  local lines = {}
+  local tt = { SetHyperlink = function() end, AddLine = function(_, l) table.insert(lines, l) end, Show = function() end }
+  A.tooltip(tt, g[1].entries[1])
+  check("tooltip: price age and last scan", lines[1] == "AH price seen today; AH scan 2m ago")
+  LootValue = { scanText = function() return "AH scan 5m ago" end }
+  check("LootValue's wording wins when loaded", A.scanText() == "AH scan 5m ago")
+  LootValue.scanText = function() return nil end
+  check("LootValue gives nil: our own text", A.scanText() == "AH scan 2m ago")
+  LootValue.scanText = function() error("boom") end
+  check("LootValue throws: our own text", A.scanText() == "AH scan 2m ago")
+  LootValue = nil
+  local ageApi = Auctionator.API.v1.GetAuctionAgeByItemID
+  Auctionator.API.v1.GetAuctionAgeByItemID = nil
+  lines = {}
+  A.tooltip(tt, g[1].entries[1])
+  check("no age API: no made-up age, scan time only", lines[1] == "AH scan 2m ago")
+  Auctionator.API.v1.GetAuctionAgeByItemID = ageApi
+  Auctionator.SavedState = nil
+  check("no saved state: no scan time", A.lastScan() == nil and A.scanText() == nil)
+  time = saved
+end
 box.scripts.OnEnterPressed(box)
 check("Enter links the item", lastCall("openchat") and lastCall("openchat")[1]:find("item:4306") ~= nil)
 check("recent saved", OmniDB.recent["item:4306"] == 1000)

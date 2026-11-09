@@ -70,7 +70,7 @@ tooltips get Auctionator's and LootValue's lines from those addons.
 
 | Result | From | Enter | Shift+Enter |
 | --- | --- | --- | --- |
-| Items | bags (live), bank and mail (saved each time you open them), every item name in the Auctionator scan, `MageMentorDB.itemNames` (with MageMentor), and Questie quest items | link in chat; at the Auction House, an Auctionator search; a Questie quest item you don't have: where it drops | link in chat |
+| Items | bags (live), bank and mail (saved each time you open them), every item name in the Auctionator scan, `MageMentorDB.itemNames` (with MageMentor), and Questie quest items; the row shows the AH price and its age ("today", "3d old"), and the tooltip adds the last AH scan time | link in chat; at the Auction House, an Auctionator search; a Questie quest item you don't have: where it drops | link in chat |
 | Places | every continent, zone, city and dungeon below the world map (`C_Map`); MageMentor's level range (green when it fits you) and hub | open the map there | |
 | People | friends, guild, group, and the last 30 people you whispered with | whisper | invite |
 | Spells | your spell book, top rank, no passives | put it on the cursor (not in combat) | link in chat |

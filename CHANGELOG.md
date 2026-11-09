@@ -37,3 +37,5 @@ results.
 - Filters such as `i:` items, `p:` places, `@` people, `q:` quests and
   `near:` nearby NPCs. Fuzzy matching finds skipped letters and one typo.
 - Typing searches run in slices with a 4 ms target per frame.
+- Item rows show how old the AH price is ("today", "3d old"), and the item
+  tooltip adds the last AH scan time ("AH scan 2h ago").
