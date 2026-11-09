@@ -11,14 +11,14 @@ personal details (names of other people, machine paths, emails) out of it.
 ## Checks
 
 From the repo root: `lua5.1 tests/lootvalue.lua`, `lua5.1 tests/omni.lua`,
-`python3 -m unittest tests/test_publish_addons.py`. The `tests` workflow
+`python3 -m unittest tests/test_release.py`. The `tests` workflow
 runs them on every push and PR. Say in the PR which checks you ran.
 
 ## Rules
 
-- **Get explicit human confirmation before every publish**: the R2 upload
-  (`publish_addons.py publish --yes`), a `release-*` tag (it makes a GitHub
-  release), and repository or Pages settings. State the exact action and
+- **Get explicit human confirmation before every publish**: a `release-*`
+  tag (it makes the GitHub release that every friend's updater installs),
+  and repository or Pages settings. State the exact action and
   target. A general "go ahead" confirms nothing.
 - A change to an addon's files raises its `.toc` `## Version` and adds a
   `CHANGELOG.md` section in the same PR, once that version is live.

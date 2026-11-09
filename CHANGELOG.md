@@ -1,7 +1,7 @@
 # Changelog
 
 Each release raises `## Version` in the addon's `.toc` and
-adds a section here, newest first. `tools/publish_addons.py plan` refuses an
+adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 

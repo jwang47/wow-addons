@@ -1,13 +1,14 @@
 # Install or update Jiahua's WoW addons (LootValue, Omni) for WoW Forever.
 # Friends run update.cmd (it downloads and runs this file); or, in PowerShell:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File update.ps1 [-Client "D:\World of Warcraft\_forever_"]
-# It reads https://dl.jwhex.dev/wow/addons.json, downloads each addon that is
+# It reads addons.json from the latest GitHub release of jwang47/wow-addons,
+# downloads each addon that is
 # new or changed, checks its SHA-256, and replaces only that addon's folder
 # in Interface\AddOns. Other addons and your settings (WTF\) are not touched.
 # Windows PowerShell 5.1 compatible.
 param(
   [string]$Client = '',
-  [string]$Manifest = 'https://dl.jwhex.dev/wow/addons.json',  # a URL or a local file (tests)
+  [string]$Manifest = 'https://github.com/jwang47/wow-addons/releases/latest/download/addons.json',  # a URL or a local file (tests)
   [switch]$Check                                             # show what would change; change nothing
 )
 $ErrorActionPreference = 'Stop'
@@ -115,8 +116,8 @@ try {
     try {
 
     $zip = Join-Path $tmp "$name.zip"
-    # A local manifest (a test build) has the zips beside it, as in the bucket.
-    $src = if ($base) { Join-Path $base (($a.url -replace '^.*?/wow/', '') -replace '/', '\') } else { $a.url }
+    # A local manifest (a test build) has the zips beside it, as in the release.
+    $src = if ($base) { Join-Path $base (([string]$a.url -split '/')[-1]) } else { $a.url }
     Get-File $src $zip
     $sha = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLower()
     if ($sha -ne $a.sha256) { throw "$name download is damaged (SHA-256 $sha, expected $($a.sha256)). Its folder was not changed." }
