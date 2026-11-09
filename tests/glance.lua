@@ -184,7 +184,8 @@ check("no slot used twice (copies aside)", not dup)
 -- Buttons and override bindings.
 local b1 = _G.GlanceKey1
 check("button 1 action", b1:GetAttribute("type") == "action" and b1:GetAttribute("action") == 1)
-check("button 1 shift action", b1:GetAttribute("shift-action") == 49)
+check("button 1 shift action", b1:GetAttribute("shift-action1") == 49 and b1:GetAttribute("shift-action*") == 49)
+check("cooldown not on the secure button", b1.cooldown.parent == _G.GlanceKeyOverlay)
 check("1 bound to our button", overrides["1"] == "GlanceKey1:LeftButton")
 check("Shift-1 bound to our button", overrides["SHIFT-1"] == "GlanceKey1:LeftButton")
 check("W not taken", overrides.W == nil)

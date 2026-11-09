@@ -29,6 +29,18 @@ end
 ---------------------------------------------------------------------------
 local ARROWS = { up = "^", down = "v", left = "<", right = ">", jump = "_", run = ">>" }
 
+-- Newer clients give a duration object (it may hold secret times); older
+-- ones give start and duration.
+function ns.keybar.setCooldown(cd, slot)
+  local AB = C_ActionBar
+  if AB and AB.GetActionCooldownDuration and cd.SetCooldownFromDurationObject then
+    local ok = pcall(function() cd:SetCooldownFromDurationObject(AB.GetActionCooldownDuration(slot)) end)
+    if ok then return end
+  end
+  local start, dur = api.GetActionCooldown(slot)
+  pcall(cd.SetCooldown, cd, start, dur)
+end
+
 local function paint(b)
   if b.mode ~= "slot" then return end
   local slot = currentSlot(b)
@@ -38,8 +50,7 @@ local function paint(b)
     b.icon:SetTexture(api.GetActionTexture(slot))
     b.icon:Show()
     b.empty:Hide()
-    local start, dur = api.GetActionCooldown(slot)
-    pcall(b.cooldown.SetCooldown, b.cooldown, start, dur)
+    ns.keybar.setCooldown(b.cooldown, slot)
     local usable, noMana = api.IsUsableAction(slot)
     usable, noMana = plain(usable), plain(noMana)
     local inRange = plain(api.IsActionInRange(slot))
@@ -68,7 +79,7 @@ local function paint(b)
     b.empty:Show()
     b.count:SetText("")
     b.glow:Hide()
-    pcall(b.cooldown.SetCooldown, b.cooldown, 0, 0)
+    pcall(b.cooldown.Clear, b.cooldown)
   end
   -- The other layer, small in the top-right corner.
   local other = shiftDown() and b.plainSlot or b.shiftSlot
@@ -106,8 +117,11 @@ local function makeButton(key, x, y)
   b.empty = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   b.empty:SetPoint("CENTER")
   b.empty:SetText("+")
-  b.cooldown = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
-  b.cooldown:SetAllPoints(b.icon)
+  -- The cooldown sweep lives on a plain overlay frame, not on the secure
+  -- button: a child of a secure button is protected, and the game blocks
+  -- SetCooldown on it from addon code (no sweep at all).
+  b.cooldown = CreateFrame("Cooldown", nil, ns.keybar.overlay, "CooldownFrameTemplate")
+  b.cooldown:SetAllPoints(b)
   b.glow = b:CreateTexture(nil, "OVERLAY")
   b.glow:SetAllPoints()
   b.glow:SetColorTexture(1, 0.85, 0.3, 0.25)
@@ -166,7 +180,11 @@ function ns.keybar.apply()
       b.mode = "slot"
       b:SetAttribute("type", "action")
       b:SetAttribute("action", b.plainSlot or b.shiftSlot)
-      b:SetAttribute("shift-action", b.shiftSlot)
+      -- Modified attributes need a button part: shift-action1 is Shift with
+      -- the left button (a key binding clicks as LeftButton). A bare
+      -- "shift-action" is never read, so Shift+key fired the plain spell.
+      b:SetAttribute("shift-action1", b.shiftSlot)
+      b:SetAttribute("shift-action*", b.shiftSlot)
       b.bg:SetColorTexture(0, 0, 0, 0.35)
       b.note:SetText("")
       b.label:SetTextColor(1, 1, 1)
@@ -243,6 +261,11 @@ ns.module("keybar", function()
   bar.edge:SetColorTexture(1, 0.85, 0.3, 0.15)
   bar.edge:Hide()
   bar:SetScale(ns.db.scale or 1)
+  ns.keybar.overlay = CreateFrame("Frame", "GlanceKeyOverlay", UIParent)
+  ns.keybar.overlay:SetAllPoints(bar)
+  ns.keybar.overlay:SetFrameStrata("MEDIUM")
+  ns.keybar.overlay:SetFrameLevel(50)
+  ns.keybar.overlay:EnableMouse(false)
   bar.shiftTag = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   bar.shiftTag:SetPoint("BOTTOMLEFT", bar, "TOPLEFT", 0, 4)
   bar.shiftTag:SetText("Shift")

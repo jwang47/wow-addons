@@ -339,6 +339,18 @@ your saved Key Bindings.
 - The Auction House window is the modern `AuctionHouseFrame`. It is
   load-on-demand, so it can be nil when an `AUCTION_HOUSE_SHOW` handler
   runs first: look again a moment later.
+- Forever has the newer "secret values": `UnitHealth` always, and
+  `UnitPowerMax`, `UnitLevel`, cast times and cooldowns at times, come back
+  hidden. Pass them straight to a status bar or `SetText`; any compare or
+  sum on one is an error ("attempt to compare ... a secret number value").
+  Test with `issecretvalue(v)` first. A cast bar runs on
+  `StatusBar:SetTimerDuration(UnitCastingDuration("player"))`.
+- `Cooldown:SetCooldown` is a protected function. On a cooldown frame that
+  is a child of a secure button, addon code cannot set it (no sweep shows).
+  Put the cooldown on a plain frame laid over the button.
+- A secure button's modified attribute needs its button part:
+  `shift-action1` (or `shift-action*`). A bare `shift-action` is never read,
+  so Shift+key fired the unmodified action.
 
 ## Develop
 

@@ -28,6 +28,7 @@ the same, and a test checks that every `.toc` version has a section here.
   gryphon art and the old XP bar (a thin XP line replaces it).
 - Chat in the same look: faint panel, tabs only under the mouse, no side
   buttons, text fades after 30 quiet seconds.
+- Shift layer and cooldown sweeps work in the game (first test round).
 - Works with the client's hidden (secret) health, power and cast values.
 
 ## UpgradeFinder 0.1.8
