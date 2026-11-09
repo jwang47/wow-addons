@@ -64,7 +64,9 @@ function ns.paint()
   if not frame then return end
   labels()
   local _, _, spec = ns.weightKey()
-  title:SetText(spec and ("Upgrades |cff9d9d9d(" .. spec .. ")|r") or "Upgrades")
+  local wname = ns.weightsName()
+  local sub = spec and wname and (spec .. ", " .. wname) or spec or wname
+  title:SetText(sub and ("Upgrades |cff9d9d9d(" .. sub .. ")|r") or "Upgrades")
   local level = call(UnitLevel, "player") or 1
   for i, row in ipairs(rows) do
     local r = view.list[view.top + i - 1]
@@ -296,22 +298,71 @@ end
 ---------------------------------------------------------------------------
 local HELP = {
   "/uf - open the list (also a button on the Auction House)",
-  "/uf weights - your stat weights; /uf weight STAT N to change one (/uf weight reset)",
+  "/uf weights - your stat weights; /uf weight STAT N to change one, /uf weight STAT default to undo it",
+  "/uf weight reset - back to the default weights for your spec",
+  "/uf save NAME - save your weights as a preset; /uf load NAME, /uf presets, /uf delete NAME",
   "/uf reset - forget the saved item scores (they are kept between sessions)",
   "/uf where - turn the \"Get it:\" lines on item tooltips on or off (needs Questie)",
-  "Stats: str agi sta int spi ap sp heal crit hit spcrit sphit dps armor def block mp5",
 }
+local function copy(t) local c = {} for k, v in pairs(t or {}) do c[k] = v end return c end
+
+-- The name of the weights in use: a preset, "custom", or nil (the defaults).
+function ns.weightsName()
+  local db, key = ns.db(), ns.weightKey()
+  if db.active[key] then return db.active[key] end
+  if next(db.weights[key] or {}) then return "custom" end
+end
+
+-- New weights: score the items again (the weights are in the cache key).
+local function reweigh(text)
+  say(text)
+  if frame and frame:IsShown() then ns.rescan() else view.all = {} end -- closed: the next open scans
+end
+
+local function statList()
+  local s = {}
+  for k in pairs(S.STATS) do table.insert(s, k) end
+  table.sort(s)
+  return table.concat(s, " ")
+end
+
 function ns.slash(msg)
   msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
   local cmd, a, b = msg:match("^(%S*)%s*(%S*)%s*(%S*)")
   local key, class, spec = ns.weightKey()
-  if cmd == "help" then for _, l in ipairs(HELP) do say(l) end
+  if cmd == "help" then for _, l in ipairs(HELP) do say(l) end say("Stats: " .. statList())
   elseif cmd == "weights" then
     local parts = {}
     for k, v in pairs(ns.weights()) do table.insert(parts, k .. " " .. v) end
     table.sort(parts)
     say(class:lower() .. (spec and (" (" .. spec .. ")") or "") .. ": " .. table.concat(parts, ", "))
+    local name = ns.weightsName()
+    say(class:lower() .. (spec and (" (" .. spec .. ")") or "") .. " weights: " .. (name or "default"))
     if class == "MAGE" and rawget(_G, "MageMentorAPI") then say("(MageMentor's weights are used for a mage: /mm weight)") end
+  elseif cmd == "presets" then
+    local names, db = {}, ns.db()
+    for n in pairs(db.presets[class] or {}) do table.insert(names, n .. (n == db.active[key] and " (in use)" or "")) end
+    table.sort(names)
+    say(#names > 0 and ("presets for " .. class:lower() .. ": " .. table.concat(names, ", ")) or "no presets yet: /uf save NAME")
+  elseif cmd == "save" and a ~= "" then
+    local db = ns.db()
+    db.presets[class] = db.presets[class] or {}
+    db.presets[class][a] = copy(ns.weights())
+    db.active[key] = a
+    say("saved your weights as \"" .. a .. "\"; /uf load " .. a .. " brings them back")
+  elseif cmd == "load" and a ~= "" then
+    local db = ns.db()
+    local p = (db.presets[class] or {})[a]
+    if not p then say("no preset \"" .. a .. "\" (/uf presets lists them)") return end
+    db.weights[key] = copy(p)
+    db.active[key] = a
+    reweigh("weights: preset \"" .. a .. "\"")
+  elseif cmd == "delete" and a ~= "" then
+    local db = ns.db()
+    if not (db.presets[class] or {})[a] then say("no preset \"" .. a .. "\"") return end
+    db.presets[class][a] = nil
+    for k, n in pairs(db.active) do if n == a and k:match("^[^:]+") == class then db.active[k] = "custom" end end
+    say("deleted preset \"" .. a .. "\" (the weights in use stay)")
   elseif cmd == "reset" then
     Scan.forget()
     ns.db().missing = {}
@@ -322,11 +373,20 @@ function ns.slash(msg)
     say("\"Get it:\" lines on item tooltips " .. (o.where and "on" or "off"))
   elseif cmd == "weight" and a == "reset" then
     ns.db().weights[key] = nil
-    Scan.forget() say("weights reset")
+    ns.db().active[key] = nil
+    reweigh("weights back to the default for " .. (spec or class:lower()))
+  elseif cmd == "weight" and a ~= "" and not S.STATS[a] then
+    say("unknown stat \"" .. a .. "\". Stats: " .. statList())
+  elseif cmd == "weight" and b == "default" then
+    local w = ns.db().weights[key]
+    if w then w[a] = nil if not next(w) then ns.db().weights[key] = nil end end
+    ns.db().active[key] = nil
+    reweigh(a .. " back to its default (" .. tostring(ns.weights()[a] or 0) .. ")")
   elseif cmd == "weight" and tonumber(b) then
     ns.db().weights[key] = ns.db().weights[key] or {}
     ns.db().weights[key][a] = tonumber(b)
-    Scan.forget() say(a .. " = " .. b .. "; Rescan to apply")
+    ns.db().active[key] = nil
+    reweigh(a .. " = " .. b)
   else ns.toggle() end
 end
 SLASH_UPGRADEFINDER1 = "/uf"

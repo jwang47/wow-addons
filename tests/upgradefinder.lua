@@ -434,6 +434,36 @@ runTimers()
 check("spec change rescans with new weights", ns.scan.key == "WARRIOR" and ns.scan.state.ran)
 P.class, TALENTS = "MAGE", nil
 
+-- Weight presets -----------------------------------------------------------------
+local function lastSay() return chat[#chat] or "" end
+local uf = SlashCmdList.UPGRADEFINDER
+local wkey = ns.weightKey()
+local key0 = ns.scan.cacheKey()
+check("default weights have no name", ns.weightsName() == nil)
+uf("weight int 2")
+check("a changed weight is custom", ns.weightsName() == "custom" and ns.weights().int == 2)
+check("a changed weight changes the cache key", ns.scan.cacheKey() ~= key0)
+uf("weight bogus 3")
+check("an unknown stat is refused", lastSay():find("unknown stat") and ns.weights().bogus == nil)
+uf("save leveling")
+check("save makes a preset of the weights in use",
+  UpgradeFinderDB.presets[ns.class()].leveling.int == 2 and ns.weightsName() == "leveling")
+uf("weight reset")
+check("reset goes back to the defaults", UpgradeFinderDB.weights[wkey] == nil and ns.weightsName() == nil
+  and ns.scan.cacheKey() == key0)
+uf("load leveling")
+check("load brings the preset back", ns.weights().int == 2 and ns.weightsName() == "leveling")
+uf("load nope")
+check("loading an unknown preset says so", lastSay():find("no preset") ~= nil and ns.weightsName() == "leveling")
+uf("presets")
+check("presets lists the one in use", lastSay():find("leveling %(in use%)") ~= nil)
+uf("weight int default")
+check("one stat back to its default", ns.weights().int == S.weightsFor(ns.class(), nil, ns.talentTab()).int
+  and ns.weightsName() ~= "leveling")
+uf("delete leveling")
+check("delete removes the preset", UpgradeFinderDB.presets[ns.class()].leveling == nil)
+uf("weight reset")
+
 -- Slot column -------------------------------------------------------------------
 check("slot name for a ring", S.groupName("INVTYPE_FINGER") == "Ring")
 check("slot name for a robe", S.groupName("INVTYPE_ROBE") == "Chest")
