@@ -128,6 +128,52 @@
   .tt { width: min(100%, 340px); }
 
 
+  /* ---- Interactive demos (no network; demo data only). ---- */
+  .demo { min-width: 0; }
+  .demo .try { font-size: 14px; color: var(--dim); margin: 10px 2px 0; }
+  .od .box { cursor: text; }
+  .od .box input { all: unset; flex: 1; min-width: 0; color: #fff; caret-color: var(--gold); }
+  .od .box:focus-within { border-color: var(--gold-soft); }
+  #od-list { min-height: 280px; }
+  .od .row { cursor: pointer; }
+  .od .row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .od .row .m { max-width: 50%; }
+  .od .row .lvl { color: var(--green); }
+  .od .cat .more { color: #8b8b84; font-size: 14px; margin-left: 6px; }
+  @media (max-width: 900px) { .od .row { flex-direction: row; } .od .row .m { text-align: right; } }
+  .od-tip { margin-top: 10px; font-size: 14.5px; min-height: 64px; }
+  .od-tip:empty { display: none; }
+  .od-act { color: var(--green-soft); }
+
+  .bag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .bag button { all: unset; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px 8px;
+    border: 1px solid #3a3f4d; border-radius: 5px; background: #0c0f1a; font-size: 13px; text-align: center; line-height: 1.2; }
+  .bag button .ic { width: 38px; height: 38px; border-radius: 4px; border: 2px solid currentColor; display: grid; place-items: center;
+    font: 700 18px var(--sans); background: #151a28; }
+  .bag button[aria-pressed="true"], .bag button:hover, .bag button:focus-visible { border-color: var(--gold-soft); background: #141826; }
+  #lv-tip { margin-top: 12px; width: auto; max-width: 380px; font-size: 14.5px; }
+  .q0 { color: #9d9d9d; } .q1 { color: #fff; } .q2 { color: #1eff00; } .q3 { color: #0070dd; }
+
+  .ufw { border: 2px solid #5b4a2a; border-radius: 6px; background: rgba(12,10,8,.95); padding: 10px 12px 8px;
+    box-shadow: 0 0 0 1px #000, 0 14px 40px rgba(0,0,0,.5); font-size: 15px; }
+  .ufw-head { display: flex; justify-content: space-between; color: var(--gold); font-size: 17px; margin-bottom: 8px; }
+  .ufw-x { color: var(--gold); }
+  .ufw-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
+  .ufw-btns button { font: 600 13.5px var(--sans); color: var(--gold); background: linear-gradient(#8a1a12, #5a0d08); border: 1px solid #c09040;
+    border-radius: 4px; padding: 5px 2px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ufw-btns button:hover { filter: brightness(1.2); }
+  #uf-list { min-height: 300px; }
+  .ufr { display: grid; grid-template-columns: 1fr auto 5.5em; gap: 10px; padding: 2px 4px; }
+  .ufr .g { color: var(--green); text-align: right; } .ufr .p { color: #fff; text-align: right; }
+  .ufr .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ufw-foot { color: #8b8b84; font-size: 13.5px; padding: 6px 4px 2px; border-top: 1px solid #2a2622; margin-top: 6px; }
+  @media (max-width: 500px) { .ufw-btns { grid-template-columns: 1fr 1fr; } }
+
+  .how { margin-top: 18px; padding: 12px 16px 4px; border-left: 3px solid var(--gold-soft); background: rgba(232,199,90,.06); border-radius: 0 4px 4px 0; font-size: 15px; }
+  .how b:first-child { color: var(--gold-soft); font-weight: 600; }
+  .how ol { margin: 6px 0 8px; padding-left: 20px; color: var(--ink); }
+  .how li { margin: 5px 0; }
+
   /* FAQ */
   .faq { padding: 40px 0 8px; border-top: 1px solid #1e212b; margin-top: 40px; }
   details { border-bottom: 1px solid #1e212b; }
@@ -179,21 +225,20 @@
     <div class="body">
       <div>
         <p class="lede"><b>One search box</b> over everything you have and everywhere you go. Type a few letters; press <kbd>Enter</kbd>.</p>
-        <p class="filters">Filters: <code>i:</code> items, <code>p:</code> places, <code>@</code> people, <code>s:</code> spells, <code>n:</code> NPCs, <code>q:</code> quests.</p>
+        <div class="how"><b>How to use it in game</b><ol>
+          <li>Press <kbd>Ctrl</kbd>+<kbd>Space</kbd> (or type <code>/omni</code>). To use another key: <code>/omni bind KEY</code>.</li>
+          <li>Type a few letters. Start with <code>i:</code> items, <code>p:</code> places, <code>@</code> people, <code>s:</code> spells, <code>n:</code> NPCs or <code>q:</code> quests to search only those.</li>
+          <li><kbd>↑</kbd> <kbd>↓</kbd> pick a result, <kbd>Enter</kbd> acts on it, <kbd>Shift</kbd>+<kbd>Enter</kbd> or a right click does the second action. <kbd>Esc</kbd> closes it.</li>
+        </ol></div>
       </div>
-      <div class="omni" aria-label="What Omni finds, shown as its own result list">
-        <div class="box">dusk <span>Ctrl+Space</span></div>
-        <div class="cat">Items</div>
-        <div class="row"><span>Bags, bank, mail, your Auctionator scan</span><span class="m"><kbd>Enter</kbd> links it; at the AH it searches</span></div>
-        <div class="cat">Places</div>
-        <div class="row sel"><span>Every zone, city and dungeon</span><span class="m"><kbd>Enter</kbd> opens the map</span></div>
-        <div class="cat">People</div>
-        <div class="row"><span>Friends, guild, group, recent whispers</span><span class="m"><kbd>Enter</kbd> whispers · <kbd>Shift</kbd>+<kbd>Enter</kbd> invites</span></div>
-        <div class="cat">Spells</div>
-        <div class="row"><span>Everything in your spellbook</span><span class="m"><kbd>Enter</kbd> puts it on your cursor</span></div>
-        <div class="cat">NPCs and quests <small>with <a href="https://www.curseforge.com/wow/addons/questie">Questie</a></small></div>
-        <div class="row"><span>Trainers, vendors, quest givers, quests</span><span class="m"><kbd>Enter</kbd> pins them on the map</span></div>
-        <div class="foot">Enter: open the map  (more below)</div>
+      <div class="demo">
+        <div class="omni od" id="od">
+          <label class="box"><input id="od-q" value="dusk" autocomplete="off" spellcheck="false" aria-label="Try Omni: type to search"><span>Ctrl+Space</span></label>
+          <div id="od-list" role="listbox" aria-label="Results"></div>
+          <div class="foot" id="od-foot"></div>
+        </div>
+        <div class="tip od-tip" id="od-tip" aria-live="polite"></div>
+        <p class="try">Try it: type <code>storm</code>, <code>frost</code>, <code>n:</code> or <code>@</code>. <kbd>↑</kbd> <kbd>↓</kbd> to pick, <kbd>Enter</kbd> to act. Demo data.</p>
       </div>
     </div>
   </section>
@@ -207,19 +252,17 @@
       <div>
         <p class="lede"><b>One line on each item tooltip:</b> vendor it, sell it on the AH, or disenchant it. Priced from your Auctionator scan.</p>
         <p>It compares the AH price (after the cut, and the deposit you lose if it doesn't sell) with the vendor price and
-          disenchanting, and says when the market looks slow. Scan now and then so the prices stay fresh.</p>
+          disenchanting, and says when the market looks slow.</p>
+        <div class="how"><b>How to use it in game</b><ol>
+          <li>Install <a href="https://www.curseforge.com/wow/addons/auctionator">Auctionator</a> too.</li>
+          <li>At the Auction House, run Auctionator's <b>Full Scan</b>. Do it again now and then, so prices stay fresh.</li>
+          <li>Point at any item: the gold <span style="color:var(--gold)">LootValue</span> line says what to do with it. Grey text gives the other options and how old the scan is.</li>
+        </ol></div>
       </div>
-      <div class="tt-stage">
-        <!-- MOCK tooltip, not a screenshot. The item is real (Dusky Belt, vendor 4s 12c); the LootValue line is an example. -->
-        <div class="tt tip" aria-label="Picture of an item tooltip with the LootValue line">
-          <div class="w" style="font-size:17px">Dusky Belt</div>
-          <div class="w" style="display:flex;justify-content:space-between"><span>Waist</span><span>Leather</span></div>
-          <div class="w">25 Armor</div>
-          <div class="w">Durability 25 / 25</div>
-          <div class="w">Requires Level 16</div>
-          <div class="w">Sell Price: 4<span class="gr">s</span> 12<span class="gr">c</span></div>
-          <div class="y">LootValue: AH ~90s <span class="gr">(or vendor 4s 12c) · AH scan 3h ago</span></div>
-        </div>
+      <div class="demo">
+        <div class="bag" id="lv-bag" aria-label="Example bag: point at an item"></div>
+        <div class="tip tt" id="lv-tip" aria-live="polite"></div>
+        <p class="try">Try it: point at (or tap) an item. Example prices.</p>
       </div>
     </div>
   </section>
@@ -234,9 +277,26 @@
         <p class="lede"><b>The gear upgrades you can buy:</b> items in your Auctionator scan and your bags that beat what you wear, biggest gain first.</p>
         <p>It works for any class, with simple leveling weights for your spec. Pick a slot, usable now or soon, gain or gain per gold,
           and what you can afford. With Questie it also says where to get an item: a quest reward, a dungeon, a vendor or a drop.</p>
+        <div class="how"><b>How to use it in game</b><ol>
+          <li>Run an Auctionator <b>Full Scan</b> at the Auction House, so it knows what is for sale.</li>
+          <li>Type <code>/uf</code>, or click <b>Upgrades</b> on the Auction House window. The first scan of the items takes a few seconds.</li>
+          <li>Use the four buttons to narrow the list. Point at a row for the tooltip and what it replaces; click searches the AH, <kbd>Shift</kbd>+click links it.</li>
+        </ol></div>
       </div>
-      <img class="shot" src="upgradefinder.jpg" width="712" height="693" loading="lazy"
-        alt="The UpgradeFinder window in game: upgrades for a mage, with the gain and the AH price of each item">
+      <div class="demo">
+        <div class="ufw" id="uf">
+          <div class="ufw-head"><span>Upgrades</span><span class="ufw-x" aria-hidden="true">✕</span></div>
+          <div class="ufw-btns">
+            <button type="button" id="uf-slot">Slot: All</button>
+            <button type="button" id="uf-use">Usable now</button>
+            <button type="button" id="uf-sort">Biggest gain</button>
+            <button type="button" id="uf-gold">Any price</button>
+          </div>
+          <div id="uf-list"></div>
+          <div class="ufw-foot" id="uf-foot"></div>
+        </div>
+        <p class="try">Try it: click the buttons (right-click Slot to go back). Most items and prices come from a real level 24 mage's scan; the demo has 1g 20s to spend. <a href="upgradefinder.jpg">The real window</a>.</p>
+      </div>
     </div>
   </section>
 
@@ -293,5 +353,214 @@
   <footer>Made by Jiahua for friends. Not made by or affiliated with Blizzard Entertainment.
     World of Warcraft is a trademark of Blizzard Entertainment, Inc.</footer>
 </main>
+<script>
+// Interactive demos. Everything here is example data in the page; nothing is fetched.
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+
+  // ---- Omni ----
+  var CATS = [
+    { k: "place", t: "Places", f: "p:", act: "opens the map at" },
+    { k: "item", t: "Items", f: "i:", act: "links" },
+    { k: "person", t: "People", f: "@", act: "whispers" },
+    { k: "spell", t: "Spells", f: "s:", act: "puts on your cursor:" },
+    { k: "npc", t: "NPCs (Questie)", f: "n:", act: "pins on the map:" },
+    { k: "quest", t: "Quests (Questie)", f: "q:", act: "pins on the map:" }
+  ];
+  var DATA = [
+    ["place", "Duskwood", "<span class=lvl>18-30</span> zone", "Zone, Eastern Kingdoms. Level 18-30."],
+    ["place", "Darkshire", "town, Duskwood", "Town in Duskwood. Flight master, inn."],
+    ["place", "Stormwind City", "city", "Alliance capital, Elwynn Forest."],
+    ["place", "Ironforge", "city", "Alliance capital, Dun Morogh."],
+    ["place", "The Deadmines", "<span class=lvl>17-26</span> dungeon", "Dungeon in Westfall. Level 17-26."],
+    ["place", "Shadowfang Keep", "<span class=lvl>22-30</span> dungeon", "Dungeon in Silverpine Forest. Level 22-30."],
+    ["place", "Westfall", "<span class=lvl>10-20</span> zone", "Zone, Eastern Kingdoms. Level 10-20."],
+    ["place", "Redridge Mountains", "<span class=lvl>15-25</span> zone", "Zone, Eastern Kingdoms. Level 15-25."],
+    ["place", "Stranglethorn Vale", "<span class=lvl>30-45</span> zone", "Zone, Eastern Kingdoms. Level 30-45."],
+    ["item", "Dusky Belt", "AH 95s 0c · 1d old", "Leather waist. AH 95s 0c (price 1d old)."],
+    ["item", "Duskbringer", "AH 40g 0s · 1d old", "Two-hand sword. AH 40g (price 1d old)."],
+    ["item", "Dusky Boots", "AH 2g 0s · 1d old", "Leather feet. AH 2g (price 1d old)."],
+    ["item", "Dusk Wand", "quest item", "Quest item."],
+    ["item", "Frost Oil", "bags ×2", "In your bags (2)."],
+    ["item", "Linen Cloth", "bags ×20 · AH 6c", "In your bags (20). AH 6c each, today."],
+    ["item", "Silk Cloth", "bank ×14 · AH 31c", "In your bank (14). AH 31c each, today."],
+    ["item", "Rune of Teleportation", "bags ×3", "In your bags (3). Reagent for Teleport spells."],
+    ["item", "Storm Gauntlets", "AH 3g 10s · today", "Mail hands. AH 3g 10s (today)."],
+    ["person", "Brightwick", "friend · 24 Mage · Duskwood", "Friend, online. Level 24 Mage in Duskwood."],
+    ["person", "Stormhollow", "guild · 31 Paladin", "Guild member, online. Level 31 Paladin."],
+    ["person", "Duskmoth", "whispered 5m ago", "Whispered you 5 minutes ago."],
+    ["spell", "Frostbolt", "rank 4", "Frostbolt (Rank 4). Frost damage, slows the target."],
+    ["spell", "Frost Nova", "rank 2", "Frost Nova (Rank 2). Roots nearby enemies."],
+    ["spell", "Frost Armor", "rank 2", "Frost Armor (Rank 2)."],
+    ["spell", "Teleport: Stormwind", "", "Teleports you to Stormwind City. Needs a Rune of Teleportation."],
+    ["spell", "Arcane Intellect", "rank 2", "Arcane Intellect (Rank 2)."],
+    ["spell", "Blink", "", "Teleports you 20 yards forward."],
+    ["npc", "Duskbat", "Duskwood", "Beast, level 20-21. Duskwood."],
+    ["npc", "Mangy Duskbat", "Duskwood", "Beast, level 22-23. Duskwood."],
+    ["npc", "Greater Duskbat", "Duskwood", "Beast, level 23-24. Duskwood."],
+    ["npc", "Duskwood Owl", "Duskwood", "Beast, level 22. Duskwood."],
+    ["npc", "Madame Eva", "Darkshire", "Quest giver in Darkshire."],
+    ["npc", "Felicia Maline", "Darkshire · flight master", "Flight master in Darkshire."],
+    ["npc", "Stormwind Guard", "Stormwind City", "Guard in Stormwind City."],
+    ["quest", "The Night Watch", "Duskwood · 24", "Level 24 quest from Commander Althea Ebonlocke, Darkshire."],
+    ["quest", "Worgen in the Woods", "Duskwood · 22", "Level 22 quest from Calor, Darkshire."],
+    ["quest", "Wolves at Our Heels", "Darkshire · 20", "Level 20 quest from Lars, Darkshire."],
+    ["quest", "The Legend of Stalvan", "Duskwood · 25", "Level 25 quest from Madame Eva, Darkshire."]
+  ];
+  var MAX = 4, sel = 0, shown = [];
+  function score(name, q) {
+    var n = name.toLowerCase(), i = n.indexOf(q);
+    if (!q) return 1;
+    if (i === 0) return 3;
+    if (i > 0 && n.charAt(i - 1) === " ") return 2;
+    return i > 0 ? 1 : 0;
+  }
+  function render() {
+    var raw = $("od-q").value.toLowerCase().replace(/^\s+/, ""), only = null;
+    CATS.forEach(function (c) { if (raw.indexOf(c.f) === 0) { only = c.k; raw = raw.slice(c.f.length); } });
+    var q = raw.replace(/^\s+|\s+$/g, ""), html = "", total = 0;
+    shown = [];
+    if (!q && !only) {
+      $("od-list").innerHTML = '<div class="row"><span class="nm" style="color:#8b8b84">Type to search everything.</span></div>';
+      $("od-foot").textContent = ""; $("od-tip").innerHTML = ""; return;
+    }
+    CATS.forEach(function (c) {
+      if (only && only !== c.k) return;
+      var hits = DATA.filter(function (d) { return d[0] === c.k && score(d[1], q) > 0; })
+        .sort(function (a, b) { return score(b[1], q) - score(a[1], q) || a[1].localeCompare(b[1]); });
+      if (!hits.length) return;
+      total += hits.length;
+      var lim = only ? 12 : MAX;
+      html += '<div class="cat">' + c.t + (hits.length > lim ? '<span class="more">+' + (hits.length - lim) + ' more</span>' : "") + "</div>";
+      hits.slice(0, lim).forEach(function (d) {
+        var i = shown.length;
+        shown.push({ d: d, c: c });
+        html += '<div class="row" role="option" data-i="' + i + '"><span class="nm">' + esc(d[1]) + '</span><span class="m">' + d[2] + "</span></div>";
+      });
+    });
+    if (!shown.length) html = '<div class="row"><span class="nm" style="color:#8b8b84">No matches in the demo data.</span></div>';
+    $("od-list").innerHTML = html;
+    sel = Math.min(sel, Math.max(shown.length - 1, 0));
+    $("od-foot").textContent = shown.length ? total + " results" : "";
+    mark();
+  }
+  function mark() {
+    var rows = $("od-list").querySelectorAll(".row[data-i]");
+    for (var i = 0; i < rows.length; i++) rows[i].className = "row" + (i === sel ? " sel" : "");
+    var s = shown[sel];
+    $("od-tip").innerHTML = s ? '<div class="name" style="font-size:17px">' + esc(s.d[1]) + '</div><div class="w">' + esc(s.d[3]) +
+      '</div><div class="gr">Enter: ' + s.c.act.replace(/ at$| on the map:$| on your cursor:$|:$/, "") + "</div>" : "";
+  }
+  function act() {
+    var s = shown[sel];
+    if (!s) return;
+    $("od-tip").innerHTML = '<div class="od-act">Omni ' + s.c.act + " " + esc(s.d[1]) + ".</div>" +
+      '<div class="gr">(In the game. This demo only says so.)</div>';
+  }
+  $("od-q").addEventListener("input", function () { sel = 0; render(); });
+  $("od-q").addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { sel = Math.min(sel + 1, shown.length - 1); mark(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { sel = Math.max(sel - 1, 0); mark(); e.preventDefault(); }
+    else if (e.key === "Enter") { act(); e.preventDefault(); }
+  });
+  $("od-list").addEventListener("mousemove", function (e) {
+    var r = e.target.closest && e.target.closest(".row[data-i]");
+    if (r && +r.getAttribute("data-i") !== sel) { sel = +r.getAttribute("data-i"); mark(); }
+  });
+  $("od-list").addEventListener("click", function (e) {
+    var r = e.target.closest && e.target.closest(".row[data-i]");
+    if (r) { sel = +r.getAttribute("data-i"); mark(); act(); }
+  });
+  render();
+
+  // ---- LootValue ----
+  // Lines follow LootValue's own format; the prices are examples.
+  var BAG = [
+    { n: "Dusky Belt", q: 2, l: ["Binds when equipped", "Waist|Leather", "25 Armor", "Requires Level 16"], sell: "4s 12c",
+      lv: 'AH ~90s 25c', rest: "(or disenchant ~18s, vendor 4s 12c)", scan: "AH scan 3h ago" },
+    { n: "Linen Cloth", q: 1, l: ["Trade Goods", "Max Stack: 20"], sell: "20c", count: 20,
+      lv: "Vendor 20c", rest: "(or AH ~1s 14c)", scan: "AH scan 3h ago" },
+    { n: "Ridge Cleaver", q: 2, l: ["Binds when equipped", "Two-Hand|Axe", "22 - 34 Damage", "+3 Strength"], sell: "1s 80c",
+      lv: "Disenchant ~25s", rest: "(or AH ~19s, vendor 1s 80c)", scan: "AH scan 3h ago" },
+    { n: "Rune of Teleportation", q: 1, l: ["Reagent"], sell: "2s 50c", count: 3,
+      lv: "AH ~9s 50c", rest: "(or vendor 2s 50c)", scan: "AH scan 31m ago" },
+    { n: "Shimmering Robe", q: 2, l: ["Soulbound", "Chest|Cloth", "31 Armor", "+5 Intellect"], sell: "6s 40c",
+      lv: "Disenchant ~22s", rest: "(or vendor 6s 40c)" },
+    { n: "Large Fang", q: 1, l: ["Trade Goods"], sell: "45c",
+      lv: "Vendor 45c", rest: "(or AH ~41c (slow: 80 listed))", scan: "AH scan 3h ago" },
+    { n: "Frost Oil", q: 1, l: ["Use: Coats a weapon with frost."], sell: "2s",
+      lv: "AH ~1g 40s", rest: "(or vendor 2s)", scan: "AH scan 3h ago" },
+    { n: "Copper Ore", q: 1, l: ["Trade Goods"], sell: "1c", count: 8,
+      lv: "AH ~8c", rest: "(or vendor 1c)", scan: "AH scan 3h ago" }
+  ];
+  function money(s) { return esc(s).replace(/(\d)([gsc])/g, '$1<span class="gr">$2</span>'); }
+  function showItem(i) {
+    var it = BAG[i], h = '<div class="q' + it.q + '" style="font-size:16px">' + esc(it.n) + "</div>";
+    it.l.forEach(function (x) {
+      var p = x.split("|");
+      h += p.length > 1 ? '<div class="w" style="display:flex;justify-content:space-between"><span>' + esc(p[0]) + "</span><span>" + esc(p[1]) + "</span></div>"
+        : '<div class="' + (/^Use:/.test(x) ? "g" : "w") + '">' + esc(x) + "</div>";
+    });
+    h += '<div class="w">Sell Price: ' + money(it.sell) + "</div>";
+    h += '<div class="y">LootValue: ' + esc(it.lv) + ' <span class="gr">' + esc(it.rest) + (it.scan ? " · " + esc(it.scan) : "") + "</span></div>";
+    $("lv-tip").innerHTML = h;
+    var b = $("lv-bag").children;
+    for (var k = 0; k < b.length; k++) b[k].setAttribute("aria-pressed", k === i ? "true" : "false");
+  }
+  $("lv-bag").innerHTML = BAG.map(function (it, i) {
+    return '<button type="button" class="q' + it.q + '" data-i="' + i + '"><span class="ic">' + esc(it.n.charAt(0)) + "</span>" +
+      esc(it.n) + (it.count ? " ×" + it.count : "") + "</button>";
+  }).join("");
+  ["mouseover", "focusin", "click"].forEach(function (ev) {
+    $("lv-bag").addEventListener(ev, function (e) {
+      var b = e.target.closest && e.target.closest("button");
+      if (b) showItem(+b.getAttribute("data-i"));
+    });
+  });
+  showItem(0);
+
+  // ---- UpgradeFinder ----
+  // From a real scan (level 24 mage); Crimson Silk Robe, Seer's Cape and the bag gloves are examples. Price in copper; 0 = in your bags.
+  var UP = [
+    ["Tree Bark Jacket", 3, "Chest", 3.4, 15000, 0], ["Invoker's Mantle", 2, "Shoulder", 2.5, 4900, 0],
+    ["Magician's Mantle", 3, "Shoulder", 2.5, 17000, 0], ["The Queen's Jewel", 3, "Finger", 2.4, 9000, 0],
+    ["Azure Silk Vest", 2, "Chest", 1.9, 3000, 0], ["Plains Ring", 3, "Finger", 1.8, 24900, 0],
+    ["Black Widow Band", 2, "Finger", 1.4, 6500, 0], ["Robes of Arcana", 2, "Chest", 1.2, 9700, 0],
+    ["Greater Magic Wand", 2, "Ranged", 1.2, 300, 0], ["Lesser Mystic Wand", 2, "Ranged", 1.2, 5300, 0],
+    ["Defias Mage Ring", 3, "Finger", 1.1, 10000, 0], ["Skycaller", 3, "Ranged", 1.0, 11400, 0],
+    ["Band of Purification", 3, "Finger", 0.9, 8800, 0], ["Hillman's Cloak", 2, "Back", 0.6, 1500, 0],
+    ["Crimson Silk Robe", 2, "Chest", 2.8, 18000, 1], ["Seer's Cape", 2, "Back", 0.9, 4000, 2],
+    ["Elixir-stained Gloves", 2, "Hands", 0.7, 0, 0]
+  ];
+  var SLOTS = ["All", "Chest", "Shoulder", "Finger", "Ranged", "Back", "Hands"], st = { slot: 0, use: 0, sort: 0, gold: 0 }, PURSE = 12000;
+  function fmt(c) {
+    if (!c) return "bags";
+    var g = Math.floor(c / 10000), s = Math.floor(c / 100) % 100, cc = c % 100;
+    return g ? g + "g " + (s < 10 ? "0" : "") + s + "s" : s + "s " + (cc < 10 ? "0" : "") + cc + "c";
+  }
+  function uf() {
+    var list = UP.filter(function (u) {
+      return (st.slot === 0 || u[2] === SLOTS[st.slot]) && (st.use === 1 || u[5] === 0) && (st.gold === 0 || u[4] <= PURSE);
+    }).sort(function (a, b) {
+      return st.sort ? (b[3] / Math.max(b[4], 100) - a[3] / Math.max(a[4], 100)) : b[3] - a[3];
+    });
+    $("uf-list").innerHTML = list.map(function (u) {
+      return '<div class="ufr"><span class="nm q' + u[1] + '">' + esc(u[0]) + (u[5] ? ' <span class="gr" style="font-size:13px">(level +' + u[5] + ")</span>" : "") +
+        '</span><span class="g">+' + u[3].toFixed(1) + '</span><span class="p">' + fmt(u[4]) + "</span></div>";
+    }).join("") || '<div class="ufr"><span class="nm gr">No upgrades for this choice.</span></div>';
+    $("uf-foot").textContent = list.length + " upgrade" + (list.length === 1 ? "" : "s");
+    $("uf-slot").textContent = "Slot: " + SLOTS[st.slot];
+    $("uf-use").textContent = st.use ? "Up to +2 lvl" : "Usable now";
+    $("uf-sort").textContent = st.sort ? "Per gold" : "Biggest gain";
+    $("uf-gold").textContent = st.gold ? "Can afford" : "Any price";
+  }
+  $("uf-slot").addEventListener("click", function () { st.slot = (st.slot + 1) % SLOTS.length; uf(); });
+  $("uf-slot").addEventListener("contextmenu", function (e) { e.preventDefault(); st.slot = (st.slot + SLOTS.length - 1) % SLOTS.length; uf(); });
+  ["use", "sort", "gold"].forEach(function (k) { $("uf-" + k).addEventListener("click", function () { st[k] = 1 - st[k]; uf(); }); });
+  uf();
+})();
+</script>
 </body>
 </html>
