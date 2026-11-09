@@ -5,6 +5,11 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## UpgradeFinder 0.1.1
+
+- Each row shows the item's slot (Chest, Ring, Ranged...) between the name
+  and the gain. The window is 60 px wider for it.
+
 ## LootValue 0.1.0
 
 First release. Needs Auctionator (run a Full Scan at the Auction House now

@@ -169,6 +169,20 @@ check("one-hand without dual wield replaces main hand", S.replaced("INVTYPE_WEAP
 
 -- Full scan (mage, MageMentor not loaded) ---------------------------------------
 ns.scan.SLICE = 3
+-- Record every font string text, to check the slot column at the end.
+local slotTexts = {}
+local createFrame = CreateFrame
+CreateFrame = function(...)
+  local f = createFrame(...)
+  local cfs = f.CreateFontString
+  f.CreateFontString = function(self, ...)
+    local fs = cfs(self, ...)
+    local set = fs.SetText
+    fs.SetText = function(w, t) table.insert(slotTexts, t) return set(w, t) end
+    return fs
+  end
+  return f
+end
 ns.open()
 check("window opens and scans", UpgradeFinderFrame:IsShown() and ns.scan.state.busy)
 runTimers()
@@ -419,6 +433,15 @@ ns.handlers.CHARACTER_POINTS_CHANGED()
 runTimers()
 check("spec change rescans with new weights", ns.scan.key == "WARRIOR" and ns.scan.state.ran)
 P.class, TALENTS = "MAGE", nil
+
+-- Slot column -------------------------------------------------------------------
+check("slot name for a ring", S.groupName("INVTYPE_FINGER") == "Ring")
+check("slot name for a robe", S.groupName("INVTYPE_ROBE") == "Chest")
+check("slot name for a wand", S.groupName("INVTYPE_WAND") == "Ranged")
+check("no slot name for a non-slot", S.groupName("INVTYPE_BAG") == nil)
+local sawSlot = false
+for _, t in ipairs(slotTexts) do if t == "Head" or t == "Ring" or t == "Weapon" then sawSlot = true end end
+check("rows show their slot", sawSlot)
 
 print(failures == 0 and "all UpgradeFinder tests passed" or (failures .. " UpgradeFinder test(s) failed"))
 os.exit(failures == 0 and 0 or 1)
