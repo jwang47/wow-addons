@@ -141,6 +141,9 @@ for _, file in ipairs({ "Data.lua", "QuestBoard.lua" }) do
   chunk("QuestBoard", ns)
 end
 local D = ns.data
+-- "Here" makes quests near you active; the tests below turn it on themselves.
+local hereYards = D.HERE_YARDS
+D.HERE_YARDS = 0
 local function fire(event) for _, f in ipairs(frames) do if f.events and f.events[event] and f.scripts.OnEvent then f.scripts.OnEvent(f, event) end end end
 
 ---------------------------------------------------------------------------
@@ -194,6 +197,11 @@ D.seen, D.activeAt = {}, {}
 local first = D.collect({ time = 1000 })
 check("nothing is active on the first look", #first.active == 0)
 OBJ[122][1].numFulfilled = 3
+D.seen, D.activeAt = {}, {}
+D.HERE_YARDS = hereYards
+local here = D.collect({ time = 2000 })
+check("a quest whose objective is near is active", #here.active == 1 and here.active[1].id == 125 and here.active[1].dist == 200)
+D.HERE_YARDS = 0
 D.seen, D.activeAt = {}, {}
 
 -- Yields when the frame budget is spent.

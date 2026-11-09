@@ -296,7 +296,7 @@ function ns.render()
       local collapsed = ns.db.collapsed[kind]
       h.text:SetText((collapsed and "+ " or "") .. HEADS[kind] .. "  " .. #list)
       local sortKey = kind == "pickup" and "sortPickup" or kind == "log" and "sortLog"
-      h.right:SetText(kind == "active" and "last 5 min"
+      h.right:SetText(kind == "active" and "recent or here"
         or sortKey and (ns.db[sortKey] == "xp" and "best XP" or "nearest") or "nearest")
       h:Show()
       y = y - HEAD_H

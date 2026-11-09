@@ -17,6 +17,7 @@ D.PICKUP_SECS = 30       -- talk to the giver
 D.FAR = 500000           -- Questie's distance for another continent or instance
 D.BUDGET_MS = 3          -- work per frame when reading the available quests
 D.ACTIVE_SECS = 300      -- a quest whose count went up this recently is "active"
+D.HERE_YARDS = 200       -- ... or whose nearest open objective is this close
 
 local function call(fn, ...)
   if type(fn) ~= "function" then return nil end
@@ -321,7 +322,8 @@ end
 
 ---------------------------------------------------------------------------
 -- Active quests: a quest whose objective count went up in the last
--- ACTIVE_SECS (you killed or looted for it). The first look at a quest only
+-- ACTIVE_SECS (you killed or looted for it), or whose nearest open
+-- objective is within HERE_YARDS (you are in its area; see collect). The first look at a quest only
 -- records its count, so nothing is active right after login.
 D.seen, D.activeAt = {}, {}
 function D.noteProgress(e, clock)
@@ -358,7 +360,8 @@ function D.collect(opts)
   for _, e in ipairs(D.logQuests()) do
     inLog[e.id] = true
     D.finish(D.placeLog(e), level)
-    if D.noteProgress(e, clock) and not e.done then
+    local recent = D.noteProgress(e, clock)
+    if not e.done and (recent or (e.dist and e.dist <= D.HERE_YARDS)) then
       table.insert(out.active, e)
     else
       table.insert(e.done and out.turnin or out.log, e)
@@ -374,7 +377,11 @@ function D.collect(opts)
       tick()
     end
   end
-  table.sort(out.active, function(a, b) return a.activeAt > b.activeAt end)
+  -- Recent progress first (newest first), then the ones you stand in.
+  table.sort(out.active, function(a, b)
+    if (a.activeAt or -1) ~= (b.activeAt or -1) then return (a.activeAt or -1) > (b.activeAt or -1) end
+    return (a.dist or math.huge) < (b.dist or math.huge)
+  end)
   D.sort(out.turnin, "near")
   D.sort(out.log, opts.sortLog or "near")
   D.sort(out.pickup, opts.sortPickup or "xp")

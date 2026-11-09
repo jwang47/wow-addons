@@ -268,7 +268,7 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
 
 | Group | What | Sorted by |
 | --- | --- | --- |
-| Active | quests in your log whose kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`) | most recent first |
+| Active | quests in your log whose kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or whose nearest open objective is within 200 yards (`HERE_YARDS`) | most recent first, then nearest |
 | Turn in | quests in your log that are complete | nearest quest giver |
 | In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
 | Pick up | quests Questie shows as available ("!") that give XP and are at most 3 levels over you (`/qb range N`) | best estimated XP per minute (right-click the group: nearest) |
