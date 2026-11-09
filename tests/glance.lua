@@ -50,6 +50,13 @@ MinimapCluster.IndicatorFrame = widget()
 PlayerFrame, TargetFrame, PlayerCastingBarFrame = widget("PlayerFrame"), widget("TargetFrame"), widget("PlayerCastingBarFrame")
 GameTooltip = widget("GameTooltip")
 NUM_CHAT_WINDOWS = 2
+BT4Bar1, BT4BarBlizzardArt = widget("BT4Bar1"), widget("BT4BarBlizzardArt")
+function BT4Bar1:IsProtected() return true end
+local drivers = {}
+function RegisterStateDriver(f, k, v) drivers[f] = v end
+function UnitXP() return 300 end
+function UnitXPMax() return 1000 end
+function GetXPExhaustion() return 200 end
 ChatFrame1, ChatFrame2 = widget("ChatFrame1"), widget("ChatFrame2")
 ChatFrame1Tab = widget("ChatFrame1Tab")
 ChatFrame1Tab.Left = widget()
@@ -293,6 +300,13 @@ check("addon button in drawer", lib.parent == _G.GlanceAddonDrawer)
 check("tab counts buttons", ns.minimap.tab.text.text == "Addons 1")
 _G.GlanceMinimap.scripts.OnUpdate(_G.GlanceMinimap, 1)
 check("minimap info line", ns.minimap.info.text == "23.4, 51.3  16:03")
+
+-- Old bars.
+check("bars left alone by default", drivers[BT4Bar1] == nil and BT4BarBlizzardArt.shown)
+SlashCmdList.GLANCE("bars hide")
+check("bartender bar hidden by driver", drivers[BT4Bar1] == "hide")
+check("gryphon art hidden", not BT4BarBlizzardArt.shown)
+check("xp bar shown", _G.GlanceXP.shown)
 
 -- Chat.
 check("chat fades", fadeSet == true)

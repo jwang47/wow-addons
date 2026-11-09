@@ -134,6 +134,7 @@ end)
 local help = {
   "/glance edit - unlock the keyboard bar: drag spells off keys, drag the bar to move it",
   "/glance reset - put the keyboard bar back at the bottom centre",
+  "/glance bars hide - hide the old action bars and gryphons (show brings them back)",
   "/glance map SIZE - minimap size in pixels (120-400); or drag its corner in /glance edit",
   "/glance import - read your key bindings again and rebuild the keyboard bar",
   "/glance take KEY - put KEY on the keyboard bar even if it has another binding",

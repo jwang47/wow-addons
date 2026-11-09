@@ -299,6 +299,11 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   corner in `/glance edit`. The zone, coordinates and clock are under it, and the
   LibDBIcon addon buttons (Questie, Details and the rest) are in one
   drawer behind the Addons tab.
+- **Old bars**: `/glance bars hide` hides Bartender4's action bars 1-10,
+  Blizzard's bottom bars, the gryphon art and the old XP bar, and draws a
+  thin XP line along the bottom edge. The bag bar, micro menu, pet and
+  stance bars stay. Move click-only items (food, potions) onto Glance keys
+  first. `/glance bars show` brings everything back.
 - **Chat**: Blizzard's chat in the same look: a faint panel, tabs that show
   under the mouse, no side buttons, a plain edit box, and text that fades
   after 30 quiet seconds (scroll or hover brings it back).
