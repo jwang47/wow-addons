@@ -41,6 +41,83 @@ function ns.keybar.setCooldown(cd, slot)
   pcall(cd.SetCooldown, cd, start, dur)
 end
 
+---------------------------------------------------------------------------
+-- Spell ranks. Action slots keep the rank you put there, so after you train
+-- Frostbolt Rank 5 a key can still cast Rank 4. Such a key gets a small
+-- amber mark; /glance ranks puts the best known rank on every slot.
+---------------------------------------------------------------------------
+local best, rankCache = {}, {}
+
+local function rankOf(id)
+  if rankCache[id] ~= nil then return rankCache[id] or nil end
+  local sub
+  if C_Spell and C_Spell.GetSpellSubtext then sub = C_Spell.GetSpellSubtext(id)
+  elseif GetSpellSubtext then sub = GetSpellSubtext(id) end
+  sub = ns.plain(sub)
+  local r = type(sub) == "string" and tonumber(sub:match("(%d+)")) or nil
+  if sub ~= nil and sub ~= "" then rankCache[id] = r or false end
+  return r
+end
+
+local function spellName(id)
+  if C_Spell and C_Spell.GetSpellName then return ns.plain(C_Spell.GetSpellName(id)) end
+  return GetSpellInfo and ns.plain((GetSpellInfo(id)))
+end
+
+-- The highest rank of each spell in the spellbook.
+function ns.keybar.scanRanks()
+  best, rankCache = {}, {}
+  local SB = C_SpellBook
+  if not (SB and SB.GetNumSpellBookSkillLines and SB.GetSpellBookItemInfo) then return end
+  local bank = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player or 0
+  for line = 1, SB.GetNumSpellBookSkillLines() do
+    local li = SB.GetSpellBookSkillLineInfo(line)
+    if li and not li.shouldHide then
+      for i = li.itemIndexOffset + 1, li.itemIndexOffset + li.numSpellBookItems do
+        local info = SB.GetSpellBookItemInfo(i, bank)
+        if info and info.spellID and not info.isPassive then
+          local r = rankOf(info.spellID) or tonumber((info.subName or ""):match("(%d+)") or "")
+          local cur = best[info.name]
+          if r and (not cur or r > cur.rank) then best[info.name] = { id = info.spellID, rank = r } end
+        end
+      end
+    end
+  end
+end
+
+-- The better rank for a slot, or nil.
+function ns.keybar.betterRank(slot)
+  if not GetActionInfo then return nil end
+  local kind, id = GetActionInfo(slot)
+  kind, id = ns.plain(kind), ns.plain(id)
+  if kind ~= "spell" or type(id) ~= "number" then return nil end
+  local name = spellName(id)
+  local top, r = name and best[name], rankOf(id)
+  if top and r and top.rank > r and top.id ~= id then return top, r end
+end
+
+local function pickupSpell(id)
+  if C_Spell and C_Spell.PickupSpell then C_Spell.PickupSpell(id)
+  elseif PickupSpell then PickupSpell(id) end
+end
+
+ns.commands.ranks = function()
+  if InCombatLockdown() then return ns.print("Not in combat.") end
+  ns.keybar.scanRanks()
+  local n = 0
+  for slot = 1, 180 do
+    local top = ns.keybar.betterRank(slot)
+    if top then
+      pickupSpell(top.id)
+      PlaceAction(slot)
+      ClearCursor()
+      n = n + 1
+    end
+  end
+  ns.print(n == 0 and "Every slot has your best rank." or ("Moved the best rank onto " .. n .. " slots."))
+  ns.keybar.paintAll()
+end
+
 local function paint(b)
   if b.mode ~= "slot" then return end
   local slot = currentSlot(b)
@@ -74,7 +151,9 @@ local function paint(b)
     local dup = (not shiftDown()) and b.dupOf
     b.icon:SetAlpha(dup and 0.3 or 1)
     b.note:SetText(dup and ("= " .. keyText(dup)) or "")
+    b.rankUp:SetShown(ns.keybar.betterRank(slot) and true or false)
   else
+    b.rankUp:Hide()
     b.icon:Hide()
     b.empty:Show()
     b.count:SetText("")
@@ -130,6 +209,12 @@ local function makeButton(key, x, y)
   b.peek:SetSize(15, 15)
   b.peek:SetPoint("TOPRIGHT", -2, -2)
   b.peek:SetAlpha(0.85)
+  -- Old rank: a small amber corner, top-left.
+  b.rankUp = b:CreateTexture(nil, "OVERLAY")
+  b.rankUp:SetSize(8, 8)
+  b.rankUp:SetPoint("TOPLEFT", 2, -2)
+  b.rankUp:SetColorTexture(1, 0.7, 0.2, 0.95)
+  b.rankUp:Hide()
   b.label = b:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
   b.label:SetPoint("BOTTOMLEFT", 3, 2)
   b.label:SetText(keyText(key))
@@ -158,6 +243,10 @@ local function makeButton(key, x, y)
     if slot and api.HasAction(slot) then
       GameTooltip:SetOwner(self, "ANCHOR_TOP")
       GameTooltip:SetAction(slot)
+      local top = ns.keybar.betterRank(slot)
+      if top then
+        GameTooltip:AddLine("You know Rank " .. top.rank .. ". Type /glance ranks to use it.", 1, 0.7, 0.2, true)
+      end
       GameTooltip:Show()
     end
   end)
@@ -295,6 +384,11 @@ ns.module("keybar", function()
   for y, row in ipairs(K.ROWS) do
     if row.lead then makeButton(row.lead, MIN_X, y - 1) end
     for i, key in ipairs(row.keys) do makeButton(key, row.x + i - 1, y - 1) end
+  end
+
+  ns.keybar.scanRanks()
+  for _, ev in ipairs({ "SPELLS_CHANGED", "LEARNED_SPELL_IN_SKILL_LINE", "SPELL_TEXT_UPDATE" }) do
+    ns.on(ev, function() ns.keybar.scanRanks(); ns.keybar.paintAll() end)
   end
 
   ns.outOfCombat("keybar", function()

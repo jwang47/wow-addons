@@ -9,6 +9,8 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - New addon, a lighter HUD (`/glance`). Not in the releases yet: try it
   with `dev.ps1 Glance`.
+- Old spell ranks: an amber corner on the key, and `/glance ranks` swaps
+  in your best rank.
 - A keyboard bar: one button per key of the left hand (1-6, Tab Q W E R T,
   A S D F G, Z X), laid out like the keyboard. At the first login it
   reads your key bindings, so each spell shows on the key it is already on.

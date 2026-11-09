@@ -338,17 +338,40 @@ check("edit box restyled", ChatFrame1EditBox.glanceBg ~= nil)
 
 check("no bags tab", ns.minimap.bags == nil)
 
+-- Spell ranks: slot 1 holds Frostbolt Rank 4, the book knows Rank 5.
+local SPELLS = { [116] = { "Frostbolt", "Rank 4" }, [205] = { "Frostbolt", "Rank 5" } }
+C_Spell = {
+  GetSpellName = function(id) return SPELLS[id] and SPELLS[id][1] end,
+  GetSpellSubtext = function(id) return SPELLS[id] and SPELLS[id][2] end,
+  PickupSpell = function(id) _G.cursorSpell = id end,
+}
+C_SpellBook = {
+  GetNumSpellBookSkillLines = function() return 1 end,
+  GetSpellBookSkillLineInfo = function() return { itemIndexOffset = 0, numSpellBookItems = 1 } end,
+  GetSpellBookItemInfo = function() return { spellID = 205, name = "Frostbolt", subName = "Rank 5" } end,
+}
+function GetActionInfo(s) if s == 1 then return "spell", 116 end end
+function ClearCursor() end
+ns.keybar.scanRanks()
+ns.keybar.paintAll()
+check("old rank found", ns.keybar.betterRank(1) and ns.keybar.betterRank(1).id == 205)
+check("old rank marked", _G.GlanceKey1.rankUp.shown)
+check("other keys not marked", not _G.GlanceKeyQ.rankUp.shown)
+placed = nil
+SlashCmdList.GLANCE("ranks")
+check("ranks places the best rank", cursorSpell == 205 and placed == 1)
+
 -- Resizing the minimap.
 SlashCmdList.GLANCE("map 260")
 check("map size saved", ns.db.mapSize == 260)
 SlashCmdList.GLANCE("map 9999")
 check("map size clamped", ns.db.mapSize == 400)
 SlashCmdList.GLANCE("edit")
-check("grip hidden until hover", (_G.GlanceMinimapGrip.alpha or 0) == (ns.unlocked and 0.9 or 0))
+check("grip hidden until hover", (_G.GlanceMinimapGrip.alpha or 0) == (ns.unlocked and 0.9 or 0.25))
 Minimap.scripts.hookOnEnter()
 check("grip shows on map hover", _G.GlanceMinimapGrip.alpha == 0.9)
 Minimap.scripts.hookOnLeave()
-check("grip hides off the map", _G.GlanceMinimapGrip.alpha == 0)
+check("grip fades off the map", _G.GlanceMinimapGrip.alpha == 0.25)
 
 -- A combat login defers secure setup.
 for _, line in ipairs(chat) do check("no error", not line:match("failed"), line) end

@@ -293,6 +293,9 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
     layers, keep their commands) and the
     movement keys. `/glance import` reads your bindings
     again.
+  - A key that holds an old spell rank (you know a higher one) shows a
+    small amber corner, and its tooltip says so. `/glance ranks` puts your
+    best known rank on every action slot, out of combat.
   - Glance's keys win over Bartender4's for the same key. Hide the
     Bartender bars you no longer need in Bartender's options.
 - **Unit frames**: small player and target bars under your character and a

@@ -120,17 +120,20 @@ ns.module("minimap", function()
   Minimap:SetAllPoints(holder)
   Minimap:SetSize(ns.db.mapSize or SIZE, ns.db.mapSize or SIZE)
 
-  -- Resizing: a grip on the bottom-left corner. It shows faintly when the
-  -- mouse is over the map; drag it to resize (no edit mode needed).
+  -- Resizing: a gold grip on the bottom-left corner, faint until the mouse
+  -- is over the map; drag it to resize (no edit mode needed).
   local grip = CreateFrame("Button", "GlanceMinimapGrip", holder)
   mm.grip = grip
-  grip:SetSize(14, 14)
+  grip:SetSize(16, 16)
+  -- Its own strata: the Minimap keeps a strata of its own after the
+  -- reparent and would draw over a grip that only has a higher level.
+  grip:SetFrameStrata("HIGH")
   grip:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0)
   grip:SetFrameLevel((Minimap.GetFrameLevel and Minimap:GetFrameLevel() or 1) + 10)
   grip.tex = grip:CreateTexture(nil, "OVERLAY")
   grip.tex:SetAllPoints()
   grip.tex:SetColorTexture(1, 0.85, 0.3, 0.8)
-  local function lit(on) grip:SetAlpha(on and 0.9 or 0) end
+  local function lit(on) grip:SetAlpha(on and 0.9 or 0.25) end
   lit(false)
   grip:SetScript("OnEnter", function() lit(true) end)
   grip:SetScript("OnLeave", function(self) if not self.from then lit(false) end end)
@@ -192,12 +195,13 @@ ns.module("minimap", function()
   hide(Minimap.ZoomIn)
   hide(Minimap.ZoomOut)
   hide(Minimap.ZoomHitArea)
-  -- Mail and crafting-order icons: keep, in the bottom-left corner.
+  -- Mail and crafting-order icons: keep, in the bottom-right corner (the
+  -- resize grip has the bottom-left).
   local ind = MinimapCluster and MinimapCluster.IndicatorFrame
   if ind then
     ind:SetParent(holder)
     ind:ClearAllPoints()
-    ind:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", 2, 2)
+    ind:SetPoint("BOTTOMRIGHT", holder, "BOTTOMRIGHT", -2, 2)
   end
   if AddonCompartmentFrame then
     AddonCompartmentFrame:SetParent(holder)
