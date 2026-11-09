@@ -542,6 +542,11 @@ function ns.blocked(addon, fn, kind)
   table.insert(db.blocked, { fn = tostring(fn), kind = kind, time = call(rawget(_G, "time")), stack = stack })
   while #db.blocked > 5 do table.remove(db.blocked, 1) end
   say(kind .. ": " .. tostring(fn) .. " (please send this line)")
+  -- On Forever the combat log is what gets forbidden: turn it off for good.
+  if ns.calib and ns.calib.logOn() then
+    ns.calib.setLog(false)
+    say("combat log turned off again: this client does not allow it")
+  end
 end
 ns.handlers = handlers
 for ev in pairs(handlers) do pcall(events.RegisterEvent, events, ev) end -- unknown events throw
