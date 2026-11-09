@@ -60,7 +60,7 @@ setmetatable(_G, { __index = function(_, k)
   return { GetText = function() return text end,
     GetTextColor = function() if red then return 1, 0.125, 0.125 end return 1, 1, 1 end }
 end })
-function CreateFrame(kind, name)
+function CreateFrame(kind, name, parent)
   if kind == "GameTooltip" then
     local t = widget(name)
     function t:ClearLines() TT.lines = {} end
@@ -71,6 +71,12 @@ function CreateFrame(kind, name)
   end
   local f = widget(name)
   if name then _G[name] = f end
+  -- The game lays out a frame when a child gets a texture, and that can fire
+  -- the parent's OnSizeChanged before the parent's build has finished.
+  function f:SetNormalTexture()
+    local h = parent and parent.scripts and parent.scripts.OnSizeChanged
+    if h then h(parent) end
+  end
   return f
 end
 UIParent = widget("UIParent")

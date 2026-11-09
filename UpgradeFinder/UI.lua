@@ -73,7 +73,9 @@ local function labels()
 end
 
 function ns.paint()
-  if not frame then return end
+  -- OnSizeChanged can fire while build() still makes the frame (the resize
+  -- grip's texture lays it out); paint only once the buttons exist.
+  if not frame or not buttons.slot then return end
   labels()
   local _, _, spec = ns.weightKey()
   local wname = ns.weightsName()

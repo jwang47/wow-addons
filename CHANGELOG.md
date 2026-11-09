@@ -5,6 +5,12 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## UpgradeFinder 0.1.8
+
+- Fix a Lua error when the Upgrades window opens for the first time
+  (`attempt to index field 'slot'`). The new resize corner made the window
+  repaint before its buttons existed.
+
 ## UpgradeFinder 0.1.7
 
 - The Upgrades window can be resized: drag its bottom-right corner. A
