@@ -32,6 +32,8 @@ local function widget(name)
   function w:GetChildren() return unpack(self.children or {}) end
   function w:GetZoom() return self.zoom or 0 end
   function w:SetZoom(z) self.zoom = z end
+  function w:SetAlpha(a) self.alpha = a end
+  function w:IsMouseOver() return false end
   function w:GetZoomLevels() return 5 end
   return setmetatable(w, { __index = function(_, k)
     if type(k) == "string" and k:match("^%u") then return function() end end
@@ -93,7 +95,7 @@ local BIND = {
   W = "MOVEFORWARD", A = "STRAFELEFT", S = "MOVEBACKWARD", D = "STRAFERIGHT",
   TAB = "TARGETNEARESTENEMY", ["SHIFT-TAB"] = "TARGETPREVIOUSENEMY",
   Z = "", -- unbound
-  B = "OPENALLBAGS",
+  B = "OPENALLBAGS", C = "TOGGLECHARACTER0",
 }
 BINDING_NAME_TARGETNEARESTENEMY = "Target Nearest Enemy"
 function GetBindingAction(k) return BIND[k] or "" end
@@ -258,12 +260,12 @@ SlashCmdList.GLANCE("take all")
 check("take all takes F", ns.char.map.F.kind == "slot" and overrides.F == "GlanceKeyF:LeftButton")
 check("take all leaves Tab", ns.char.map.TAB.kind == "command")
 check("take all leaves W", ns.char.map.W.kind == "move")
-check("take all leaves B for bags", ns.char.map.B.kind == "command" and overrides.B == nil)
+check("C, V and B not on the bar", _G.GlanceKeyC == nil and _G.GlanceKeyV == nil and _G.GlanceKeyB == nil)
+check("take all leaves B and C", ns.char.map.B == nil and overrides.B == nil and overrides.C == nil)
 check("Shift-B left alone", ns.char.map["SHIFT-B"] == nil and overrides["SHIFT-B"] == nil)
 SlashCmdList.GLANCE("take b")
 SlashCmdList.GLANCE("take shift-b")
-check("bag key cannot be taken", ns.char.map.B.kind == "command" and overrides.B == nil
-  and overrides["SHIFT-B"] == nil)
+check("bag key cannot be taken", overrides.B == nil and overrides["SHIFT-B"] == nil)
 check("taken F gets a Shift layer", ns.char.map["SHIFT-F"] and ns.char.map["SHIFT-F"].kind == "slot")
 
 -- Import in combat waits.
@@ -334,10 +336,7 @@ check("chat side buttons hidden", not ChatFrame1ButtonFrame.shown and not ChatFr
 check("tabs hide without the mouse", CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA == 0)
 check("edit box restyled", ChatFrame1EditBox.glanceBg ~= nil)
 
-local bagsOpened
-function ToggleAllBags() bagsOpened = true end
-ns.minimap.bags.scripts.OnClick()
-check("bags button", bagsOpened)
+check("no bags tab", ns.minimap.bags == nil)
 
 -- Resizing the minimap.
 SlashCmdList.GLANCE("map 260")
@@ -345,7 +344,11 @@ check("map size saved", ns.db.mapSize == 260)
 SlashCmdList.GLANCE("map 9999")
 check("map size clamped", ns.db.mapSize == 400)
 SlashCmdList.GLANCE("edit")
-check("grip shows in edit", _G.GlanceMinimapGrip.shown == ns.unlocked)
+check("grip hidden until hover", (_G.GlanceMinimapGrip.alpha or 0) == (ns.unlocked and 0.9 or 0))
+Minimap.scripts.hookOnEnter()
+check("grip shows on map hover", _G.GlanceMinimapGrip.alpha == 0.9)
+Minimap.scripts.hookOnLeave()
+check("grip hides off the map", _G.GlanceMinimapGrip.alpha == 0)
 
 -- A combat login defers secure setup.
 for _, line in ipairs(chat) do check("no error", not line:match("failed"), line) end

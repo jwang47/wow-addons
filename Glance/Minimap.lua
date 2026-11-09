@@ -120,7 +120,8 @@ ns.module("minimap", function()
   Minimap:SetAllPoints(holder)
   Minimap:SetSize(ns.db.mapSize or SIZE, ns.db.mapSize or SIZE)
 
-  -- Resizing: a grip on the bottom-left corner in /glance edit.
+  -- Resizing: a grip on the bottom-left corner. It shows faintly when the
+  -- mouse is over the map; drag it to resize (no edit mode needed).
   local grip = CreateFrame("Button", "GlanceMinimapGrip", holder)
   mm.grip = grip
   grip:SetSize(14, 14)
@@ -129,12 +130,20 @@ ns.module("minimap", function()
   grip.tex = grip:CreateTexture(nil, "OVERLAY")
   grip.tex:SetAllPoints()
   grip.tex:SetColorTexture(1, 0.85, 0.3, 0.8)
-  grip:Hide()
+  local function lit(on) grip:SetAlpha(on and 0.9 or 0) end
+  lit(false)
+  grip:SetScript("OnEnter", function() lit(true) end)
+  grip:SetScript("OnLeave", function(self) if not self.from then lit(false) end end)
+  Minimap:HookScript("OnEnter", function() lit(true) end)
+  Minimap:HookScript("OnLeave", function() if not grip.from then lit(false) end end)
   grip:SetScript("OnMouseDown", function(self)
     local x, y = GetCursorPosition()
     self.from = { x = x, y = y, size = holder:GetWidth() }
   end)
-  grip:SetScript("OnMouseUp", function(self) self.from = nil end)
+  grip:SetScript("OnMouseUp", function(self)
+    self.from = nil
+    lit(self:IsMouseOver() or Minimap:IsMouseOver())
+  end)
   grip:SetScript("OnUpdate", function(self)
     if not self.from then return end
     local x, y = GetCursorPosition()
@@ -143,7 +152,7 @@ ns.module("minimap", function()
     local grow = math.max(self.from.x - x, self.from.y - y) / scale
     mm.setSize(self.from.size + grow)
   end)
-  table.insert(ns.editHooks, function(on) grip:SetShown(on) end)
+  table.insert(ns.editHooks, function(on) lit(on) end)
   Minimap:SetMaskTexture("Interface\\Buttons\\WHITE8X8")
   Minimap:EnableMouseWheel(true)
   Minimap:SetScript("OnMouseWheel", function(self, d)
@@ -209,12 +218,6 @@ ns.module("minimap", function()
 
   mm.tab = chip(holder, "Addons")
   mm.tab:SetPoint("TOPLEFT", zone, "BOTTOMLEFT", 0, -2)
-  -- Bags: opens every bag (Baganator when it is loaded takes this over).
-  mm.bags = chip(holder, "Bags")
-  mm.bags:SetPoint("LEFT", mm.tab, "RIGHT", 4, 0)
-  mm.bags:SetScript("OnClick", function()
-    if ToggleAllBags then ToggleAllBags() elseif OpenAllBags then OpenAllBags() end
-  end)
   mm.drawer = CreateFrame("Frame", "GlanceAddonDrawer", holder)
   mm.drawer:SetPoint("TOPRIGHT", holder, "BOTTOMRIGHT", 0, -44)
   mm.drawer.bg = mm.drawer:CreateTexture(nil, "BACKGROUND")

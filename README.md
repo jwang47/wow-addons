@@ -271,7 +271,7 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
 
 - **Keyboard bar** (bottom centre): one button per key of the left hand,
   laid out like the keyboard: 1-6, Tab Q W E R T, A S D F G and
-  Z X C V B. At the first login Glance reads each key's binding. A key that
+  Z X (C, V and B stay with the game). At the first login Glance reads each key's binding. A key that
   fires an action button (Blizzard's bars or Bartender4's) keeps that slot,
   so your spells show on the keys they are already on. A free key gets an
   empty slot. Movement keys (dashed, with an arrow) and keys with another
@@ -288,8 +288,9 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
     action buttons then).
   - `/glance take F` puts a key with another command on the bar;
     `/glance free F` gives it back. `/glance take all` takes every key with
-    another command (F: Assist, Z: Sheathe, C: Character and so on), except
-    Tab, the bag keys (B and its Shift layer stay with your bags) and the
+    another command (F: Assist, Z: Sheathe and so on), except
+    Tab, the bag keys and the character pane (B and C, with their Shift
+    layers, keep their commands) and the
     movement keys. `/glance import` reads your bindings
     again.
   - Glance's keys win over Bartender4's for the same key. Hide the
@@ -298,10 +299,10 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   cast bar below them. They replace Blizzard's player, target and cast
   frames (`/glance blizzard on` keeps those).
 - **Minimap**: square, top-right, mouse-wheel zoom, right-click for
-  tracking. `/glance map 250` sets its size (120 to 400), or drag the gold
-  corner in `/glance edit`. The zone, coordinates and clock are under it, and the
+  tracking. Drag the gold corner at its bottom left (it shows when the
+  mouse is over the map) to resize it, or type `/glance map 250` (120 to 400). The zone, coordinates and clock are under it, and the
   LibDBIcon addon buttons (Questie, Details and the rest) are in one
-  drawer behind the Addons tab. The Bags tab beside it opens your bags.
+  drawer behind the Addons tab.
 - **Old bars**: `/glance bars hide` hides Bartender4's bottom action bars
   (1, 2 and 5-10; the right-edge bars 3 and 4 stay),
   Blizzard's bottom bars, the gryphon art and the old XP bar, and draws a

@@ -16,7 +16,8 @@ K.ROWS = {
   { x = 1,    keys = { "1", "2", "3", "4", "5", "6" } },
   { x = 1.5,  keys = { "Q", "W", "E", "R", "T" }, lead = "TAB" },
   { x = 1.75, keys = { "A", "S", "D", "F", "G" } },
-  { x = 2.25, keys = { "Z", "X", "C", "V", "B" } },
+  -- C, V and B stay with the game (character pane, nameplates, bags).
+  { x = 2.25, keys = { "Z", "X" } },
 }
 K.MODS = { "", "SHIFT-" }   -- layers: plain and Shift
 
@@ -53,10 +54,13 @@ function K.classify(cmd)
   return "command", cmd
 end
 
--- Bag keys stay with the bags: /glance take never moves them, and their
--- Shift layer stays free too (OPENALLBAGS, TOGGLEBACKPACK, TOGGLEBAG1 ...).
-function K.isBagCommand(cmd)
-  return type(cmd) == "string" and cmd:find("BAG") ~= nil and not cmd:match("^CLICK ")
+-- Kept keys stay with their command: /glance take never moves them, and
+-- their Shift layer stays free too. The bag keys (OPENALLBAGS,
+-- TOGGLEBACKPACK, TOGGLEBAG1 ...) and the character pane (C).
+local KEEP = { TOGGLECHARACTER0 = true }
+function K.isKept(cmd)
+  if type(cmd) ~= "string" or cmd:match("^CLICK ") then return false end
+  return KEEP[cmd] or cmd:find("BAG") ~= nil
 end
 
 -- Every key the bar shows, in row order.
@@ -96,7 +100,7 @@ function K.build(getBinding, hasAction, allBindings, take, prev)
   local map, wantFree = {}, {}
   for _, key in ipairs(K.allKeys()) do
     local plainKind
-    local bagKey = K.isBagCommand(getBinding(key))
+    local bagKey = K.isKept(getBinding(key))
     for _, mod in ipairs(K.MODS) do
       local mk = mod .. key
       local kind, v = K.classify(getBinding(mk))
