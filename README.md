@@ -98,7 +98,7 @@ nothing). Fuzzy hits rank below exact ones.
 
 Filters: `i:` items, `p:` places, `@` or `w:` people, `s:` spells, `n:` NPCs,
 `q:` quests (your log and Questie), `l:` your log only, `c:` commands,
-`near:` or `nb:` nearby NPCs (alone: everything nearby, nearest first). An empty box lists what you used last.
+`near:` or `nb:` nearby NPCs (alone: everything nearby, nearest first). The Nearby group always comes first. An empty box lists the 5 nearest NPCs, then what you used last.
 
 Ranking: a name that starts with the query first, then names where each
 query word starts a word, then names that only contain it. Inside each
