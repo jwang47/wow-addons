@@ -78,6 +78,7 @@ function ns.paint()
       row.icon:SetTexture(call(api("C_Item.GetItemIconByID"), r.id) or 134400)
       -- Free elsewhere (quest, dungeon, vendor): a short tag after the name.
       local tag = r.source ~= "dungeon" and ns.where.tag(ns.where.of(r.id)) or nil
+      if r.recipe then tag = "craft" end -- a pattern: the row is the item it makes
       row.name:SetText(tag and (r.name .. "  |cff8cc7ff" .. tag .. "|r") or r.name)
       row.name:SetTextColor(qualityColor(r.id))
       local gain = string.format("+%.1f", r.gain)
@@ -127,16 +128,27 @@ local function showDetails(row)
   if not (r and tt) then return end
   tt:SetOwner(row, "ANCHOR_RIGHT")
   tt:SetHyperlink("item:" .. r.id)
+  -- One entry per line: the label on the left, the number on the right.
+  local function section(title, list)
+    if #list == 0 then return end
+    tt:AddLine(title, 1, 0.82, 0)
+    for _, e in ipairs(list) do
+      tt:AddDoubleLine("  " .. e[1], e[2], 0.9, 0.9, 0.9, e[3] and 0.25 or 1, e[3] and 1 or 0.38, 0.25)
+    end
+  end
   tt:AddLine(" ")
-  tt:AddLine(string.format("Upgrades: +%.1f  (score %.1f vs %.1f worn)", r.gain, r.value, r.value - r.gain), 0.25, 1, 0.25)
+  tt:AddDoubleLine(string.format("Upgrade +%.1f", r.gain), string.format("score %.1f vs %.1f worn", r.value, r.value - r.gain),
+    0.25, 1, 0.25, 0.6, 0.6, 0.6)
+  if r.recipe then tt:AddLine("Crafted: " .. r.recipe .. (r.craft and (" (" .. r.craft .. ")") or ""), 1, 0.82, 0) end
   if r.note then tt:AddLine(r.note, 1, 0.82, 0) end
   -- What it changes (Stats.lua): stats, then offense and defense.
   local ok, d, off, def = pcall(ns.stats.forRow, r)
   if ok and d and next(d) then
     tt:AddLine(" ")
-    tt:AddLine("Changes: " .. ns.stats.statLine(d), 1, 0.82, 0, true)
-    if #off > 0 then tt:AddLine("Offense: " .. ns.stats.join(off), 1, 0.82, 0, true) end
-    if #def > 0 then tt:AddLine("Defense: " .. ns.stats.join(def), 1, 0.82, 0, true) end
+    section("Stats", ns.stats.statList(d))
+    section("Offense", off)
+    section("Defense", def)
+    tt:AddLine(" ")
   end
   -- The "Get it:" lines come from the item tooltip hook (Where.lua).
   local where = ns.where.of(r.id)
@@ -156,6 +168,8 @@ local function showDetails(row)
   tt:AddLine("Alt-click: try it in the Build window", 0.6, 0.6, 0.6)
   tt:Show()
 end
+
+ns.showDetails = showDetails
 
 local function click(row)
   local r = row.data

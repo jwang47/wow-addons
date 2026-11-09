@@ -24,6 +24,12 @@ the same, and a test checks that every `.toc` version has a section here.
   and mana. Cooldown spells go whenever ready, the best filler the rest of
   the time. The window shows the rotation; row tooltips use it for Est. DPS
   until the combat log has enough hits.
+- Patterns, plans and other recipes on the AH now show as the item they
+  make (tagged "craft"), scored like any other item. A missing profession
+  does not hide them; the tooltip names it.
+- The row tooltip is easier to read: one stat per line, the name on the
+  left and the change on the right, under Stats, Offense and Defense.
+- Each weight preset has an x button that deletes it.
 
 ## UpgradeFinder 0.1.5
 

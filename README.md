@@ -130,7 +130,9 @@ beats what you wear, biggest gain first. Each row is one line (icon, name,
 slot, `+gain`, then the price, "bags", or the dungeon's short name such as
 `DM` or `BRD`); hover a row for the item tooltip plus the score you wear, the
 gain per gold and what it replaces. Click searches the AH (when it is open;
-for a dungeon drop it names the boss in chat), Shift-click links it.
+for a dungeon drop it names the boss in chat), Shift-click links it. A pattern, plan or other recipe on the AH shows
+as the gear it makes, tagged "craft" (its tooltip names the profession;
+Scan.lua reads the made item's slot and stats from the recipe tooltip).
 
 - Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
@@ -209,7 +211,7 @@ for a dungeon drop it names the boss in chat), Shift-click links it.
   opens a panel beside the window (`UpgradeFinder/Weights.lua`): a box per
   stat, gold when it differs from the default (empty it for the default);
   a name box with **Save** and **Defaults**; and a button per preset (click
-  loads it, shift-right-click deletes it). In chat, `/uf weight STAT N` changes a weight for
+  loads it, the x beside it deletes it). In chat, `/uf weight STAT N` changes a weight for
   your current spec (an unknown stat is refused), `/uf weight STAT default`
   undoes one, `/uf weight reset` goes back to the defaults, and `/uf weights`
   lists them. `/uf save NAME` keeps the weights in use as a preset for your

@@ -94,7 +94,7 @@ C_Item = {
   GetItemInfoInstant = function(x)
     local id = tonumber(tostring(x):match("(%d+)"))
     if id == 110 and passes < 1 then return nil end -- the game has not seen it yet
-    return id, nil, nil, ITEMS[id] and ITEMS[id].loc
+    return id, nil, nil, ITEMS[id] and ITEMS[id].loc, nil, ITEMS[id] and ITEMS[id].class
   end,
   RequestLoadItemDataByID = function(id) table.insert(calls, "load " .. id) end,
   -- 109 arrives on the second look after it was asked for.
@@ -512,6 +512,12 @@ IsShiftKeyDown = function() return true end
 wui.presets[1].scripts.OnClick(wui.presets[1], "RightButton")
 IsShiftKeyDown = nil
 check("shift-right-click deletes", UpgradeFinderDB.presets[ns.class()]["big-int"] == nil and not wui.presets[1].shown)
+ns.savePreset("spare")
+ns.paintWeights()
+check("each preset has a delete button", wui.presets[1].preset == "spare" and wui.presets[1].del.shown)
+wui.presets[1].del.scripts.OnClick(wui.presets[1].del)
+check("the x button deletes the preset", UpgradeFinderDB.presets[ns.class()].spare == nil
+  and not wui.presets[1].shown and not wui.presets[1].del.shown)
 SlashCmdList.UPGRADEFINDER("weight reset")
 
 -- Slot column -------------------------------------------------------------------
@@ -750,6 +756,40 @@ Bd.delete("hood")
 check("build: delete", #Bd.names() == 0)
 Bd.reset()
 GetActionInfo, GetSpellInfo, GetSpellDescription, GetSpellBaseCooldown, GetSpellPowerCost = nil, nil, nil, nil, nil
+
+-- Recipes: a pattern scores as the item it makes ------------------------------
+local Sc = ns.scan
+ITEMS[114] = { loc = "", class = 9, lines = { "Pattern: Frost Circlet", "Frost Circlet", "Binds when picked up",
+  "Head", "+9 Intellect", "Requires Level 20", "Use: Teaches you how to craft Frost Circlet.",
+  "Bolt of Silk Cloth (8)", { "Requires Tailoring (125)", red = true } } }
+ITEMS[115] = { loc = "", class = 9, lines = { "Plans: Iron Helm", "Iron Helm", "Head", { "Plate", red = true },
+  "+8 Strength", { "Requires Blacksmithing (100)", red = true } } }
+ITEMS[116] = { loc = "", class = 9, lines = { "Recipe: Fish Stew", "Use: Teaches you how to cook Fish Stew." } }
+Sc.item(114) Sc.item(115) Sc.item(116)
+local c114 = Sc.cache[114]
+check("recipe: scores the item it makes", c114 and c114.name == "Frost Circlet" and c114.loc == "INVTYPE_HEAD"
+  and c114.value > 0 and c114.recipe == "Pattern: Frost Circlet" and c114.craft == "Tailoring (125)")
+check("recipe: a missing profession is not unusable", c114 and c114.unusable == false and c114.reqLevel == 20)
+check("recipe: plate you cannot wear is unusable", Sc.cache[115] and Sc.cache[115].unusable == true)
+check("recipe: no gear inside is skipped", Sc.cache[116] == false)
+local rr = Sc.rows({ [114] = "AH" })
+check("recipe: the row carries the pattern", rr[1] and rr[1].recipe == "Pattern: Frost Circlet" and rr[1].gain > 0)
+
+-- Row tooltip: one stat per line, label left, number right -------------------
+local doubles, singles = {}, {}
+local gt = GameTooltip
+local oldAdd, oldDouble = gt.AddLine, gt.AddDoubleLine
+gt.AddLine = function(_, l) table.insert(singles, l) end
+gt.AddDoubleLine = function(_, l, r) table.insert(doubles, { l, r }) end
+ns.showDetails({ data = rr[1] })
+gt.AddLine, gt.AddDoubleLine = oldAdd, oldDouble
+local function hasDouble(l) for _, d in ipairs(doubles) do if d[1]:match(l) then return d end end end
+local function hasSingle(l) for _, t in ipairs(singles) do if t == l then return true end end end
+check("tooltip: an Upgrade line and a Crafted line", hasDouble("^Upgrade %+") ~= nil
+  and hasSingle("Crafted: Pattern: Frost Circlet (Tailoring (125))"))
+local intLine = hasDouble("^  Intellect$")
+check("tooltip: one stat per line", hasSingle("Stats") and intLine and intLine[2]:match("^%+%d") ~= nil)
+check("tooltip: no run-on Changes line", not hasSingle("Changes:"))
 
 print(failures == 0 and "all UpgradeFinder tests passed" or (failures .. " UpgradeFinder test(s) failed"))
 os.exit(failures == 0 and 0 or 1)

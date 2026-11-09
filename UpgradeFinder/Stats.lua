@@ -14,6 +14,12 @@ St.NAMES = {
   holy = "Holy dmg", crit = "Crit", hit = "Hit", spcrit = "Spell crit", sphit = "Spell hit", mp5 = "Mp5",
   armor = "Armor", def = "Defense", block = "Block", dps = "Weapon DPS",
 }
+-- Full names, for the one-stat-per-line tooltip.
+St.LONG = {
+  str = "Strength", agi = "Agility", sta = "Stamina", int = "Intellect", spi = "Spirit", ap = "Attack power",
+  sp = "Spell damage", frost = "Frost damage", fire = "Fire damage", arcane = "Arcane damage",
+  shadow = "Shadow damage", nature = "Nature damage", holy = "Holy damage", mp5 = "Mana per 5 sec",
+}
 St.ORDER = { "str", "agi", "sta", "int", "spi", "ap", "sp", "heal", "frost", "fire", "arcane", "shadow", "nature",
   "holy", "crit", "hit", "spcrit", "sphit", "mp5", "dps", "armor", "def", "block" }
 St.PCT = { crit = true, hit = true, spcrit = true, sphit = true }
@@ -129,6 +135,17 @@ function St.statLine(d)
     end
   end
   return table.concat(parts, "  ")
+end
+
+-- The stat change as entries { label, value, good }, one per stat, for a
+-- tooltip with the label on the left and the number on the right.
+function St.statList(d)
+  local out = {}
+  for _, k in ipairs(St.ORDER) do
+    local v = d[k]
+    if v then table.insert(out, { St.LONG[k] or St.NAMES[k], fmt(v, St.PCT[k]), v > 0 }) end
+  end
+  return out
 end
 
 -- The offense and defense entries for a stat change d. Each entry is
