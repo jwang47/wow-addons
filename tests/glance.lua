@@ -93,6 +93,7 @@ local BIND = {
   W = "MOVEFORWARD", A = "STRAFELEFT", S = "MOVEBACKWARD", D = "STRAFERIGHT",
   TAB = "TARGETNEARESTENEMY", ["SHIFT-TAB"] = "TARGETPREVIOUSENEMY",
   Z = "", -- unbound
+  B = "OPENALLBAGS",
 }
 BINDING_NAME_TARGETNEARESTENEMY = "Target Nearest Enemy"
 function GetBindingAction(k) return BIND[k] or "" end
@@ -257,6 +258,12 @@ SlashCmdList.GLANCE("take all")
 check("take all takes F", ns.char.map.F.kind == "slot" and overrides.F == "GlanceKeyF:LeftButton")
 check("take all leaves Tab", ns.char.map.TAB.kind == "command")
 check("take all leaves W", ns.char.map.W.kind == "move")
+check("take all leaves B for bags", ns.char.map.B.kind == "command" and overrides.B == nil)
+check("Shift-B left alone", ns.char.map["SHIFT-B"] == nil and overrides["SHIFT-B"] == nil)
+SlashCmdList.GLANCE("take b")
+SlashCmdList.GLANCE("take shift-b")
+check("bag key cannot be taken", ns.char.map.B.kind == "command" and overrides.B == nil
+  and overrides["SHIFT-B"] == nil)
 check("taken F gets a Shift layer", ns.char.map["SHIFT-F"] and ns.char.map["SHIFT-F"].kind == "slot")
 
 -- Import in combat waits.

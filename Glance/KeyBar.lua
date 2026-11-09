@@ -359,7 +359,8 @@ ns.commands.take = function(rest)
     -- Every key with another command, except Tab (targeting) and movement.
     local n = 0
     for mk, e in pairs(ns.char.map or {}) do
-      if e.kind == "command" and mk ~= "TAB" and mk ~= "SHIFT-TAB" then
+      if e.kind == "command" and mk ~= "TAB" and mk ~= "SHIFT-TAB"
+          and not K.isBagCommand(e.cmd) then
         ns.char.take[mk] = true
         n = n + 1
       end

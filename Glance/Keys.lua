@@ -53,6 +53,12 @@ function K.classify(cmd)
   return "command", cmd
 end
 
+-- Bag keys stay with the bags: /glance take never moves them, and their
+-- Shift layer stays free too (OPENALLBAGS, TOGGLEBACKPACK, TOGGLEBAG1 ...).
+function K.isBagCommand(cmd)
+  return type(cmd) == "string" and cmd:find("BAG") ~= nil and not cmd:match("^CLICK ")
+end
+
 -- Every key the bar shows, in row order.
 function K.allKeys()
   local out = {}
@@ -90,10 +96,12 @@ function K.build(getBinding, hasAction, allBindings, take, prev)
   local map, wantFree = {}, {}
   for _, key in ipairs(K.allKeys()) do
     local plainKind
+    local bagKey = K.isBagCommand(getBinding(key))
     for _, mod in ipairs(K.MODS) do
       local mk = mod .. key
       local kind, v = K.classify(getBinding(mk))
-      if take[mk] and kind ~= "slot" then kind = "free" end
+      if take[mk] and kind ~= "slot" and not bagKey then kind = "free" end
+      if bagKey and mod ~= "" and kind ~= "slot" then kind = "skip" end
       if mod == "" then plainKind = kind end
       -- A free Shift layer only on a key that is a spell key itself, so
       -- Shift+W still walks and Shift+Tab still does what Tab does.
