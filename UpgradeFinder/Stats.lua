@@ -99,6 +99,12 @@ function St.context(class, w)
   local _, effective = call(rawget(_G, "UnitArmor"), "player")
   ctx.armor = effective
   ctx.health = call(rawget(_G, "UnitHealthMax"), "player")
+  -- Measured Forever ratios (Calib.lua), where there is enough data.
+  local calib = ns.calib and ns.calib.ratios(ctx.level, class) or {}
+  for _, k in ipairs({ "intPerCrit", "agiPerCrit", "hpPerSta", "manaPerInt" }) do
+    if calib[k] then ctx[k] = calib[k][1] end
+  end
+  if ns.calib then ctx.dpsFn = ns.calib.dpsChange end
   return ctx
 end
 
@@ -135,8 +141,11 @@ function St.derive(d, ctx, w, loc)
     if v and math.abs(v) >= (pct and 0.05 or 0.5) then table.insert(list, { label, fmt(v, pct), v > 0 }) end
   end
   local est
-  local intCrit = St.INT_PER_CRIT[class] and (d.int or 0) / per(level, St.INT_PER_CRIT[class]) or 0
-  local agiCrit = St.AGI_PER_CRIT[class] and (d.agi or 0) / per(level, St.AGI_PER_CRIT[class]) or 0
+  -- Measured ratios (ctx, from Calib.lua) win over the Classic guesses.
+  local intPer = ctx.intPerCrit or (St.INT_PER_CRIT[class] and per(level, St.INT_PER_CRIT[class]))
+  local agiPer = ctx.agiPerCrit or (St.AGI_PER_CRIT[class] and per(level, St.AGI_PER_CRIT[class]))
+  local intCrit = intPer and (d.int or 0) / intPer or 0
+  local agiCrit = agiPer and (d.agi or 0) / agiPer or 0
 
   if role == "caster" or role == "healer" then
     local heal = role == "healer"
@@ -154,6 +163,9 @@ function St.derive(d, ctx, w, loc)
     local after = (B + 0.8 * (now + power)) * (1 + 0.5 * (c0 + crit / 100))
       * (heal and 1 or math.min(0.99, h0 + (d.sphit or 0) / 100))
     est = after / before - 1
+    -- Your own spells (Calib.lua), once enough hits are logged.
+    local measured = not heal and ctx.dpsFn and ctx.dpsFn(power, crit / 100, ctx.sp)
+    if measured then est = (1 + measured) * math.min(0.99, h0 + (d.sphit or 0) / 100) / h0 - 1 end
   else
     local ranged = role == "ranged"
     local apNow = ranged and ctx.rap or ctx.ap or (60 + level * 3)
@@ -176,16 +188,24 @@ function St.derive(d, ctx, w, loc)
     table.insert(off, { (role == "healer" and "Est. healing" or "Est. DPS"), fmt(est * 100, true), est > 0 })
   end
 
-  add(def, "Health", (d.sta or 0) * 10)
+  local hp = (d.sta or 0) * (ctx.hpPerSta or 10)
+  add(def, "Health", hp)
   local armor = (d.armor or 0) + (d.agi or 0) * 2
+  local armorNow = ctx.armor or level * 20
   if math.abs(armor) >= 0.5 then
-    local now = ctx.armor or level * 20
-    local dr = (St.reduction(now + armor, level) - St.reduction(now, level)) * 100
+    local dr = (St.reduction(armorNow + armor, level) - St.reduction(armorNow, level)) * 100
     table.insert(def, { "Armor", fmt(armor) .. string.format(" (%+.1f%% less damage)", dr), armor > 0 })
+  end
+  -- Effective health against physical hits: health / (1 - armor reduction).
+  local hpNow = ctx.health or (level * 15 + 40)
+  local ehp0 = hpNow / (1 - St.reduction(armorNow, level))
+  local ehp1 = (hpNow + hp) / (1 - St.reduction(armorNow + armor, level))
+  if math.abs(ehp1 - ehp0) >= 0.5 then
+    table.insert(def, { "eHP", fmt(ehp1 - ehp0) .. string.format(" (%+.1f%%)", (ehp1 / ehp0 - 1) * 100), ehp1 > ehp0 })
   end
   add(def, "Defense", d.def)
   add(def, "Block", d.block)
-  if class ~= "WARRIOR" and class ~= "ROGUE" then add(def, "Mana", (d.int or 0) * 15) end
+  if class ~= "WARRIOR" and class ~= "ROGUE" then add(def, "Mana", (d.int or 0) * (ctx.manaPerInt or 15)) end
   add(def, "Mp5", d.mp5)
   return off, def, role
 end

@@ -149,7 +149,7 @@ ns.DUNGEONS = {
   { "Shadowfang Keep", "SFK", 11, 30, { "Arugal", 111 } },
 }
 
-for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Stats.lua", "UI.lua", "Weights.lua" }) do
+for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Stats.lua", "Calib.lua", "UI.lua", "Weights.lua" }) do
   assert(loadfile(root .. "UpgradeFinder/" .. file))("UpgradeFinder", ns)
 end
 local S = ns.score
@@ -594,6 +594,71 @@ local rd, roff = St.forRow(hoodRow)
 WORN[1] = wasHead
 ns.scan.readWorn()
 check("forRow: Silk Hood vs Worn Cap", rd and rd.int == 3 and rd.sta == 4 and find(roff, "Est. DPS") ~= nil)
+
+-- eHP --------------------------------------------------------------------------
+off, def = St.derive({ sta = 10, armor = 200 }, { class = "WARRIOR", level = 30, health = 1000, armor = 1000 }, ww, "INVTYPE_CHEST")
+local ehp = find(def, "eHP")
+-- 1000 / (1 - 1000/3950) = 1338.98; 1100 / (1 - 1200/4150) = 1547.46
+check("eHP from health and armor", ehp and ehp[2] == "+208 (+15.6%)" and ehp[3] == true)
+
+-- Calibration (Calib.lua) ----------------------------------------------------
+local Cal = ns.calib
+Cal.reset()
+local snaps = Cal.store().snaps
+-- Level 24: 24 Int per 1% crit, 10 health per Sta (+ 50), 15 mana per Int.
+for _, int in ipairs({ 40, 52, 64 }) do
+  table.insert(snaps, { level = 24, int = int, agi = 20, sta = 30, spcrit = 2 + int / 24, hp = 50 + 30 * 10,
+    mana = 100 + int * 15 })
+end
+table.insert(snaps, { level = 24, int = 64, agi = 20, sta = 41, spcrit = 2 + 64 / 24, hp = 50 + 41 * 10, mana = 100 + 64 * 15 })
+local r = Cal.ratios(24, ns.class())
+check("calib: Int per crit measured", r.intPerCrit and math.abs(r.intPerCrit[1] - 24) < 1e-6 and r.intPerCrit.n == 4)
+check("calib: health per Sta measured", r.hpPerSta and math.abs(r.hpPerSta[1] - 10) < 1e-6)
+check("calib: mana per Int measured", r.manaPerInt and math.abs(r.manaPerInt[1] - 15) < 1e-6)
+check("calib: no Agi spread, no Agi ratio", r.agiPerCrit == nil)
+local r30 = Cal.ratios(30, ns.class())
+check("calib: another level scales the crit ratio", r30.intPerCrit and math.abs(r30.intPerCrit[1] - 30) < 1e-6)
+check("calib: a small spread does not count", Cal.slope({ { level = 5, int = 10, spcrit = 1 }, { level = 5, int = 12, spcrit = 2 } },
+  5, "int", "spcrit") == nil)
+off = St.derive({ int = 12 }, { class = "MAGE", level = 24, intPerCrit = 12 }, mw, "INVTYPE_HEAD")
+check("derive uses a measured ratio", find(off, "Spell crit")[2] == "+1.0%")
+-- Spells: Frostbolt hits 100 + 0.8 x sp, crits 150, at sp 0..40.
+UnitGUID = function() return "me" end
+local curSP = 0
+GetSpellBonusDamage = function() return curSP end
+for i = 1, 40 do
+  local sp = i
+  curSP = sp
+  Cal.combat(0, "SPELL_DAMAGE", false, "me", "Ded", 0, 0, "mob", "Boar", 0, 0, 116, "Frostbolt", 16,
+    math.floor(100 + 0.8 * sp + 0.5), 0, 16, nil, nil, nil, false)
+  if i % 4 == 0 then
+    Cal.combat(0, "SPELL_DAMAGE", false, "me", "Ded", 0, 0, "mob", "Boar", 0, 0, 116, "Frostbolt", 16, 150, 0, 16, nil, nil, nil, true)
+  end
+end
+Cal.combat(0, "SPELL_DAMAGE", false, "someone", "X", 0, 0, "mob", "Boar", 0, 0, 116, "Frostbolt", 16, 9999, 0, 16, nil, nil, nil, false)
+Cal.combat(0, "SPELL_MISSED", false, "me", "Ded", 0, 0, "mob", "Boar", 0, 0, 116, "Frostbolt", 16, "RESIST")
+local model = Cal.model()
+check("calib: a spell with enough hits", #model == 1 and model[1].name == "Frostbolt")
+check("calib: others' damage is not counted", Cal.store().spells[116].dmg < 9999)
+check("calib: coefficient fitted from varied spell damage", model[1].fitted and math.abs(model[1].coef - 0.8) < 0.02)
+check("calib: crit rate", math.abs(model[1].critRate - 10 / 50) < 1e-9)
+check("calib: misses counted", Cal.store().spells[116].misses == 1)
+local dc = Cal.dpsChange(20, 0, 20.5)
+-- hit at 20.5 sp: 116.4; +20 sp: +16 -> (132.4 / 116.4) - 1 = 0.1375
+check("calib: DPS change from your spells", dc and math.abs(dc - 0.1375) < 0.005)
+local report = table.concat(Cal.report(), "\n")
+check("calib: report lists the spell and the ratio", report:find("Frostbolt %(116%)") ~= nil and report:find("Int per 1%% spell crit: 22%.0 %(measured at level 24") ~= nil)
+GetSpellBonusDamage = nil
+SlashCmdList.UPGRADEFINDER("calib reset")
+UnitStat = function(_, i) return 0, ({ 10, 20, 30, 40, 50 })[i] end
+GetSpellCritChance = function() return 4.5 end
+UnitHealthMax = function() return 400 end
+check("calib: a snapshot from the game", Cal.snap() == true and Cal.store().snaps[1].int == 40
+  and Cal.store().snaps[1].spcrit == 4.5 and Cal.store().snaps[1].hp == 400)
+check("calib: the same snapshot is not saved twice", Cal.snap() == false and #Cal.store().snaps == 1)
+UnitStat, GetSpellCritChance, UnitHealthMax = nil, nil, nil
+Cal.reset()
+check("/uf calib reset clears", #Cal.store().snaps == 0 and next(Cal.store().spells) == nil)
 
 print(failures == 0 and "all UpgradeFinder tests passed" or (failures .. " UpgradeFinder test(s) failed"))
 os.exit(failures == 0 and 0 or 1)
