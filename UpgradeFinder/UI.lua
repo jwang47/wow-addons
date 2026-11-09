@@ -130,6 +130,14 @@ local function showDetails(row)
   tt:AddLine(" ")
   tt:AddLine(string.format("Upgrades: +%.1f  (score %.1f vs %.1f worn)", r.gain, r.value, r.value - r.gain), 0.25, 1, 0.25)
   if r.note then tt:AddLine(r.note, 1, 0.82, 0) end
+  -- What it changes (Stats.lua): stats, then offense and defense.
+  local ok, d, off, def = pcall(ns.stats.forRow, r)
+  if ok and d and next(d) then
+    tt:AddLine(" ")
+    tt:AddLine("Changes: " .. ns.stats.statLine(d), 1, 0.82, 0, true)
+    if #off > 0 then tt:AddLine("Offense: " .. ns.stats.join(off), 1, 0.82, 0, true) end
+    if #def > 0 then tt:AddLine("Defense: " .. ns.stats.join(def), 1, 0.82, 0, true) end
+  end
   -- The "Get it:" lines come from the item tooltip hook (Where.lua).
   local where = ns.where.of(r.id)
   local drop = r.drop

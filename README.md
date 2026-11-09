@@ -146,6 +146,20 @@ for a dungeon drop it names the boss in chat), Shift-click links it.
   and on. The table is game data and does not know Forever's own changes:
   the stats always come from the client's tooltip, but a drop Forever moved
   or removed still shows.
+- What it changes (`UpgradeFinder/Stats.lua`): hover a row for the stat
+  changes against the worn item(s) it replaces, then **Offense** and
+  **Defense**, like Path of Building. The role comes from the weights in
+  use (caster, healer, tank, ranged for a hunter, else melee). Rules:
+  Stamina x10 health, Intellect x15 mana, Agility x2 armor; Intellect and
+  Agility give crit at the level-60 ratios scaled down by level (for
+  example 59.5 Int per 1% spell crit for a level-60 mage); attack power from
+  Strength and Agility per class; armor reduction is
+  `armor / (armor + 400 + 85 x level)`. The estimated DPS change is one cast
+  of `4 x level + 20` base damage plus 0.8 x spell damage, with crits for
+  +50% (melee: weapon DPS + AP / 14, crits for +100%), against your current
+  totals from the game where it gives them (`GetSpellBonusDamage`,
+  `GetSpellCritChance`, `UnitAttackPower`, `UnitArmor`). The numbers are
+  estimates for comparing items, not a combat simulator.
 - Usable: no red line on the tooltip (armor type, weapon skill, class); a red
   "Requires Level" only hides it until you are within the level window.
 - Score: a mage with MageMentor on uses MageMentor's score

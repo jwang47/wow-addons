@@ -166,19 +166,29 @@ end
 local ONE_HAND = { INVTYPE_WEAPON = true, INVTYPE_WEAPONMAINHAND = true }
 local OFF_HAND = { INVTYPE_HOLDABLE = true, INVTYPE_WEAPONOFFHAND = true, INVTYPE_SHIELD = true }
 function S.replaced(loc, slotValue, twoHander, dualWield)
+  local slots, note = S.replacedSlots(loc, slotValue, twoHander, dualWield)
+  if not slots then return nil end
+  local v = 0
+  for _, slot in ipairs(slots) do v = v + (slotValue[slot] or 0) end
+  return v, note
+end
+
+-- The worn slots the item takes the place of (the weaker ring or trinket,
+-- both hands for a two-hander), and a note; nil for a non-slot.
+function S.replacedSlots(loc, slotValue, twoHander, dualWield)
   local slots = S.SLOTS[loc]
   if not slots then return nil end
-  if slots.both then return (slotValue[16] or 0) + (slotValue[17] or 0) end
+  if slots.both then return { 16, 17 } end
   if (ONE_HAND[loc] or OFF_HAND[loc]) and twoHander then
-    return slotValue[16] or 0, "replaces your two-hander"
+    return { 16 }, "replaces your two-hander"
   end
-  if loc == "INVTYPE_WEAPON" and not dualWield then return slotValue[16] or 0 end
-  local worst
+  if loc == "INVTYPE_WEAPON" and not dualWield then return { 16 } end
+  local worst, at
   for _, slot in ipairs(slots) do
     local v = slotValue[slot] or 0
-    if not worst or v < worst then worst = v end
+    if not worst or v < worst then worst, at = v, slot end
   end
-  return worst
+  return { at }
 end
 
 -- Filters and sorts candidate rows. A row is { id, name, loc, gain, price,

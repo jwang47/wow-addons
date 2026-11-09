@@ -5,6 +5,15 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## UpgradeFinder 0.1.4
+
+- A row's tooltip shows what the upgrade changes, in the style of Path of
+  Building: the stat changes against the item(s) it replaces, then
+  **Offense** (spell damage or healing, spell crit, attack power, crit,
+  hit, weapon DPS, and an estimated DPS or healing change) and **Defense**
+  (health, armor with the change in damage taken, defense, block, mana,
+  mp5). Gains are green, losses red. The derived numbers are estimates.
+
 ## UpgradeFinder 0.1.3
 
 - Dungeon drops are candidates too: the boss and trash loot of the 25
