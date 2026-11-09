@@ -5,6 +5,19 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## UpgradeFinder 0.1.5
+
+- Calibration: UpgradeFinder measures the Forever formulas from your own
+  client. It saves your stats next to the crit, health and mana the game
+  reports when your gear, level or stats change, and fits Int per 1% spell
+  crit, Agi per 1% crit, health per Stamina and mana per Intellect. From the
+  combat log it learns each of your spells: average hit, crit rate, share of
+  your damage, and the spell damage coefficient. Measured values replace the
+  Classic guesses in the tooltip once there is enough data.
+- `/uf calib` shows what it has measured; `/uf calib reset` clears it.
+- The Defense line shows **eHP**: effective health against physical hits,
+  health / (1 - armor reduction), with the change in percent.
+
 ## UpgradeFinder 0.1.4
 
 - A row's tooltip shows what the upgrade changes, in the style of Path of

@@ -339,6 +339,7 @@ local HELP = {
   "/uf reset - forget the saved item scores (they are kept between sessions)",
   "/uf where - turn the \"Get it:\" lines on item tooltips on or off (needs Questie)",
   "/uf dungeons - turn the dungeon drops in the list on or off (the From button filters them)",
+  "/uf calib - the Forever formulas measured from your client (crit per Int and Agi, your spells); /uf calib reset",
 }
 local function copy(t) local c = {} for k, v in pairs(t or {}) do c[k] = v end return c end
 
@@ -445,6 +446,12 @@ function ns.slash(msg)
     local o = ns.db().opts
     o.where = o.where == false
     say("\"Get it:\" lines on item tooltips " .. (o.where and "on" or "off"))
+  elseif cmd == "calib" and a == "reset" then
+    ns.calib.reset()
+    say("calibration data for your class cleared")
+  elseif cmd == "calib" then
+    pcall(ns.calib.snap)
+    for _, l in ipairs(ns.calib.report()) do say(l) end
   elseif cmd == "dungeons" then
     local o = ns.db().opts
     o.dungeons = o.dungeons == false

@@ -2,7 +2,7 @@
 ## Title: UpgradeFinder
 ## Notes: Gear from your Auctionator scan, your bags and the dungeon drops that beats what you wear, for your class. /uf or the Upgrades button on the Auction House.
 ## Author: jwang47
-## Version: 0.1.4
+## Version: 0.1.5
 ## SavedVariables: UpgradeFinderDB
 ## OptionalDeps: Auctionator, MageMentor, Questie
 
@@ -11,5 +11,6 @@ Dungeons.lua
 Scan.lua
 Where.lua
 Stats.lua
+Calib.lua
 UI.lua
 Weights.lua

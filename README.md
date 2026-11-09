@@ -160,6 +160,24 @@ for a dungeon drop it names the boss in chat), Shift-click links it.
   totals from the game where it gives them (`GetSpellBonusDamage`,
   `GetSpellCritChance`, `UnitAttackPower`, `UnitArmor`). The numbers are
   estimates for comparing items, not a combat simulator.
+- Calibration (`UpgradeFinder/Calib.lua`): when your gear, level or stats
+  change (1 s after the last event), it saves a snapshot to
+  `UpgradeFinderDB.calib[class].snaps`: level, Int, Agi, Sta (`UnitStat`),
+  spell crit and crit minus the crit lines on your gear, max health, max
+  mana, armor. Within one level, a least-squares slope over at least 4
+  points of spread gives Int per 1% spell crit, Agi per 1% crit, health per
+  Sta and mana per Int; another level uses the nearest measured one (crit
+  ratios scaled by level). From `COMBAT_LOG_EVENT_UNFILTERED` (your own
+  `SPELL_DAMAGE` and `SPELL_MISSED` only) each spell ID keeps running sums:
+  hits, crits, misses, damage, and non-crit unresisted hits against your
+  spell damage then. After 20 such hits a spell joins the DPS model: its
+  share of your damage, crit rate, average hit, and the coefficient (fitted
+  once your spell damage spread is 15 or more, else cast time / 3.5 s).
+  Est. DPS for a caster then uses your spells instead of the generic cast.
+  `/uf calib` lists it all, `/uf calib reset` clears it for your class.
+  Buffs that add crit directly can skew a snapshot; reset if a number looks
+  wrong.
+- eHP: health / (1 - armor reduction), physical hits only.
 - Usable: no red line on the tooltip (armor type, weapon skill, class); a red
   "Requires Level" only hides it until you are within the level window.
 - Score: a mage with MageMentor on uses MageMentor's score
