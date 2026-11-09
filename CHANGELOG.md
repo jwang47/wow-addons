@@ -5,6 +5,22 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## Glance 0.1.0
+
+- New addon, a lighter HUD (`/glance`). Not in the releases yet: try it
+  with `dev.ps1 Glance`.
+- A keyboard bar: one button per key of the left hand (1-6, Tab Q W E R T,
+  A S D F G, Z X C V B), laid out like the keyboard. At the first login it
+  reads your key bindings, so each spell shows on the key it is already on.
+  Movement keys and keys with other commands stay as they are. Drag a spell
+  onto a key to put it there; hold Shift to see and fill the Shift layer.
+  `/glance edit` (or Alt-drag) takes spells off.
+- Small player and target bars under your character, and a cast bar below
+  them. They hide Blizzard's player, target and cast frames
+  (`/glance blizzard on` brings those back).
+- A square minimap in the top-right corner: mouse-wheel zoom, the zone,
+  coordinates and clock under it, and the addon buttons in one drawer.
+
 ## UpgradeFinder 0.1.8
 
 - Fix a Lua error when the Upgrades window opens for the first time

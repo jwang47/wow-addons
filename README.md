@@ -1,6 +1,6 @@
-# wow-addons: LootValue, Omni and UpgradeFinder
+# wow-addons: LootValue, Omni, UpgradeFinder and Glance
 
-Three small World of Warcraft addons for the WoW Forever client (a
+Small World of Warcraft addons for the WoW Forever client (a
 Classic-based client, interface 16001). They should also work on other
 Classic clients with the same APIs, but we test them only on Forever.
 
@@ -12,6 +12,9 @@ Classic clients with the same APIs, but we test them only on Forever.
 - **UpgradeFinder**: a short list of gear from your Auctionator scan, your
   bags and the dungeon drops that beats what you wear, for any class and
   spec (`/uf`).
+- **Glance** (in testing, not in the releases yet): a lighter HUD with a
+  keyboard-shaped action bar, a square minimap and small floating unit
+  frames (`/glance`).
 
 Download page: https://jwang47.github.io/wow-addons/ (Windows installer).
 Releases: [GitHub releases](https://github.com/jwang47/wow-addons/releases)
@@ -259,6 +262,45 @@ the price to buy the made item on the AH instead.
   chest, container); `/uf where` turns them off. Items Questie does not know
   (new Forever items) get nothing. Item keys used: `questRewards`,
   `npcDrops`, `vendors`, `objectDrops`, `itemDrops`.
+
+## Glance
+
+A lighter HUD (`/glance`), still in testing: it is not in the releases
+yet. Try it with `dev.ps1 Glance` (see "Dev mode"), then restart the game
+once. The design mockups are in [docs/glance.md](docs/glance.md).
+
+- **Keyboard bar** (bottom centre): one button per key of the left hand,
+  laid out like the keyboard: 1-6, Tab Q W E R T, A S D F G and
+  Z X C V B. At the first login Glance reads each key's binding. A key that
+  fires an action button (Blizzard's bars or Bartender4's) keeps that slot,
+  so your spells show on the keys they are already on. A free key gets an
+  empty slot. Movement keys (dashed, with an arrow) and keys with another
+  command (Tab: Target) keep their binding.
+  - Drag a spell from the spell book onto a key to put it on that key.
+    That is the whole binding: no Key Bindings window.
+  - Hold Shift: the bar shows the Shift layer, and a drop goes there. The
+    small icon in a key's corner is its spell on the other layer.
+  - `/glance edit` unlocks the bar so a drag takes a spell off; Alt-drag
+    works when the bar is locked. Nothing moves in combat (the game locks
+    action buttons then).
+  - `/glance take F` puts a key with another command on the bar;
+    `/glance free F` gives it back. `/glance import` reads your bindings
+    again.
+  - Glance's keys win over Bartender4's for the same key. Hide the
+    Bartender bars you no longer need in Bartender's options.
+- **Unit frames**: small player and target bars under your character and a
+  cast bar below them. They replace Blizzard's player, target and cast
+  frames (`/glance blizzard on` keeps those).
+- **Minimap**: square, top-right, mouse-wheel zoom, right-click for
+  tracking. The zone, coordinates and clock are under it, and the
+  LibDBIcon addon buttons (Questie, Details and the rest) are in one
+  drawer behind the Addons tab.
+- `/glance keybar off`, `/glance units off` and `/glance minimap off` turn
+  a part off (the game reloads).
+
+The bar uses the game's secure action buttons and override bindings
+(`SetOverrideBindingClick`), so it only reads bindings; it never changes
+your saved Key Bindings.
 
 ## Forever client notes
 

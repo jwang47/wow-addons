@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: Glance
+## Notes: A lighter HUD: a keyboard-shaped action bar, a square minimap and small floating unit frames. /glance
+## Author: jwang47
+## Version: 0.1.0
+## SavedVariables: GlanceDB
+## SavedVariablesPerCharacter: GlanceCharDB
+
+Core.lua
+Keys.lua
+KeyBar.lua
+Units.lua
+Minimap.lua
