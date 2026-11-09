@@ -16,6 +16,9 @@ the same, and a test checks that every `.toc` version has a section here.
   you wear, shift-right-click leaves it empty.
 - Save builds by name, load them (the Builds button), and compare the build
   with what you wear or with any saved build (the Compare button).
+- The combat log is off by default: the Forever client forbids it to
+  addons (a "blocked" pop-up at login). `/uf calib log` turns it on. A
+  blocked call is now named in chat.
 - Caster DPS from your action bars: each damage spell on a bar gives its
   damage (from the spell text, or your measured hits), cast time, cooldown
   and mana. Cooldown spells go whenever ready, the best filler the rest of

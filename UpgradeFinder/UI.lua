@@ -348,7 +348,7 @@ local HELP = {
   "/uf where - turn the \"Get it:\" lines on item tooltips on or off (needs Questie)",
   "/uf dungeons - turn the dungeon drops in the list on or off (the From button filters them)",
   "/uf build - the Build window: try items in each slot, save builds, compare them (Alt-click a row to add it)",
-  "/uf calib - the Forever formulas measured from your client (crit per Int and Agi, your spells); /uf calib reset",
+  "/uf calib - the Forever formulas measured from your client (crit per Int and Agi, your spells); /uf calib reset; /uf calib log turns on the combat log (Forever blocks it)",
 }
 local function copy(t) local c = {} for k, v in pairs(t or {}) do c[k] = v end return c end
 
@@ -457,6 +457,9 @@ function ns.slash(msg)
     say("\"Get it:\" lines on item tooltips " .. (o.where and "on" or "off"))
   elseif cmd == "build" then
     ns.toggleBuild(true)
+  elseif cmd == "calib" and a == "log" then
+    ns.calib.setLog(not ns.calib.logOn())
+    say("combat log for spell calibration " .. (ns.calib.logOn() and "on (if the game blocks it, turn it off again)" or "off"))
   elseif cmd == "calib" and a == "reset" then
     ns.calib.reset()
     say("calibration data for your class cleared")

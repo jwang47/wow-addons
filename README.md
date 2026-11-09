@@ -186,7 +186,7 @@ for a dungeon drop it names the boss in chat), Shift-click links it.
   mana, armor. Within one level, a least-squares slope over at least 4
   points of spread gives Int per 1% spell crit, Agi per 1% crit, health per
   Sta and mana per Int; another level uses the nearest measured one (crit
-  ratios scaled by level). From `COMBAT_LOG_EVENT_UNFILTERED` (your own
+  ratios scaled by level). With `/uf calib log` on (Forever forbids it, see the client notes), from `COMBAT_LOG_EVENT_UNFILTERED` (your own
   `SPELL_DAMAGE` and `SPELL_MISSED` only) each spell ID keeps running sums:
   hits, crits, misses, damage, and non-crit unresisted hits against your
   spell damage then. After 20 such hits a spell joins the DPS model: its
@@ -254,6 +254,14 @@ for a dungeon drop it names the boss in chat), Shift-click links it.
   `npcDrops`, `vendors`, `objectDrops`, `itemDrops`.
 
 ## Forever client notes
+
+- Addons may not use the combat log: registering for
+  `COMBAT_LOG_EVENT_UNFILTERED` brings up "blocked from an action only
+  available to the Blizzard UI" right after login. UpgradeFinder leaves it
+  off (`/uf calib log` turns it on for a client that allows it) and takes
+  spell damage from the action bars instead. UpgradeFinder also says in
+  chat which call the game blocked (`ADDON_ACTION_BLOCKED`/`_FORBIDDEN`)
+  and keeps the last five in `UpgradeFinderDB.blocked`.
 
 - There is no global `GetItemInfo`; use `C_Item.GetItemInfo` or
   `C_Item.GetItemInfoInstant`. `/api search <name>` in chat lists what

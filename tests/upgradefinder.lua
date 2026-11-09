@@ -603,6 +603,12 @@ check("eHP from health and armor", ehp and ehp[2] == "+208 (+15.6%)" and ehp[3] 
 
 -- Calibration (Calib.lua) ----------------------------------------------------
 local Cal = ns.calib
+check("calib: the combat log is not registered by default (Forever forbids it)",
+  not (Cal.frame.events or {}).COMBAT_LOG_EVENT_UNFILTERED and not Cal.logOn())
+SlashCmdList.UPGRADEFINDER("calib log")
+check("/uf calib log turns it on", Cal.logOn() and Cal.frame.events.COMBAT_LOG_EVENT_UNFILTERED == true)
+SlashCmdList.UPGRADEFINDER("calib log")
+check("/uf calib log again turns it off", not Cal.logOn())
 Cal.reset()
 local snaps = Cal.store().snaps
 -- Level 24: 24 Int per 1% crit, 10 health per Sta (+ 50), 15 mana per Int.
