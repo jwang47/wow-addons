@@ -16,6 +16,7 @@ D.RETURN_SECS = 60       -- back to the finisher after the objectives
 D.PICKUP_SECS = 30       -- talk to the giver
 D.FAR = 500000           -- Questie's distance for another continent or instance
 D.BUDGET_MS = 3          -- work per frame when reading the available quests
+D.ACTIVE_SECS = 300      -- a quest whose count went up this recently is "active"
 
 local function call(fn, ...)
   if type(fn) ~= "function" then return nil end
@@ -155,14 +156,15 @@ end
 -- Objectives left: { text, have, need } for each unfinished objective.
 local function objectivesLeft(id)
   local list = call(api("C_QuestLog.GetQuestObjectives"), id)
-  local left, all = {}, 0
+  local left, all, count = {}, 0, 0
   for _, o in ipairs(type(list) == "table" and list or {}) do
     all = all + 1
+    count = count + (plain(o.numFulfilled) or 0) + (o.finished and 1 or 0)
     if not o.finished then
       table.insert(left, { text = o.text, have = plain(o.numFulfilled), need = plain(o.numRequired) })
     end
   end
-  return left, all
+  return left, all, count
 end
 
 -- One entry per quest in the log, headers skipped.
@@ -184,11 +186,11 @@ function D.logQuests()
       if done == nil then
         done = (call(api("C_QuestLog.ReadyForTurnIn"), id) or call(api("C_QuestLog.IsComplete"), id)) and true or false
       end
-      local left, all = objectivesLeft(id)
+      local left, all, count = objectivesLeft(id)
       -- A quest with objectives and none left is ready even if the flag lags.
       if all > 0 and #left == 0 then done = true end
       table.insert(list, { id = id, name = name, level = plain(level), header = zone, done = done,
-        left = left, objectives = all, index = i, kind = done and "turnin" or "log" })
+        left = left, objectives = all, count = count, index = i, kind = done and "turnin" or "log" })
     end
   end
   return list
@@ -318,6 +320,23 @@ function D.finish(e, level)
 end
 
 ---------------------------------------------------------------------------
+-- Active quests: a quest whose objective count went up in the last
+-- ACTIVE_SECS (you killed or looted for it). The first look at a quest only
+-- records its count, so nothing is active right after login.
+D.seen, D.activeAt = {}, {}
+function D.noteProgress(e, clock)
+  local before = D.seen[e.id]
+  D.seen[e.id] = e.count
+  if before and e.count and e.count > before then D.activeAt[e.id] = clock end
+  local at = D.activeAt[e.id]
+  if at and clock - at <= D.ACTIVE_SECS then
+    e.activeAt = at
+    return true
+  end
+  return false
+end
+
+---------------------------------------------------------------------------
 -- One full pass. It is a coroutine body: it yields when the frame budget is
 -- spent, so a long list of available quests never stalls the game.
 -- opts: { sortLog, sortPickup, maxAbove, yield = function or nil }
@@ -333,12 +352,17 @@ function D.collect(opts)
       start = now()
     end
   end
-  local out = { turnin = {}, log = {}, pickup = {}, questie = D.hasQuestie(), level = level }
+  local out = { active = {}, turnin = {}, log = {}, pickup = {}, questie = D.hasQuestie(), level = level }
   local inLog = {}
+  local clock = opts.time or call(rawget(_G, "GetTime")) or 0
   for _, e in ipairs(D.logQuests()) do
     inLog[e.id] = true
     D.finish(D.placeLog(e), level)
-    table.insert(e.done and out.turnin or out.log, e)
+    if D.noteProgress(e, clock) and not e.done then
+      table.insert(out.active, e)
+    else
+      table.insert(e.done and out.turnin or out.log, e)
+    end
     tick()
   end
   if out.questie then
@@ -350,6 +374,7 @@ function D.collect(opts)
       tick()
     end
   end
+  table.sort(out.active, function(a, b) return a.activeAt > b.activeAt end)
   D.sort(out.turnin, "near")
   D.sort(out.log, opts.sortLog or "near")
   D.sort(out.pickup, opts.sortPickup or "xp")

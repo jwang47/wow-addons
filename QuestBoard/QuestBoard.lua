@@ -14,7 +14,7 @@ local defaults = {
   sortLog = "near",      -- near | xp
   sortPickup = "xp",     -- near | xp
   maxAbove = 3,          -- pick-ups at most this many levels over you
-  rows = { turnin = 6, log = 8, pickup = 8 },
+  rows = { active = 4, turnin = 6, log = 8, pickup = 8 },
   collapsed = {},
   combatAlpha = 0.35,
   hideTrackers = false,
@@ -34,8 +34,8 @@ ns.say = say
 ---------------------------------------------------------------------------
 local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6
 local FONT, FONT_DIM = "GameFontHighlightSmall", "GameFontDisableSmall"
-local HEADS = { turnin = "Turn in", log = "In your log", pickup = "Pick up" }
-local ORDER = { "turnin", "log", "pickup" }
+local HEADS = { active = "Active", turnin = "Turn in", log = "In your log", pickup = "Pick up" }
+local ORDER = { "active", "turnin", "log", "pickup" }
 
 local panel, rows, heads = nil, {}, {}
 local state = nil        -- last collect() result
@@ -264,7 +264,7 @@ local function makeHead(kind)
   h.right:SetPoint("RIGHT", 0, 0)
   h:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   h:SetScript("OnClick", function(_, button)
-    if button == "RightButton" and kind ~= "turnin" then
+    if button == "RightButton" and (kind == "log" or kind == "pickup") then
       local key = kind == "pickup" and "sortPickup" or "sortLog"
       ns.db[key] = ns.db[key] == "xp" and "near" or "xp"
     else
@@ -296,7 +296,8 @@ function ns.render()
       local collapsed = ns.db.collapsed[kind]
       h.text:SetText((collapsed and "+ " or "") .. HEADS[kind] .. "  " .. #list)
       local sortKey = kind == "pickup" and "sortPickup" or kind == "log" and "sortLog"
-      h.right:SetText(sortKey and (ns.db[sortKey] == "xp" and "best XP" or "nearest") or "nearest")
+      h.right:SetText(kind == "active" and "last 5 min"
+        or sortKey and (ns.db[sortKey] == "xp" and "best XP" or "nearest") or "nearest")
       h:Show()
       y = y - HEAD_H
       if not collapsed then

@@ -182,6 +182,20 @@ check("XP per minute estimate", math.abs(e201.rate - 2000 / (secs / 60)) < 0.01)
 check("row meta for a pick-up", ns.meta(e201):match("^~%d+ xp/m  150 yd$") ~= nil)
 check("row meta for a log quest", ns.meta(out.log[2]) == "3/6  900 yd")
 
+-- Active: a quest whose count went up in the last 5 minutes moves to the top.
+D.seen, D.activeAt = {}, {}
+D.collect({ time = 100 })
+OBJ[122][1].numFulfilled = 4
+local act = D.collect({ time = 160 })
+check("a kill makes the quest active", #act.active == 1 and act.active[1].id == 122 and #act.log == 1)
+local later = D.collect({ time = 160 + 301 })
+check("it leaves Active after 5 minutes", #later.active == 0 and #later.log == 2)
+D.seen, D.activeAt = {}, {}
+local first = D.collect({ time = 1000 })
+check("nothing is active on the first look", #first.active == 0)
+OBJ[122][1].numFulfilled = 3
+D.seen, D.activeAt = {}, {}
+
 -- Yields when the frame budget is spent.
 local yields = 0
 local co = coroutine.create(function() D.collect({ yield = function() yields = yields + 1 coroutine.yield() end }) end)
