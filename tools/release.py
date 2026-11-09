@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the release files for LootValue and Omni.
+"""Build the release files for LootValue, Omni and UpgradeFinder.
 
   python3 tools/release.py build [--tag release-YYYY-MM-DD]
       zips, addons.json, update.ps1 and update.cmd in logs/wow-addons/
@@ -33,7 +33,7 @@ OUT = ROOT / "logs" / "wow-addons"
 REPO_URL = "https://github.com/jwang47/wow-addons"
 LATEST = REPO_URL + "/releases/latest/download/"
 # Folders shipped, in install order. A folder that does not exist is skipped.
-ADDONS = ["LootValue", "Omni"]
+ADDONS = ["LootValue", "Omni", "UpgradeFinder"]
 # Files that stay the player's own: shipped as a default, never overwritten.
 KEEP = {}
 # Addons that must be installed for an addon to load (its .toc

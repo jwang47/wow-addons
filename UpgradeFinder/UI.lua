@@ -1,0 +1,376 @@
+-- UpgradeFinder window: a short ranked list of gear that beats what you wear.
+-- Each row is one line (icon, name, gain, price); hover for the details.
+local _, ns = ...
+local S, Scan = ns.score, ns.scan
+local call, api = ns.call, ns.api
+
+local ROWS, ROW_H, W = 14, 20, 380
+local frame, rows, status, title, buttons = nil, {}, nil, nil, {}
+local view = { list = {}, top = 1, all = {} }
+ns.view = view
+
+-- The Auction House window: AuctionHouseFrame on newer clients,
+-- AuctionFrame on the classic UI that Forever loads.
+function ns.ahFrame()
+  for _, name in ipairs({ "AuctionHouseFrame", "AuctionFrame" }) do
+    local f = rawget(_G, name)
+    if type(f) == "table" then return f, name end
+  end
+end
+
+local function say(msg)
+  local f = rawget(_G, "DEFAULT_CHAT_FRAME")
+  if f then f:AddMessage("|cff69ccf0Upgrades:|r " .. msg) end
+end
+ns.say = say
+
+function ns.money(copper)
+  copper = math.floor(copper or 0)
+  local g, s, c = math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100
+  if g > 0 then return string.format("%dg %02ds", g, s) end
+  if s > 0 then return string.format("%ds %02dc", s, c) end
+  return c .. "c"
+end
+
+local function opts()
+  local o = ns.db().opts
+  return { group = S.GROUPS[o.group or 1], level = call(UnitLevel, "player") or 1, ahead = o.ahead or 0,
+    money = call(GetMoney) or 0, affordable = o.affordable, sort = o.sort }
+end
+
+-- keep: stay at the same scroll place (the list grows while items load).
+function ns.apply(keep)
+  view.list = S.rank(view.all, opts())
+  view.top = keep and math.max(1, math.min(view.top, #view.list - ROWS + 1)) or 1
+  ns.paint()
+end
+
+local function qualityColor(id)
+  local q = call(api("C_Item.GetItemQualityByID"), id)
+  local r, g, b = call(api("C_Item.GetItemQualityColor"), q or 1)
+  if r then return r, g, b end
+  return 1, 1, 1
+end
+
+local function labels()
+  local o = ns.db().opts
+  buttons.slot:SetText("Slot: " .. S.GROUPS[o.group or 1][1])
+  buttons.level:SetText((o.ahead or 0) > 0 and ("Up to +" .. o.ahead .. " lvl") or "Usable now")
+  buttons.sort:SetText(o.sort == "pergold" and "Per gold" or "Biggest gain")
+  buttons.money:SetText(o.affordable and "Can afford" or "Any price")
+end
+
+function ns.paint()
+  if not frame then return end
+  labels()
+  local _, _, spec = ns.weightKey()
+  title:SetText(spec and ("Upgrades |cff9d9d9d(" .. spec .. ")|r") or "Upgrades")
+  local level = call(UnitLevel, "player") or 1
+  for i, row in ipairs(rows) do
+    local r = view.list[view.top + i - 1]
+    row.data = r
+    if r then
+      row:Show()
+      row.icon:SetTexture(call(api("C_Item.GetItemIconByID"), r.id) or 134400)
+      -- Free elsewhere (quest, dungeon, vendor): a short tag after the name.
+      local tag = ns.where.tag(ns.where.of(r.id))
+      row.name:SetText(tag and (r.name .. "  |cff8cc7ff" .. tag .. "|r") or r.name)
+      row.name:SetTextColor(qualityColor(r.id))
+      local gain = string.format("+%.1f", r.gain)
+      if (r.reqLevel or 0) > level then gain = "|cff9d9d9d" .. gain .. " @" .. r.reqLevel .. "|r" end
+      row.gain:SetText(gain)
+      row.price:SetText(r.source == "AH" and (r.price and ns.money(r.price) or "|cff9d9d9d?|r") or "|cff40ff40" .. r.source .. "|r")
+    else
+      row:Hide()
+    end
+  end
+  local st = Scan.state
+  if st.gearLoading and #view.all == 0 then
+    local w = Scan.worn()
+    status:SetText("Loading your own gear" .. (w.missingSlot and (" (" .. w.missingSlot .. ")") or "") .. "...")
+  elseif st.busy then
+    status:SetText(string.format("Checking items... %d / %d", st.done, st.total))
+  elseif #view.all == 0 and not st.ran then
+    status:SetText("Open to scan your Auctionator prices and bags.")
+  else
+    local more = #view.list > ROWS and string.format("  (scroll for %d more)", #view.list - ROWS) or ""
+    status:SetText(string.format("%d upgrade%s%s", #view.list, #view.list == 1 and "" or "s", more)
+      .. (st.pending and st.pending > 0 and string.format(st.loading and "  |cff9d9d9dloading %d more...|r"
+        or "  |cff9d9d9d%d did not load (Rescan)|r", st.pending) or "")
+      .. ((st.skipped or 0) > 0 and not st.loading
+        and string.format("  |cff9d9d9d%d skipped (Rescan)|r", st.skipped) or ""))
+  end
+end
+
+function ns.rescan()
+  local first = true
+  Scan.run(function() ns.paint() end, function(all)
+    Scan.state.ran = true
+    view.all = all
+    ns.apply(not first)
+    first = false
+  end)
+  ns.paint()
+end
+
+-- Tooltip: the item, then what it replaces and the numbers.
+local function showDetails(row)
+  local r = row.data
+  local tt = rawget(_G, "GameTooltip")
+  if not (r and tt) then return end
+  tt:SetOwner(row, "ANCHOR_RIGHT")
+  tt:SetHyperlink("item:" .. r.id)
+  tt:AddLine(" ")
+  tt:AddLine(string.format("Upgrades: +%.1f  (score %.1f vs %.1f worn)", r.gain, r.value, r.value - r.gain), 0.25, 1, 0.25)
+  if r.note then tt:AddLine(r.note, 1, 0.82, 0) end
+  -- The "Get it:" lines come from the item tooltip hook (Where.lua).
+  local where = ns.where.of(r.id)
+  if r.source == "AH" and where and (where.quests[1] or where.dungeon) then
+    tt:AddLine(where.quests[1] and "A quest gives it: you may not need to buy it"
+      or ("Drops in " .. where.dungeon .. ": you may not need to buy it"), 0.55, 0.78, 1)
+  end
+  if r.perGold then tt:AddLine(string.format("%.2f per gold", r.perGold), 0.7, 0.7, 0.7) end
+  if (r.reqLevel or 0) > (call(UnitLevel, "player") or 1) then tt:AddLine("Needs level " .. r.reqLevel, 1, 0.5, 0.3) end
+  tt:AddLine(r.source == "AH" and "Click: search the AH   Shift-click: link" or "In your bags   Shift-click: link", 0.6, 0.6, 0.6)
+  tt:Show()
+end
+
+local function click(row)
+  local r = row.data
+  if not r then return end
+  if IsShiftKeyDown and IsShiftKeyDown() then
+    local _, link = call(api("C_Item.GetItemInfo"), r.id)
+    if link and not call(rawget(_G, "ChatEdit_InsertLink"), link) then call(rawget(_G, "ChatFrame_OpenChat"), link) end
+    return
+  end
+  local search = api("Auctionator.API.v1.MultiSearchExact")
+  local ah = ns.ahFrame()
+  if search and ah and ah.IsShown and ah:IsShown() then call(search, "UpgradeFinder", { r.name })
+  else say(r.name .. ": open the Auction House to search for it.") end
+end
+
+local function cycle(key)
+  local o = ns.db().opts
+  if key == "slot" then o.group = (o.group or 1) % #S.GROUPS + 1
+  elseif key == "level" then o.ahead = ((o.ahead or 0) == 0) and 2 or 0
+  elseif key == "sort" then o.sort = (o.sort == "pergold") and "gain" or "pergold"
+  elseif key == "money" then o.affordable = not o.affordable end
+  ns.apply()
+end
+ns.cycle = cycle
+
+local function build()
+  frame = CreateFrame("Frame", "UpgradeFinderFrame", UIParent, rawget(_G, "BackdropTemplateMixin") and "BackdropTemplate" or nil)
+  frame:SetSize(W, 92 + ROWS * ROW_H)
+  frame:SetPoint("CENTER", UIParent, "CENTER", 260, 40)
+  frame:SetFrameStrata("HIGH")
+  frame:SetClampedToScreen(true)
+  frame:SetMovable(true)
+  frame:EnableMouse(true)
+  frame:RegisterForDrag("LeftButton")
+  frame:SetScript("OnDragStart", frame.StartMoving)
+  frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+  if frame.SetBackdrop then
+    frame:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
+      insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+    frame:SetBackdropColor(0.06, 0.05, 0.04, 0.95)
+    frame:SetBackdropBorderColor(0.6, 0.5, 0.3, 1)
+  end
+  local special = rawget(_G, "UISpecialFrames")
+  if type(special) == "table" then table.insert(special, "UpgradeFinderFrame") end
+
+  title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  title:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -10)
+  title:SetText("Upgrades")
+  local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+  local again = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  again:SetSize(64, 18)
+  again:SetPoint("RIGHT", close, "LEFT", -2, 0)
+  again:SetText("Rescan")
+  -- Keeps the saved scores; tries the items that did not load again.
+  again:SetScript("OnClick", function() ns.db().missing = {} ns.rescan() end)
+
+  -- Four toggle buttons in one row: slot, level, sort, price.
+  local x = 10
+  for _, spec in ipairs({ { "slot", 100 }, { "level", 92 }, { "sort", 86 }, { "money", 80 } }) do
+    local b = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    b:SetSize(spec[2], 20)
+    b:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -32)
+    b:SetScript("OnClick", function() cycle(spec[1]) end)
+    if spec[1] == "slot" then
+      b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+      b:SetScript("OnClick", function(_, button)
+        local o = ns.db().opts
+        o.group = button == "RightButton" and ((o.group or 1) - 2) % #S.GROUPS + 1 or (o.group or 1) % #S.GROUPS + 1
+        ns.apply()
+      end)
+    end
+    buttons[spec[1]] = b
+    x = x + spec[2] + 4
+  end
+
+  for i = 1, ROWS do
+    local row = CreateFrame("Button", nil, frame)
+    row:SetHeight(ROW_H)
+    row:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -58 - (i - 1) * ROW_H)
+    row:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -58 - (i - 1) * ROW_H)
+    local hl = row:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(0.9, 0.7, 0.3, 0.18)
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(ROW_H - 2, ROW_H - 2)
+    row.icon:SetPoint("LEFT", row, "LEFT", 0, 0)
+    row.price = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.price:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+    row.price:SetWidth(64)
+    row.price:SetJustifyH("RIGHT")
+    row.gain = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.gain:SetPoint("RIGHT", row.price, "LEFT", -6, 0)
+    row.gain:SetWidth(62)
+    row.gain:SetJustifyH("RIGHT")
+    row.gain:SetTextColor(0.25, 1, 0.25)
+    row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+    row.name:SetPoint("RIGHT", row.gain, "LEFT", -6, 0)
+    row.name:SetJustifyH("LEFT")
+    row:RegisterForClicks("LeftButtonUp")
+    row:SetScript("OnEnter", showDetails)
+    row:SetScript("OnLeave", function() local tt = rawget(_G, "GameTooltip") if tt then tt:Hide() end end)
+    row:SetScript("OnClick", click)
+    rows[i] = row
+  end
+  frame:EnableMouseWheel(true)
+  frame:SetScript("OnMouseWheel", function(_, delta)
+    view.top = math.max(1, math.min(view.top - delta * 3, math.max(1, #view.list - ROWS + 1)))
+    ns.paint()
+  end)
+  status = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  status:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 12, 10)
+  status:SetJustifyH("LEFT")
+end
+
+function ns.open()
+  if not frame then build() end
+  frame:Show()
+  if #view.all == 0 and not Scan.state.busy then ns.rescan()
+  elseif Scan.state.busy then ns.paint()
+  else ns.apply() end -- gear, bags or money may have changed while it was closed
+end
+
+function ns.toggle()
+  if frame and frame:IsShown() then frame:Hide() else ns.open() end
+end
+UpgradeFinder_Toggle = ns.toggle
+
+-- A button on the Auction House window.
+local ahButton
+function ns.addAHButton(tries)
+  if ahButton then return end
+  local ah, name = ns.ahFrame()
+  if not ah then
+    -- The window's addon can load just after the event: look again.
+    if (tries or 0) < 5 then call(api("C_Timer.After"), 0.2, function() ns.addAHButton((tries or 0) + 1) end) end
+    return
+  end
+  ahButton = CreateFrame("Button", nil, ah, "UIPanelButtonTemplate")
+  ahButton:SetSize(84, 22)
+  if name == "AuctionFrame" then
+    ahButton:SetPoint("TOPRIGHT", ah, "TOPRIGHT", -40, -14) -- left of the close button
+  else
+    ahButton:SetPoint("TOPRIGHT", ah, "TOPRIGHT", -60, -1)
+  end
+  ahButton:SetFrameLevel((ah.GetFrameLevel and ah:GetFrameLevel() or 0) + 10)
+  ahButton:SetText("Upgrades")
+  ahButton:SetScript("OnClick", ns.toggle)
+end
+
+---------------------------------------------------------------------------
+-- /uf and events
+---------------------------------------------------------------------------
+local HELP = {
+  "/uf - open the list (also a button on the Auction House)",
+  "/uf weights - your stat weights; /uf weight STAT N to change one (/uf weight reset)",
+  "/uf reset - forget the saved item scores (they are kept between sessions)",
+  "/uf where - turn the \"Get it:\" lines on item tooltips on or off (needs Questie)",
+  "Stats: str agi sta int spi ap sp heal crit hit spcrit sphit dps armor def block mp5",
+}
+function ns.slash(msg)
+  msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+  local cmd, a, b = msg:match("^(%S*)%s*(%S*)%s*(%S*)")
+  local key, class, spec = ns.weightKey()
+  if cmd == "help" then for _, l in ipairs(HELP) do say(l) end
+  elseif cmd == "weights" then
+    local parts = {}
+    for k, v in pairs(ns.weights()) do table.insert(parts, k .. " " .. v) end
+    table.sort(parts)
+    say(class:lower() .. (spec and (" (" .. spec .. ")") or "") .. ": " .. table.concat(parts, ", "))
+    if class == "MAGE" and rawget(_G, "MageMentorAPI") then say("(MageMentor's weights are used for a mage: /mm weight)") end
+  elseif cmd == "reset" then
+    Scan.forget()
+    ns.db().missing = {}
+    say("saved item scores cleared; Rescan reads every item again")
+  elseif cmd == "where" then
+    local o = ns.db().opts
+    o.where = o.where == false
+    say("\"Get it:\" lines on item tooltips " .. (o.where and "on" or "off"))
+  elseif cmd == "weight" and a == "reset" then
+    ns.db().weights[key] = nil
+    Scan.forget() say("weights reset")
+  elseif cmd == "weight" and tonumber(b) then
+    ns.db().weights[key] = ns.db().weights[key] or {}
+    ns.db().weights[key][a] = tonumber(b)
+    Scan.forget() say(a .. " = " .. b .. "; Rescan to apply")
+  else ns.toggle() end
+end
+SLASH_UPGRADEFINDER1 = "/uf"
+SLASH_UPGRADEFINDER2 = "/upgrades"
+SlashCmdList.UPGRADEFINDER = function(msg)
+  local ok, err = pcall(ns.slash, msg)
+  if not ok then say("error: " .. tostring(err)) end
+end
+
+BINDING_HEADER_UPGRADEFINDER = "UpgradeFinder"
+BINDING_NAME_UPGRADEFINDER_TOGGLE = "Show gear upgrades"
+
+function ns.refresh()
+  if not Scan.lastSources or Scan.state.busy then return end
+  view.all = Scan.refresh()
+  if frame and frame:IsShown() then ns.apply(true) end
+end
+
+function ns.specCheck()
+  if not Scan.key or Scan.key == ns.weightKey() then return end
+  Scan.state.gen = (Scan.state.gen or 0) + 1 -- stops a scan with the old weights
+  Scan.state.busy, Scan.state.loading = false, false
+  Scan.forget()
+  view.all, Scan.key = {}, nil
+  Scan.state.ran = false
+  if frame and frame:IsShown() then ns.rescan() end
+end
+
+local events = CreateFrame("Frame")
+ns.events = events
+local handlers = {
+  AUCTION_HOUSE_SHOW = function() ns.addAHButton() end,
+  -- Newer clients open the AH through the interaction manager (Auctionator
+  -- listens to both).
+  PLAYER_INTERACTION_MANAGER_FRAME_SHOW = function(kind)
+    if kind ~= nil and kind == api("Enum.PlayerInteractionType.Auctioneer") then ns.addAHButton() end
+  end,
+  -- What you wear or carry changed: the stored item values stay, the gains
+  -- and the bag items change. During a scan its end rereads both.
+  PLAYER_EQUIPMENT_CHANGED = function() ns.refresh() end,
+  BAG_UPDATE_DELAYED = function() ns.refresh() end,
+  -- New talent points can change your spec, and so the weights.
+  CHARACTER_POINTS_CHANGED = function() ns.specCheck() end,
+  PLAYER_TALENT_UPDATE = function() ns.specCheck() end,
+  PLAYER_LEVEL_UP = function() if frame and frame:IsShown() then ns.apply() end end,
+}
+ns.handlers = handlers
+for ev in pairs(handlers) do pcall(events.RegisterEvent, events, ev) end -- unknown events throw
+events:SetScript("OnEvent", function(_, ev, ...)
+  local ok, err = pcall(handlers[ev], ...)
+  if not ok then say(ev .. " error: " .. tostring(err)) end
+end)

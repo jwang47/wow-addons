@@ -1,0 +1,372 @@
+-- UpgradeFinder scanning: reads items through a hidden tooltip (stats, red
+-- "can't use" lines, required level), scores what you wear, and walks the
+-- Auctionator scan and your bags a slice per frame.
+local _, ns = ...
+local S = ns.score
+local Scan = {}
+ns.scan = Scan
+
+local function pass(ok, ...) if ok then return ... end end
+local function call(fn, ...)
+  if type(fn) ~= "function" then return nil end
+  return pass(pcall(fn, ...))
+end
+ns.call = call
+local function api(path)
+  local t = _G
+  for part in path:gmatch("[^%.]+") do
+    if type(t) ~= "table" then return nil end
+    t = rawget(t, part)
+  end
+  return t
+end
+ns.api = api
+
+function ns.db()
+  if type(UpgradeFinderDB) ~= "table" then UpgradeFinderDB = {} end
+  local db = UpgradeFinderDB
+  db.weights = db.weights or {}   -- [class] = { stat = weight } overrides
+  db.opts = db.opts or { ahead = 0, sort = "gain", affordable = false, group = 1 }
+  return db
+end
+
+function ns.class()
+  local _, class = call(UnitClass, "player")
+  return class or S.DEFAULT_CLASS
+end
+
+-- The talent tree with the most points (nil below level 10). Classic
+-- GetTalentTabInfo returns name, icon, points, ...; later clients return
+-- id, name, description, icon, points, ...
+function ns.talentTab()
+  local get = rawget(_G, "GetTalentTabInfo")
+  local best, most = nil, 0
+  for tab = 1, call(rawget(_G, "GetNumTalentTabs")) or 3 do
+    local r = { call(get, tab) }
+    local points = type(r[1]) == "number" and r[5] or r[3]
+    if type(points) == "number" and points > most then best, most = tab, points end
+  end
+  return best
+end
+
+-- Where weights and overrides come from: "CLASS" or "CLASS:Spec".
+function ns.weightKey()
+  local class = ns.class()
+  local spec = S.specName(class, ns.talentTab())
+  return spec and (class .. ":" .. spec) or class, class, spec
+end
+
+function ns.weights()
+  local key, class = ns.weightKey()
+  return S.weightsFor(class, ns.db().weights[key], ns.talentTab())
+end
+
+-- The score function: MageMentor's own for a mage when it is loaded (so the
+-- numbers match its tooltips), otherwise the built-in weights for your spec.
+function ns.valueOf(lines, w)
+  lines = S.withoutSets(lines) -- MageMentor's reader would count set bonuses
+  local mm = rawget(_G, "MageMentorAPI")
+  if ns.class() == "MAGE" and type(mm) == "table" and mm.parseStats and mm.score then
+    local ok, v = pcall(function() return mm.score(mm.parseStats(lines)) end)
+    if ok and type(v) == "number" then return v end
+  end
+  return S.value(S.parse(lines), w or ns.weights())
+end
+
+---------------------------------------------------------------------------
+-- Hidden tooltip
+---------------------------------------------------------------------------
+local TT = "UpgradeFinderScanTooltip"
+local scanner
+
+local function isRed(fs)
+  if not fs or not fs.GetTextColor then return false end
+  local r, g, b = fs:GetTextColor()
+  return r and r > 0.9 and g < 0.3 and b < 0.3 and true or false
+end
+
+local REQ_LEVEL = "^" .. (type(rawget(_G, "ITEM_MIN_LEVEL")) == "string" and ITEM_MIN_LEVEL or "Requires Level %d")
+  :gsub("%%d", "(%%d+)")
+
+-- Lines, unusable (a red line other than the level), required level.
+-- nil while the game still loads the item ("Retrieving item information").
+function Scan.read(setter)
+  if not scanner then
+    scanner = CreateFrame("GameTooltip", TT, nil, "GameTooltipTemplate")
+  end
+  scanner:SetOwner(rawget(_G, "WorldFrame") or UIParent, "ANCHOR_NONE")
+  scanner:ClearLines()
+  setter(scanner)
+  local lines, unusable, req = {}, false, nil
+  for i = 1, scanner:NumLines() do
+    local left = _G[TT .. "TextLeft" .. i]
+    local t = left and left:GetText()
+    if t then table.insert(lines, t) end
+    local lvl = t and tonumber(t:match(REQ_LEVEL))
+    if lvl then req = lvl
+    elseif isRed(left) or isRed(_G[TT .. "TextRight" .. i]) then unusable = true end
+  end
+  if #lines < 2 then return nil end
+  return lines, unusable, req
+end
+
+---------------------------------------------------------------------------
+-- What you wear
+---------------------------------------------------------------------------
+-- Equip location ("" or nil for non-gear), and whether the game knew the
+-- item at all (the instant lookup can return nothing for an unseen item).
+local function equipLoc(id)
+  local instant = api("C_Item.GetItemInfoInstant") or rawget(_G, "GetItemInfoInstant")
+  local known, _, _, loc = call(instant, id)
+  return loc, known ~= nil
+end
+Scan.equipLoc = equipLoc
+
+local worn = { value = {}, twoHander = false }
+Scan.SLOT_NAMES = { "head", "neck", "shoulder", "shirt", "chest", "waist", "legs", "feet", "wrist", "hands",
+  "ring", "ring", "trinket", "trinket", "back", "main hand", "off hand", "ranged" }
+
+-- The score of each worn item is saved (per weight set, per item link), so
+-- the next login need not wait for the game to load your own gear.
+function Scan.readWorn()
+  worn = { value = {}, twoHander = false, missing = 0 }
+  local db, key = ns.db(), Scan.key or ns.weightKey()
+  db.worn = db.worn or {}
+  local saved, keep = db.worn[key] or {}, {}
+  for slot = 1, 18 do
+    local link = call(GetInventoryItemLink, "player", slot)
+    if link then
+      local lines = Scan.read(function(tt) tt:SetInventoryItem("player", slot) end)
+      if lines then
+        keep[link] = ns.valueOf(lines, Scan.w)
+      elseif saved[link] then
+        keep[link] = saved[link] -- last time's score while the game loads it
+      else
+        -- Not loaded and never seen: it would count as 0 and make every
+        -- item for this slot look like a big upgrade, so wait for it.
+        worn.missing = worn.missing + 1
+        worn.missingSlot = Scan.SLOT_NAMES[slot]
+        call(api("C_Item.RequestLoadItemDataByID"), tonumber(link:match("item:(%d+)")))
+      end
+      worn.value[slot] = keep[link] or 0
+      if slot == 16 then worn.twoHander = equipLoc(link) == "INVTYPE_2HWEAPON" end
+    end
+  end
+  -- Dual wield: the game says so, or (older client) an off-hand weapon.
+  local can = rawget(_G, "CanDualWield")
+  if type(can) == "function" then
+    worn.dualWield = call(can) and true or false
+  else
+    local off = call(GetInventoryItemLink, "player", 17)
+    worn.dualWield = off and equipLoc(off) == "INVTYPE_WEAPON" or false
+  end
+  db.worn[key] = keep -- only what you wear now
+  return worn
+end
+function Scan.worn() return worn end
+
+---------------------------------------------------------------------------
+-- Candidates: the Auctionator scan and your bags
+---------------------------------------------------------------------------
+-- cache[id] = { name, loc, value, unusable, reqLevel } or false (not gear)
+local cache = {}
+Scan.cache = cache
+local state = { busy = false, pending = 0, done = 0, total = 0 }
+Scan.state = state
+Scan.SLICE = 60
+
+function Scan.forget() for k in pairs(cache) do cache[k] = nil end end
+
+-- The item scores are saved (UpgradeFinderDB.items, the same table as
+-- cache), so a /reload or the next login shows the list without reading
+-- thousands of tooltips again. They are kept while the weights are the
+-- same: the key holds the weight set, VERSION (bump it when scoring
+-- changes), and for a mage with MageMentor a fingerprint of its weights.
+Scan.VERSION = 2
+Scan.SKIP_FOR = 24 * 3600 -- items that never loaded are skipped this long
+local PROBE = { "int", "spi", "sta", "sp", "frost", "fire", "arcane", "crit", "hit", "mp5", "armor" }
+function Scan.cacheKey()
+  local key = ns.weightKey() .. "#v" .. Scan.VERSION
+  local mm = rawget(_G, "MageMentorAPI")
+  if ns.class() == "MAGE" and type(mm) == "table" and type(mm.score) == "function" then
+    local parts = {}
+    for _, stat in ipairs(PROBE) do
+      local ok, v = pcall(mm.score, { [stat] = 1 })
+      table.insert(parts, ok and tostring(v) or "?")
+    end
+    key = key .. "#mm" .. table.concat(parts, ",")
+  end
+  return key
+end
+
+local function useStore()
+  local db, key = ns.db(), Scan.cacheKey()
+  if db.items ~= cache then
+    if db.itemsKey == key and type(db.items) == "table" then
+      for id, c in pairs(db.items) do if cache[id] == nil then cache[id] = c end end
+    end
+    db.items = cache
+  end
+  if db.itemsKey ~= key then Scan.forget() db.itemsKey = key end
+  db.missing = db.missing or {}
+  return db
+end
+
+local function now() return call(rawget(_G, "time")) or 0 end
+
+local function auctionatorIDs(into)
+  local db = api("Auctionator.Database.db")
+  if type(db) ~= "table" then return end
+  -- Keys are "12345", and gear can be keyed with a prefix and item level
+  -- ("g:12345:20"): the first number is the item ID.
+  for key in pairs(db) do
+    local id = tonumber(type(key) == "string" and key:match("(%d+)") or key)
+    if id then into[id] = into[id] or "AH" end
+  end
+end
+
+local function bagIDs(into)
+  for id, src in pairs(into) do if src == "bags" then into[id] = nil end end
+  for bag = 0, rawget(_G, "NUM_BAG_SLOTS") or 4 do
+    for slot = 1, call(api("C_Container.GetContainerNumSlots"), bag) or 0 do
+      local info = call(api("C_Container.GetContainerItemInfo"), bag, slot)
+      if type(info) == "table" and info.itemID then into[info.itemID] = "bags" end
+    end
+  end
+end
+
+-- Items the client has not seen yet load from the server. We ask for
+-- REQUESTS of them per pass, look again every WAIT seconds, and stop after
+-- PATIENCE passes in a row with nothing new.
+Scan.REQUESTS, Scan.WAIT, Scan.PATIENCE = 150, 1.5, 4
+
+local function cached(id)
+  local f = api("C_Item.IsItemDataCachedByID")
+  if not f then return true end -- older client: let the tooltip tell
+  return call(f, id) and true or false
+end
+
+-- One item: fills cache[id]; returns false if it is still loading.
+function Scan.item(id)
+  if cache[id] ~= nil then return true end
+  local loc, known = equipLoc(id)
+  if not known then return false end -- not seen yet: ask and look again
+  if not loc or not S.SLOTS[loc] then cache[id] = false return true end
+  if not cached(id) then return false end
+  local lines, unusable, req = Scan.read(function(tt) tt:SetHyperlink("item:" .. id) end)
+  if not lines then return false end
+  cache[id] = { name = lines[1], loc = loc, value = ns.valueOf(lines, Scan.w), unusable = unusable, reqLevel = req }
+  local missing = ns.db().missing
+  if missing then missing[id] = nil end
+  return true
+end
+
+-- Walks ids a slice per frame; done(stillLoading, loadedCount) at the end.
+local function walk(ids, gen, onStep, done)
+  local i, still, got = 1, {}, 0
+  local function step()
+    if gen ~= state.gen then return end -- a newer scan took over
+    local budget = Scan.SLICE
+    while budget > 0 and i <= #ids do
+      if Scan.item(ids[i]) then got = got + 1 else table.insert(still, ids[i]) end
+      i, budget = i + 1, budget - 1
+    end
+    if onStep then onStep(i - 1) end
+    if i <= #ids then call(api("C_Timer.After"), 0, step) else done(still, got) end
+  end
+  step()
+end
+
+-- Scans every candidate. onDone(rows) runs when the first pass ends and
+-- again each time more items finish loading; onStep(state) repaints.
+function Scan.run(onStep, onDone)
+  if state.busy then return end
+  local sources = {}
+  auctionatorIDs(sources)
+  bagIDs(sources)
+  local ids = {}
+  local db = useStore()
+  local skipped = 0
+  for id in pairs(sources) do
+    local t = db.missing[id]
+    if cache[id] == nil and t and now() - t < Scan.SKIP_FOR then skipped = skipped + 1
+    else table.insert(ids, id) end
+  end
+  table.sort(ids)
+  state.skipped = skipped
+  state.gen = (state.gen or 0) + 1
+  local gen = state.gen
+  state.busy, state.loading, state.total, state.done, state.pending = true, false, #ids, 0, 0
+  Scan.w, Scan.key = ns.weights(), ns.weightKey()
+  local asked, idle, due = {}, 0, true -- due: rows changed since last shown
+  local function ask(list)
+    local n = 0
+    for _, id in ipairs(list) do
+      if n >= Scan.REQUESTS then break end
+      if not asked[id] then
+        asked[id], n = true, n + 1
+        call(api("C_Item.RequestLoadItemDataByID"), id)
+      end
+    end
+    return n
+  end
+  local function after(still, got)
+    if gen ~= state.gen then return end
+    local n = ask(still)
+    if got > 0 or n > 0 then idle = 0 else idle = idle + 1 end
+    state.busy, state.pending = false, #still
+    Scan.readWorn() -- gear may have changed during the scan
+    local gearReady = worn.missing == 0
+    state.loading = (#still > 0 or not gearReady) and idle < Scan.PATIENCE
+    if not state.loading then
+      -- Gave up on these: skip them next time (Rescan tries them again).
+      for _, id in ipairs(still) do db.missing[id] = now() end
+    end
+    state.gearLoading = not gearReady and state.loading
+    due = due or got > 0
+    -- Gains are shown only once your own gear has loaded (or we gave up).
+    if due and (gearReady or not state.loading) and onDone then
+      due = false
+      onDone(Scan.rows(sources))
+    end
+    if onStep then onStep(state) end
+    if state.loading then
+      call(api("C_Timer.After"), Scan.WAIT, function() walk(still, gen, nil, after) end)
+    end
+  end
+  Scan.readWorn()
+  walk(ids, gen, function(done)
+    state.done = done
+    if onStep then onStep(state) end
+  end, after)
+end
+
+-- Bags changed or gear moved: rebuild the "bags" sources (an item you
+-- equipped is no longer a free candidate; an AH copy stays), score new bag
+-- items, reread what you wear and return fresh rows.
+function Scan.refresh()
+  local sources = {}
+  auctionatorIDs(sources)
+  bagIDs(sources)
+  for id, src in pairs(sources) do if src == "bags" then Scan.item(id) end end
+  Scan.readWorn()
+  return Scan.rows(sources)
+end
+
+-- Rows for S.rank from the cache, with gains against what you wear now.
+function Scan.rows(sources)
+  local rows = {}
+  local price = api("Auctionator.API.v1.GetAuctionPriceByItemID")
+  for id, src in pairs(sources) do
+    local c = cache[id]
+    if c then
+      local base, note = S.replaced(c.loc, worn.value, worn.twoHander, worn.dualWield)
+      local p = src == "AH" and (call(price, "UpgradeFinder", id)
+        or call(api("Auctionator.API.v1.GetAuctionPriceByItemLink"), "UpgradeFinder", "item:" .. id)) or nil
+      table.insert(rows, { id = id, name = c.name, loc = c.loc, gain = c.value - (base or 0), price = p,
+        reqLevel = c.reqLevel, unusable = c.unusable, source = src, note = note, value = c.value })
+    end
+  end
+  Scan.lastSources = sources
+  return rows
+end

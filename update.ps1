@@ -1,4 +1,4 @@
-# Install or update Jiahua's WoW addons (LootValue, Omni) for WoW Forever.
+# Install or update Jiahua's WoW addons (LootValue, Omni, UpgradeFinder) for WoW Forever.
 # Friends run update.cmd (it downloads and runs this file); or, in PowerShell:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File update.ps1 [-Client "D:\World of Warcraft\_forever_"]
 # It reads addons.json from the latest GitHub release of jwang47/wow-addons,
