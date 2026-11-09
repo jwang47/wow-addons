@@ -295,7 +295,8 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   cast bar below them. They replace Blizzard's player, target and cast
   frames (`/glance blizzard on` keeps those).
 - **Minimap**: square, top-right, mouse-wheel zoom, right-click for
-  tracking. The zone, coordinates and clock are under it, and the
+  tracking. `/glance map 250` sets its size (120 to 400), or drag the gold
+  corner in `/glance edit`. The zone, coordinates and clock are under it, and the
   LibDBIcon addon buttons (Questie, Details and the rest) are in one
   drawer behind the Addons tab.
 - `/glance keybar off`, `/glance units off` and `/glance minimap off` turn

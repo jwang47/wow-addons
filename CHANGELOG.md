@@ -22,6 +22,8 @@ the same, and a test checks that every `.toc` version has a section here.
   (`/glance blizzard on` brings those back).
 - A square minimap in the top-right corner: mouse-wheel zoom, the zone,
   coordinates and clock under it, and the addon buttons in one drawer.
+  `/glance map SIZE` or the gold corner in edit mode resizes it.
+- Works with the client's hidden (secret) health, power and cast values.
 
 ## UpgradeFinder 0.1.8
 

@@ -37,6 +37,17 @@ function ns.safe(name, fn, ...)
 end
 
 ---------------------------------------------------------------------------
+-- Secret values: the Forever client hides some numbers from addons (health
+-- always, power and cast times at times). Such a value may go straight to a
+-- status bar or SetText, but any compare or sum on it is an error. plain(v)
+-- gives v when it is an ordinary value and nil when it is secret.
+---------------------------------------------------------------------------
+function ns.plain(v)
+  if issecretvalue and issecretvalue(v) then return nil end
+  return v
+end
+
+---------------------------------------------------------------------------
 -- API shims: the Forever client has C_ActionBar, older clients globals.
 ---------------------------------------------------------------------------
 local AB = C_ActionBar or {}
@@ -94,6 +105,7 @@ events:SetScript("OnEvent", function(_, event, ...)
 end)
 events:RegisterEvent("PLAYER_REGEN_ENABLED")
 
+ns.editHooks = {}  -- fn(unlocked), run on /glance edit
 ns.modules = {}  -- name -> setup function, run at PLAYER_LOGIN in order
 ns.order = {}
 function ns.module(name, setup)
@@ -121,6 +133,7 @@ end)
 local help = {
   "/glance edit - unlock the keyboard bar: drag spells off keys, drag the bar to move it",
   "/glance reset - put the keyboard bar back at the bottom centre",
+  "/glance map SIZE - minimap size in pixels (120-400); or drag its corner in /glance edit",
   "/glance import - read your key bindings again and rebuild the keyboard bar",
   "/glance take KEY - put KEY on the keyboard bar even if it has another binding",
   "/glance take all - the same for every key with another command, except Tab",

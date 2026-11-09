@@ -2,7 +2,8 @@
 -- under it. Addon buttons (LibDBIcon) fold into a drawer behind one tab.
 local addonName, ns = ...
 
-local SIZE = 190
+local SIZE = 190          -- default; /glance map or the edit-mode corner changes it
+local MIN, MAX = 120, 400
 local mm = {}
 ns.minimap = mm
 
@@ -89,16 +90,60 @@ local function chip(parent, text)
   return b
 end
 
+function mm.setSize(size)
+  size = math.floor(math.max(MIN, math.min(MAX, size)) + 0.5)
+  ns.db.mapSize = size
+  if not mm.holder then return size end
+  mm.holder:SetSize(size, size)
+  Minimap:SetSize(size, size)
+  -- Nudge the zoom so the game redraws the map at the new size.
+  local z = Minimap:GetZoom()
+  Minimap:SetZoom(z > 0 and z - 1 or z + 1)
+  Minimap:SetZoom(z)
+  return size
+end
+
+ns.commands.map = function(rest)
+  local n = tonumber(rest)
+  if not n then return ns.print("/glance map SIZE, " .. MIN .. " to " .. MAX .. " (now " .. (ns.db.mapSize or SIZE) .. ")") end
+  ns.print("Minimap " .. mm.setSize(n) .. " px.")
+end
+
 ns.module("minimap", function()
   local holder = CreateFrame("Frame", "GlanceMinimap", UIParent)
   mm.holder = holder
-  holder:SetSize(SIZE, SIZE)
+  holder:SetSize(ns.db.mapSize or SIZE, ns.db.mapSize or SIZE)
   holder:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -16)
 
   Minimap:SetParent(holder)
   Minimap:ClearAllPoints()
   Minimap:SetAllPoints(holder)
-  Minimap:SetSize(SIZE, SIZE)
+  Minimap:SetSize(ns.db.mapSize or SIZE, ns.db.mapSize or SIZE)
+
+  -- Resizing: a grip on the bottom-left corner in /glance edit.
+  local grip = CreateFrame("Button", "GlanceMinimapGrip", holder)
+  mm.grip = grip
+  grip:SetSize(14, 14)
+  grip:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0)
+  grip:SetFrameLevel((Minimap.GetFrameLevel and Minimap:GetFrameLevel() or 1) + 10)
+  grip.tex = grip:CreateTexture(nil, "OVERLAY")
+  grip.tex:SetAllPoints()
+  grip.tex:SetColorTexture(1, 0.85, 0.3, 0.8)
+  grip:Hide()
+  grip:SetScript("OnMouseDown", function(self)
+    local x, y = GetCursorPosition()
+    self.from = { x = x, y = y, size = holder:GetWidth() }
+  end)
+  grip:SetScript("OnMouseUp", function(self) self.from = nil end)
+  grip:SetScript("OnUpdate", function(self)
+    if not self.from then return end
+    local x, y = GetCursorPosition()
+    local scale = holder:GetEffectiveScale()
+    -- Dragging left or down grows the map (it hangs from the top-right).
+    local grow = math.max(self.from.x - x, self.from.y - y) / scale
+    mm.setSize(self.from.size + grow)
+  end)
+  table.insert(ns.editHooks, function(on) grip:SetShown(on) end)
   Minimap:SetMaskTexture("Interface\\Buttons\\WHITE8X8")
   Minimap:EnableMouseWheel(true)
   Minimap:SetScript("OnMouseWheel", function(self, d)

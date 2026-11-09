@@ -32,7 +32,8 @@ local ARROWS = { up = "^", down = "v", left = "<", right = ">", jump = "_", run 
 local function paint(b)
   if b.mode ~= "slot" then return end
   local slot = currentSlot(b)
-  local has = slot and api.HasAction(slot)
+  local plain = ns.plain
+  local has = slot and plain(api.HasAction(slot))
   if has then
     b.icon:SetTexture(api.GetActionTexture(slot))
     b.icon:Show()
@@ -40,7 +41,8 @@ local function paint(b)
     local start, dur = api.GetActionCooldown(slot)
     pcall(b.cooldown.SetCooldown, b.cooldown, start, dur)
     local usable, noMana = api.IsUsableAction(slot)
-    local inRange = api.IsActionInRange(slot)
+    usable, noMana = plain(usable), plain(noMana)
+    local inRange = plain(api.IsActionInRange(slot))
     if inRange == false then
       b.icon:SetVertexColor(0.9, 0.3, 0.3)
     elseif usable then
@@ -51,11 +53,11 @@ local function paint(b)
       b.icon:SetVertexColor(0.4, 0.4, 0.4)
     end
     local count = ""
-    if api.IsConsumableAction and api.IsConsumableAction(slot) and api.GetActionCount then
+    if api.IsConsumableAction and plain(api.IsConsumableAction(slot)) and api.GetActionCount then
       count = api.GetActionCount(slot) or ""
     end
     b.count:SetText(count)
-    local current = api.IsCurrentAction and api.IsCurrentAction(slot)
+    local current = api.IsCurrentAction and plain(api.IsCurrentAction(slot))
     b.glow:SetShown(current and true or false)
     -- Same spell as another key: dim, and name that key.
     local dup = (not shiftDown()) and b.dupOf
@@ -70,7 +72,7 @@ local function paint(b)
   end
   -- The other layer, small in the top-right corner.
   local other = shiftDown() and b.plainSlot or b.shiftSlot
-  if other and other ~= slot and api.HasAction(other) then
+  if other and other ~= slot and plain(api.HasAction(other)) then
     b.peek:SetTexture(api.GetActionTexture(other))
     b.peek:Show()
   else
@@ -273,6 +275,7 @@ end)
 ---------------------------------------------------------------------------
 ns.commands.edit = function()
   ns.unlocked = not ns.unlocked
+  for _, fn in ipairs(ns.editHooks) do ns.safe("edit", fn, ns.unlocked) end
   if bar then
     bar.editTag:SetShown(ns.unlocked)
     bar.edge:SetShown(ns.unlocked)

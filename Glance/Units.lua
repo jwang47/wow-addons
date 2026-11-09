@@ -31,8 +31,8 @@ end
 function ns.units.healthColor(unit)
   if UnitIsUnit and UnitIsUnit(unit, "player") then return 0.3, 0.78, 0.35 end
   if UnitIsPlayer(unit) then return classColor(unit) end
-  if UnitIsTapDenied and UnitIsTapDenied(unit) then return 0.55, 0.55, 0.55 end
-  local r = UnitReaction(unit, "player")
+  if UnitIsTapDenied and ns.plain(UnitIsTapDenied(unit)) then return 0.55, 0.55, 0.55 end
+  local r = ns.plain(UnitReaction(unit, "player"))
   if r and r <= 3 then return 0.88, 0.32, 0.27 end
   if r == 4 then return 0.95, 0.8, 0.3 end
   return 0.35, 0.8, 0.35
@@ -50,7 +50,8 @@ local function update(f)
   if not UnitExists(u) then return end
   f.name:SetText(UnitName(u))
   local lvl = UnitLevel(u)
-  f.level:SetText((lvl and lvl > 0) and lvl or "??")
+  local known = ns.plain(lvl)
+  if known and known <= 0 then f.level:SetText("??") else f.level:SetText(lvl) end
   f.hp:SetMinMaxValues(0, UnitHealthMax(u))
   f.hp:SetValue(UnitHealth(u))
   f.hp:SetStatusBarColor(ns.units.healthColor(u))
@@ -58,7 +59,8 @@ local function update(f)
   f.mp:SetMinMaxValues(0, maxp)
   f.mp:SetValue(UnitPower(u))
   f.mp:SetStatusBarColor(powerColor(u))
-  f.mp:SetShown(not (maxp == 0))
+  local m = ns.plain(maxp)
+  f.mp:SetShown(m == nil or m > 0)   -- a hidden maximum: keep the bar
 end
 ns.units.update = update
 
@@ -92,20 +94,39 @@ end
 -- Cast bar
 ---------------------------------------------------------------------------
 local cast
-local function castInfo()
-  local name, _, _, startMS, endMS = UnitCastingInfo("player")
-  if name then return name, startMS, endMS, false end
-  name, _, _, startMS, endMS = UnitChannelInfo("player")
-  if name then return name, startMS, endMS, true end
-end
-
+-- Cast and channel times can be secret, so the bar runs on the game's own
+-- timer (SetTimerDuration with UnitCastingDuration) where the client has
+-- it, and on our own sums only where the times are plain numbers.
 local function castUpdate()
-  local name, startMS, endMS, channel = castInfo()
-  if not name then cast:Hide() return end
+  local channel = false
+  local n = select("#", UnitCastingInfo("player"))
+  local name, _, _, startMS, endMS = UnitCastingInfo("player")
+  if n == 0 then
+    n = select("#", UnitChannelInfo("player"))
+    name, _, _, startMS, endMS = UnitChannelInfo("player")
+    channel = true
+  end
+  if n == 0 then cast:Hide() return end
   cast.text:SetText(name)
-  cast.bar:SetMinMaxValues(startMS, endMS)
   cast.channel = channel
-  cast.startMS, cast.endMS = startMS, endMS
+  cast.startMS, cast.endMS = ns.plain(startMS), ns.plain(endMS)
+  cast.timer = false
+  local durFn = channel and UnitChannelDuration or UnitCastingDuration
+  if cast.bar.SetTimerDuration and durFn and not (cast.startMS and cast.endMS) then
+    local ok = pcall(function()
+      local d = durFn("player")
+      local E = Enum or {}
+      local interp = E.StatusBarInterpolation and E.StatusBarInterpolation.Immediate
+      local dirs = E.StatusBarTimerDirection
+      local dir = dirs and (channel and dirs.RemainingTime or dirs.ElapsedTime)
+      cast.bar:SetTimerDuration(d, interp, dir)
+    end)
+    cast.timer = ok
+  end
+  if not cast.timer and cast.startMS and cast.endMS then
+    cast.bar:SetMinMaxValues(cast.startMS, cast.endMS)
+  end
+  cast.time:SetText("")
   cast:Show()
 end
 
@@ -122,6 +143,7 @@ local function makeCast()
   cast.time:SetPoint("RIGHT", -5, 0)
   cast:Hide()
   cast:SetScript("OnUpdate", function(self)
+    if self.timer or not (self.startMS and self.endMS) then return end
     ns.safe("cast bar", function()
       local now = GetTime() * 1000
       if self.channel then

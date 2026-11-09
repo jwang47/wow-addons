@@ -246,6 +246,31 @@ check("hostile is red", r > 0.8)
 local pr, pg = ns.units.healthColor("player")
 check("own health is green", pg > pr)
 
+-- Secret values: compares on them must not happen.
+local SECRET = setmetatable({}, { __eq = function() error("compare on secret") end,
+  __lt = function() error("compare on secret") end, __le = function() error("compare on secret") end })
+function issecretvalue(v) return v == nil and false or rawequal(v, SECRET) end
+UnitPowerMax = function() return SECRET end
+UnitLevel = function() return SECRET end
+UnitReaction = function() return SECRET end
+local before = #chat
+fire("UNIT_MAXPOWER", "player")
+fire("PLAYER_TARGET_CHANGED")
+check("secret power and level are fine", #chat == before, chat[#chat])
+check("power bar kept", _G.GlancePlayer.mp.shown)
+UnitCastingInfo = function() return "Frostbolt", "", 1, SECRET, SECRET end
+UnitCastingDuration = function() return "duration" end
+local timerSet
+ns.units.cast.bar.SetTimerDuration = function(_, d) timerSet = d end
+fire("UNIT_SPELLCAST_START", "player")
+check("cast uses the game timer", timerSet == "duration" and ns.units.cast.timer)
+ns.units.cast.scripts.OnUpdate(ns.units.cast)
+check("no cast error", #chat == before, chat[#chat])
+UnitCastingInfo = function() end
+fire("UNIT_SPELLCAST_STOP", "player")
+check("cast bar hides", not ns.units.cast.shown)
+issecretvalue = nil
+
 -- Minimap.
 check("square shape", GetMinimapShape() == "SQUARE")
 check("minimap moved", Minimap.parent == _G.GlanceMinimap)
@@ -258,6 +283,14 @@ check("addon button in drawer", lib.parent == _G.GlanceAddonDrawer)
 check("tab counts buttons", ns.minimap.tab.text.text == "Addons 1")
 _G.GlanceMinimap.scripts.OnUpdate(_G.GlanceMinimap, 1)
 check("minimap info line", ns.minimap.info.text == "23.4, 51.3  16:03")
+
+-- Resizing the minimap.
+SlashCmdList.GLANCE("map 260")
+check("map size saved", ns.db.mapSize == 260)
+SlashCmdList.GLANCE("map 9999")
+check("map size clamped", ns.db.mapSize == 400)
+SlashCmdList.GLANCE("edit")
+check("grip shows in edit", _G.GlanceMinimapGrip.shown == ns.unlocked)
 
 -- A combat login defers secure setup.
 for _, line in ipairs(chat) do check("no error", not line:match("failed"), line) end
