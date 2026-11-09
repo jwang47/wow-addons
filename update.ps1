@@ -91,6 +91,7 @@ function Save-Installed { $all | ConvertTo-Json -Depth 3 | Set-Content -Path $in
 
 $changed = 0
 $failed = @()
+$dev = @()       # addons in dev mode (a link), left as they are
 $fresh = $false   # a folder that did not exist before needs a game restart
 # Staging sits in the WoW folder, on the same drive as AddOns: Move-Item
 # cannot move a folder to another drive (%TEMP% is usually on C:).
@@ -129,6 +130,14 @@ try {
     $old = $null
     if ($name -notmatch '^[A-Za-z0-9_]+$') { throw "Bad addon name in addons.json: $name" }
     $dst = Join-Path $addons $name
+    # A link is a developer copy (dev.ps1): never change it, just say so.
+    if ((Test-Path -LiteralPath $dst) -and ((Get-Item -LiteralPath $dst -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+      $t = (Get-Item -LiteralPath $dst -Force).Target
+      if ($t -is [array]) { $t = $t[0] }
+      Write-Host "  ${name}: dev copy (link to $t), not changed. dev.ps1 -Off $name goes back to the release." -ForegroundColor Yellow
+      $dev += $name
+      continue
+    }
     $have = (Test-Path (Join-Path $dst "$name.toc")) -and ($installed[$name] -eq $a.sha256)
     foreach ($req in @($a.requires)) {
       if ($req -and -not (Test-Path (Join-Path $addons "$req\$req.toc"))) {
@@ -157,9 +166,6 @@ try {
       if ($k -and (Test-Path (Join-Path $dst $k))) { Copy-Item (Join-Path $dst $k) (Join-Path $new $k) -Force }
     }
     if (Test-Path $dst) {
-      if ((Get-Item -LiteralPath $dst -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
-        throw "$dst is a link (a developer copy?). It was not changed."
-      }
       $old = Join-Path $tmp "$name.old"
       Move-Item $dst $old
     } else { $fresh = $true }
@@ -201,6 +207,7 @@ if ($Check) {
 } elseif ($failed.Count -eq 0) {
   Write-Host 'Everything is up to date.'
 }
+if ($dev.Count -gt 0) { Write-Host "In dev mode (not updated): $($dev -join ', ')." -ForegroundColor Yellow }
 if ($failed.Count -gt 0) {
   Write-Host "Not updated: $($failed -join ', '). Run update.cmd again later." -ForegroundColor Red
   exit 1

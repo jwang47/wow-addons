@@ -217,6 +217,28 @@ Checks, from the repo root (Lua 5.1 and Python 3):
 The `tests` workflow runs all four on each push and pull request. The real
 check is in game.
 
+### Dev mode: try a checkout in the game
+
+WoW loads one folder per addon name from `Interface\AddOns`, so a
+developer copy takes the place of the release copy. `dev.ps1` switches
+one addon at a time (PowerShell, from this checkout):
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File dev.ps1 Omni
+powershell -NoProfile -ExecutionPolicy Bypass -File dev.ps1 -Status
+powershell -NoProfile -ExecutionPolicy Bypass -File dev.ps1 -Off
+```
+
+`dev.ps1 Omni` moves the installed Omni to `<client>\wow-addons-prod\Omni`
+and puts a link (a junction) to this checkout's `Omni\` in its place, so an
+edit shows after `/reload`. `-Off` (with names, or for all) removes the
+links and puts the release copies back. `-Status` lists each addon as dev or
+release. It finds the WoW folder that `update.cmd` saved; give
+`-Client "<_forever_ folder>"` otherwise. `update.cmd` never changes a
+linked folder: it lists it as "dev copy" and ends with "In dev mode (not
+updated): ...". Switch a branch with `git checkout` in this checkout and
+`/reload`.
+
 ## Release
 
 1. In the PR: raise `## Version` in each changed addon's `.toc` and add its
