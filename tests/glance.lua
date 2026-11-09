@@ -50,7 +50,7 @@ MinimapCluster.IndicatorFrame = widget()
 PlayerFrame, TargetFrame, PlayerCastingBarFrame = widget("PlayerFrame"), widget("TargetFrame"), widget("PlayerCastingBarFrame")
 GameTooltip = widget("GameTooltip")
 NUM_CHAT_WINDOWS = 2
-BT4Bar1, BT4BarBlizzardArt = widget("BT4Bar1"), widget("BT4BarBlizzardArt")
+BT4Bar1, BT4Bar3, BT4BarBlizzardArt = widget("BT4Bar1"), widget("BT4Bar3"), widget("BT4BarBlizzardArt")
 function BT4Bar1:IsProtected() return true end
 local drivers = {}
 function RegisterStateDriver(f, k, v) drivers[f] = v end
@@ -312,6 +312,7 @@ check("bars left alone by default", drivers[BT4Bar1] == nil and BT4BarBlizzardAr
 SlashCmdList.GLANCE("bars hide")
 check("bartender bar hidden by driver", drivers[BT4Bar1] == "hide")
 check("gryphon art hidden", not BT4BarBlizzardArt.shown)
+check("right-edge bar kept", BT4Bar3.shown and drivers[BT4Bar3] == nil)
 check("xp bar shown", _G.GlanceXP.shown)
 
 -- Chat.

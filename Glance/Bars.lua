@@ -7,10 +7,15 @@ local bars = {}
 ns.bars = bars
 
 -- Bartender4 names its bars BT4Bar<id>; Blizzard art and XP are bars too.
--- The bag bar, micro menu, pet and stance bars stay.
+-- The bag bar, micro menu, pet and stance bars stay, and so do the two
+-- right-edge bars (Bartender 3 and 4): click bars that the keyboard bar does
+-- not replace.
+local KEEP = { [3] = true, [4] = true }
 local function targets()
   local list = {}
-  for i = 1, 10 do table.insert(list, _G["BT4Bar" .. i]) end
+  for i = 1, 10 do
+    if not KEEP[i] then table.insert(list, _G["BT4Bar" .. i]) end
+  end
   for _, name in ipairs({ "BT4BarBlizzardArt", "BT4BarStatusTrackingBar",
       "MainActionBar", "MainMenuBar", "MainMenuBarArtFrame", "MultiBarBottomLeft",
       "MultiBarBottomRight", "StatusTrackingBarManager" }) do
