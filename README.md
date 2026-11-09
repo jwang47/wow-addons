@@ -139,7 +139,7 @@ Checks, from the repo root (Lua 5.1 and Python 3):
 | --- | --- |
 | `lua5.1 tests/lootvalue.lua` | LootValue against a mock of the game and Auctionator APIs |
 | `lua5.1 tests/omni.lua` | Omni against a mock of the game API |
-| `python3 -m unittest tests/test_publish_addons.py` | Zips, manifest, version guard, changelog, page |
+| `python3 -m unittest tests/test_release.py` | Zips, manifest, version guard, changelog, page |
 
 The `tests` workflow runs all three on each push and pull request. The real
 check is in game.
@@ -148,25 +148,20 @@ check is in game.
 
 1. In the PR: raise `## Version` in each changed addon's `.toc` and add its
    section to `CHANGELOG.md`. A test checks that each version has a section.
-2. After the merge, with Jiahua's OK (each step publishes):
-   - `python3 tools/publish_addons.py plan` (read-only), then
-     `python3 tools/publish_addons.py publish --yes`. It uploads the zips,
-     `update.ps1`, `update.cmd` and `addons.json` under the `wow/` prefix
-     of the R2 bucket `kartdrift-miami-updates`, which serves
-     `dl.jwhex.dev`. Zips are named by SHA-256 and never replaced;
-     `addons.json` goes up last. `plan` refuses an addon whose files
-     changed since the live `addons.json` under the same version. It needs
-     `CLOUDFLARE_API_TOKEN` (and `CLOUDFLARE_ACCOUNT_ID` when the token
-     sees more than one account).
-   - Push a tag `release-YYYY-MM-DD` on that commit. The `release` workflow
-     makes the GitHub release with `<Addon>-<version>.zip` (the same bytes).
+2. After the merge, with Jiahua's OK (it publishes to every friend): push a
+   tag `release-YYYY-MM-DD` on that commit. The `release` workflow runs the
+   tests and `tools/release.py check` (it refuses an addon whose files
+   changed since the latest release under the same version), then makes the
+   GitHub release with `<Addon>-<version>.zip`, `addons.json`, `update.ps1`
+   and `update.cmd`. `update.cmd` and `update.ps1` read
+   `releases/latest/download/addons.json`, so friends get it at their next
+   run.
 3. The `pages` workflow publishes `site/` to GitHub Pages when `site/`
-   changes on `main`. Turn it on once: Settings, Pages, Source "GitHub
-   Actions".
+   changes on `main` (or run it by hand).
 
-**Test build:** `python3 tools/publish_addons.py build --root <folder with
-LootValue\ and Omni\>` writes `logs/wow-addons/` in the bucket layout; then
-`update.ps1 -Client <test folder> -Manifest logs\wow-addons\addons.json`.
+**Test build:** `python3 tools/release.py build --root <folder with
+LootValue\ and Omni\>` writes `logs/wow-addons/` in the release layout;
+then `update.ps1 -Client <test folder> -Manifest logs\wow-addons\addons.json`.
 
 These addons started in Jiahua's private monorepo (`jwang47/scratch`,
 `wow-mage/`) and moved here on 2026-11-09.

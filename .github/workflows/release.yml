@@ -1,6 +1,7 @@
 # A pushed tag "release-YYYY-MM-DD" makes a GitHub release with one zip per
-# addon (<Addon>-<version>.zip, the same bytes as on dl.jwhex.dev) and the
-# CHANGELOG.md as notes. Pushing the tag publishes: it needs Jiahua's OK.
+# addon (<Addon>-<version>.zip), addons.json, update.ps1 and update.cmd, and
+# the CHANGELOG.md as notes. update.cmd reads the latest release, so pushing
+# the tag publishes to every friend: it needs Jiahua's OK.
 name: release
 on:
   push:
@@ -12,8 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: python3 -m unittest tests/test_publish_addons.py
-      - run: python3 tools/publish_addons.py build
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
+      - run: lua5.1 tests/lootvalue.lua && lua5.1 tests/omni.lua
+      - run: python3 -m unittest tests/test_release.py
+      - run: python3 tools/release.py check --tag "$GITHUB_REF_NAME"
       - env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" logs/wow-addons/release/*.zip --title "$GITHUB_REF_NAME" --notes-file CHANGELOG.md
+        run: |
+          cd logs/wow-addons
+          gh release create "$GITHUB_REF_NAME" *.zip addons.json update.ps1 update.cmd \
+            --title "$GITHUB_REF_NAME" --notes-file ../../CHANGELOG.md

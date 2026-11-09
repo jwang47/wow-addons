@@ -13,4 +13,26 @@ jobs:
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
       - run: lua5.1 tests/lootvalue.lua
       - run: lua5.1 tests/omni.lua
-      - run: python3 -m unittest tests/test_publish_addons.py
+      - run: python3 -m unittest tests/test_release.py
+  updater:
+    # update.ps1 in Windows PowerShell 5.1, against a local test build.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: pwsh
+        run: python tools/release.py build
+      - shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $client = Join-Path $env:RUNNER_TEMP '_forever_'
+          New-Item -ItemType Directory -Force (Join-Path $client 'Interface\AddOns\Auctionator') | Out-Null
+          Set-Content (Join-Path $client 'Interface\AddOns\Auctionator\Auctionator.toc') '## Title: stub'
+          $manifest = 'logs\wow-addons\addons.json'
+          powershell -NoProfile -ExecutionPolicy Bypass -File update.ps1 -Client $client -Manifest $manifest
+          if ($LASTEXITCODE -ne 0) { throw "first run failed" }
+          foreach ($a in 'LootValue', 'Omni') {
+            if (-not (Test-Path (Join-Path $client "Interface\AddOns\$a\$a.toc"))) { throw "$a not installed" }
+          }
+          $out = powershell -NoProfile -ExecutionPolicy Bypass -File update.ps1 -Client $client -Manifest $manifest | Out-String
+          Write-Host $out
+          if ($out -notmatch 'LootValue 0\.1\.0: up to date' -or $out -notmatch 'Omni 0\.1\.0: up to date') { throw "second run reinstalled" }
