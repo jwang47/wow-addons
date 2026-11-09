@@ -275,7 +275,8 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
 - The level number is in the quest log colours (grey, green, yellow,
   orange, red). Each row shows the distance and an arrow that turns with
   you.
-- Click a row: set and track the game's map pin at the place. Shift-click:
+- Click a row: open the world map (M) at the place, and set and track the
+  game's map pin there. Shift-click:
   link the quest in chat. Right-click: open the quest log (your quests) or
   show the giver with Questie's map icon (pick-ups). Hover: XP, the
   estimate, the giver or finisher, the open objectives.

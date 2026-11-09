@@ -194,6 +194,19 @@ function D.logQuests()
   return list
 end
 
+-- The NPC in ids whose name is name (the nearest one Questie picked), or
+-- the first one.
+function D.npcNamed(ids, name)
+  if type(ids) ~= "table" or not ids[1] then return nil end
+  local qdb = D.module("QuestieDB")
+  if name and qdb and type(qdb.QueryNPCSingle) == "function" then
+    for _, id in ipairs(ids) do
+      if call(qdb.QueryNPCSingle, id, "name") == name then return id end
+    end
+  end
+  return ids[1]
+end
+
 -- Adds Questie's XP and nearest place to a log entry.
 function D.placeLog(e)
   e.xp = D.questXP(e.id)
@@ -208,7 +221,10 @@ function D.placeLog(e)
   if type(quest) ~= "table" then return e end
   e.req = quest.requiredLevel
   if e.done then
-    if quest.Finisher then place(e, call(du.GetNearestFinisherOrStarter, quest.Finisher)) end
+    if quest.Finisher then
+      place(e, call(du.GetNearestFinisherOrStarter, quest.Finisher))
+      e.npc = D.npcNamed(quest.Finisher.NPC, e.target)
+    end
   elseif quest.Objectives then
     place(e, call(du.GetNearestSpawnForQuest, quest))
   end
@@ -260,7 +276,10 @@ function D.pickup(id, level, maxAbove)
     if type(raw[k]) == "table" then e.objectives = e.objectives + #raw[k] end
   end
   e.xp = D.questXP(id)
-  if du and quest.Starts then place(e, call(du.GetNearestFinisherOrStarter, quest.Starts)) end
+  if du and quest.Starts then
+    place(e, call(du.GetNearestFinisherOrStarter, quest.Starts))
+    e.npc = D.npcNamed(quest.Starts.NPC, e.target)
+  end
   -- Started by an item that drops: no giver to walk to.
   if not e.spawn and quest.Starts and quest.Starts.Item then e.fromItem = true end
   return e

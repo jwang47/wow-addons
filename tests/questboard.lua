@@ -79,6 +79,8 @@ C_Map = {
   CanSetUserWaypointOnMap = function(id) return id == 1433 end,
   SetUserWaypoint = function(p) log("waypoint", p) return true end,
 }
+C_Map.OpenWorldMap = function(id) log("openMap", id) WorldMapFrame.shown = true end
+WorldMapFrame = { shown = false, IsShown = function(self) return self.shown end, SetMapID = function(self, id) self.mapID = id end }
 C_SuperTrack = { SetSuperTrackedUserWaypoint = function(on) log("track", on) end }
 UiMapPoint = { CreateFromCoordinates = function(m, x, y) return { m = m, x = x, y = y } end }
 
@@ -213,11 +215,24 @@ check("arrow follows the player", math.abs(firstRow.arrow.rotation - 0.3) < 1e-9
 calls = {}
 firstRow.scripts.OnClick(firstRow, "LeftButton")
 local wp = lastCall("waypoint")
+check("click opens the world map there", lastCall("openMap") and lastCall("openMap")[1] == 1433 and WorldMapFrame.mapID == 1433)
 check("click sets a map pin", wp and wp[1].m == 1433 and math.abs(wp[1].x - 0.4) < 1e-9 and lastCall("track"))
 P.shift = true
 firstRow.scripts.OnClick(firstRow, "LeftButton")
 P.shift = false
 check("shift-click links the quest", lastCall("link") and lastCall("link")[1]:match("quest:127"))
+-- Right-click on a log quest opens the quest log at it, and only once.
+local opened, toggled = nil, 0
+function QuestMapFrame_OpenToQuestDetails(id) opened = id end
+function ToggleQuestLog() toggled = toggled + 1 end
+local logRow
+for _, f in ipairs(frames) do if f.entry and f.entry.kind == "log" then logRow = f break end end
+logRow.scripts.OnClick(logRow, "RightButton")
+check("right-click opens the quest log at the quest", opened == logRow.entry.id and toggled == 0)
+-- Clicking a turn-in marks the finisher with Questie's icon.
+calls = {}
+firstRow.scripts.OnClick(firstRow, "LeftButton")
+check("click marks the finisher on the map", lastCall("showNPC") and lastCall("showNPC")[1] == 1271)
 local pickRow
 for _, f in ipairs(frames) do if f.entry and f.entry.kind == "pickup" then pickRow = f break end end
 calls = {}

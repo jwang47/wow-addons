@@ -89,7 +89,7 @@ local function tooltip(r)
     if o.text then tip:AddLine("- " .. o.text, 0.8, 0.8, 0.8) end
   end
   tip:AddLine(" ")
-  tip:AddLine("Click: pin it on the map   Shift-click: link", 0.5, 0.5, 0.5)
+  tip:AddLine("Click: show it on the map   Shift-click: link", 0.5, 0.5, 0.5)
   if e.kind ~= "pickup" then tip:AddLine("Right-click: open the quest log", 0.5, 0.5, 0.5)
   else tip:AddLine("Right-click: show the giver on the map", 0.5, 0.5, 0.5) end
   tip:Show()
@@ -113,12 +113,30 @@ local function pinPoint(mapID, x, y)
 end
 ns.pinPoint = pinPoint
 
--- Sets and tracks the game's map pin at the entry's place.
+-- Opens the world map (M) at mapID. Another map addon can take over
+-- OpenWorldMap and show nothing, so if the map is still hidden after it,
+-- toggle it open and set the map (as Omni does).
+function ns.openMap(mapID)
+  local f = rawget(_G, "WorldMapFrame")
+  local function shown() return type(f) == "table" and f.IsShown and f:IsShown() and true or false end
+  local open = api("C_Map.OpenWorldMap")
+  if open then call(open, mapID) end
+  if type(f) ~= "table" then return open ~= nil end
+  if not shown() then
+    if not call(rawget(_G, "ToggleWorldMap")) and not shown() then call(rawget(_G, "ShowUIPanel"), f) end
+  end
+  if f.SetMapID then call(f.SetMapID, f, mapID) end
+  return true
+end
+
+-- Opens the world map at the entry's place, and sets and tracks the game's
+-- map pin there.
 function ns.pin(e)
   local zdb = D.module("ZoneDB")
   local s = e.spawn
   if not (zdb and s and s[1] and s[1] >= 0) then say(e.name .. ": no place known") return false end
   local mapID = call(zdb.GetUiMapIdByAreaId, zdb, e.zone)
+  if mapID then ns.openMap(mapID) end
   local id, px, py
   if mapID then id, px, py = pinPoint(mapID, s[1] / 100, s[2] / 100) end
   local point, set = api("UiMapPoint.CreateFromCoordinates"), api("C_Map.SetUserWaypoint")
@@ -144,21 +162,29 @@ function ns.openLog(e)
     call(rawget(_G, "QuestLog_Update"))
     return
   end
-  if call(rawget(_G, "QuestMapFrame_OpenToQuestDetails"), e.id) == nil then
-    call(api("C_QuestLog.SetSelectedQuest"), e.id)
-    call(rawget(_G, "ToggleQuestLog"))
+  -- The Forever client has the newer quest log inside the world map. This
+  -- returns nothing, so test that it exists, not what it returns (a
+  -- ToggleQuestLog after it would close the log again).
+  local details = rawget(_G, "QuestMapFrame_OpenToQuestDetails")
+  if type(details) == "function" then
+    local ok = pcall(details, e.id)
+    if ok then return end
   end
+  call(api("C_QuestLog.SetSelectedQuest"), e.id)
+  call(rawget(_G, "ToggleQuestLog"))
 end
 
--- Questie's own map icon for the giver, as Omni does.
+-- Questie's own map icon for an NPC (the giver or the finisher), as Omni
+-- does: it stands out on the map more than the small pin.
+function ns.markNPC(npc)
+  local qmap = D.module("QuestieMap")
+  if not (qmap and npc and type(qmap.ShowNPC) == "function") then return false end
+  call(qmap.ResetManualFrames, qmap, "questboard")
+  return call(qmap.ShowNPC, qmap, npc, nil, nil, nil, nil, nil, "questboard") ~= nil
+end
+
 function ns.showGiver(e)
-  local qmap, qdb = D.module("QuestieMap"), D.module("QuestieDB")
-  local quest = qdb and call(qdb.GetQuest, e.id)
-  local npc = quest and quest.Starts and quest.Starts.NPC and quest.Starts.NPC[1]
-  if qmap and npc and type(qmap.ShowNPC) == "function" then
-    call(qmap.ResetManualFrames, qmap, "questboard")
-    call(qmap.ShowNPC, qmap, npc, nil, nil, nil, nil, nil, "questboard")
-  end
+  ns.markNPC(e.npc)
   ns.pin(e)
 end
 
@@ -169,6 +195,7 @@ function ns.click(e, button)
     if e.kind == "pickup" then return ns.showGiver(e) end
     return ns.openLog(e)
   end
+  if e.npc then ns.markNPC(e.npc) end
   return ns.pin(e)
 end
 
