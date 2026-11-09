@@ -85,7 +85,8 @@ function ns.paint()
       if (r.reqLevel or 0) > level then gain = "|cff9d9d9d" .. gain .. " @" .. r.reqLevel .. "|r" end
       row.slot:SetText(S.groupName(r.loc) or "")
       row.gain:SetText(gain)
-      row.price:SetText(r.source == "AH" and (r.price and ns.money(r.price) or "|cff9d9d9d?|r")
+      row.price:SetText(r.cost and ("|cffffd100" .. ns.money(r.cost.total) .. (r.cost.missing > 0 and "+" or "") .. "|r")
+        or r.source == "AH" and (r.price and ns.money(r.price) or "|cff9d9d9d?|r")
         or r.source == "dungeon" and r.drop and ("|cff8cc7ff" .. r.drop.short .. "|r")
         or "|cff40ff40" .. r.source .. "|r")
     else
@@ -140,6 +141,27 @@ local function showDetails(row)
   tt:AddDoubleLine(string.format("Upgrade +%.1f", r.gain), string.format("score %.1f vs %.1f worn", r.value, r.value - r.gain),
     0.25, 1, 0.25, 0.6, 0.6, 0.6)
   if r.recipe then tt:AddLine("Crafted: " .. r.recipe .. (r.craft and (" (" .. r.craft .. ")") or ""), 1, 0.82, 0) end
+  -- Craft or buy: the pattern and reagents against the made item on the AH.
+  local cost = r.cost
+  if cost then
+    local unknown = "|cff9d9d9d?|r"
+    tt:AddLine(" ")
+    tt:AddDoubleLine("Craft", ns.money(cost.total) .. (cost.missing > 0 and " +?" or ""), 1, 0.82, 0, 1, 1, 1)
+    tt:AddDoubleLine("  Pattern", cost.pattern and ns.money(cost.pattern) or unknown, 0.9, 0.9, 0.9, 1, 1, 1)
+    for _, p in ipairs(cost.parts) do
+      tt:AddDoubleLine("  " .. p[1] .. " x" .. p[2], p[3] and (ns.money(p[3] * p[2]) .. (p[4] == "vendor" and " (vendor)" or ""))
+        or unknown, 0.9, 0.9, 0.9, 1, 1, 1)
+    end
+    if cost.bop then
+      tt:AddDoubleLine("Buy it made", "binds on pickup", 1, 0.82, 0, 0.6, 0.6, 0.6)
+    elseif cost.buy then
+      local cheaper = cost.buy < cost.total
+      tt:AddDoubleLine("Buy it made", ns.money(cost.buy) .. (cheaper and "  cheaper" or ""), 1, 0.82, 0,
+        cheaper and 0.25 or 1, 1, cheaper and 0.25 or 1)
+    else
+      tt:AddDoubleLine("Buy it made", "not on the AH", 1, 0.82, 0, 0.6, 0.6, 0.6)
+    end
+  end
   if r.note then tt:AddLine(r.note, 1, 0.82, 0) end
   -- What it changes (Stats.lua): stats, then offense and defense.
   local ok, d, off, def = pcall(ns.stats.forRow, r)

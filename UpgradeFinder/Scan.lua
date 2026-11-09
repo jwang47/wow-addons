@@ -189,7 +189,7 @@ function Scan.forget() for k in pairs(cache) do cache[k] = nil end end
 -- thousands of tooltips again. They are kept while the weights are the
 -- same: the key holds the weight set, VERSION (bump it when scoring
 -- changes), and for a mage with MageMentor a fingerprint of its weights.
-Scan.VERSION = 3 -- 3: recipes score as the item they make
+Scan.VERSION = 4 -- 3: recipes score as the item they make; 4: their reagents
 Scan.SKIP_FOR = 24 * 3600 -- items that never loaded are skipped this long
 local PROBE = { "int", "spi", "sta", "sp", "frost", "fire", "arcane", "crit", "hit", "mp5", "armor" }
 function Scan.cacheKey()
@@ -329,10 +329,22 @@ local function recipe(id)
     if not line:match(PROFESSION) then unusable = true end
   end
   local made = lines[1]:match("^[^:]+: (.+)$") or lines[2]
+  -- Reagents: the line after "Use: Teaches ...", such as "Bolt of Silk
+  -- Cloth (8), Fine Thread (4)". A reagent without a count is one.
+  local reagents, bop = {}, false
+  for i, line in ipairs(lines) do
+    if line == rawget(_G, "ITEM_BIND_ON_PICKUP") or line == "Binds when picked up" then bop = true end
+    if line:match("^Use: Teaches") and lines[i + 1] and not lines[i + 1]:match(PROFESSION) then
+      for part in (lines[i + 1] .. ","):gmatch("%s*([^,]+),") do
+        local name, n = part:match("^(.-)%s*%((%d+)%)$")
+        table.insert(reagents, { name or part, tonumber(n) or 1 })
+      end
+    end
+  end
   local body = {}
   for i = 2, #lines do table.insert(body, lines[i]) end
   cache[id] = { name = made, recipe = lines[1], loc = loc, value = ns.valueOf(body, Scan.w), unusable = unusable,
-    reqLevel = req, craft = craft and craft:gsub("^Requires ", "") or nil }
+    reqLevel = req, craft = craft and craft:gsub("^Requires ", "") or nil, reagents = reagents, bop = bop }
   return true
 end
 
@@ -454,6 +466,42 @@ function Scan.refresh()
   return Scan.rows(sources)
 end
 
+-- The price of one item by name or id: the AH price from Auctionator, or
+-- the vendor's price when that is lower (thread, dye). nil: not known.
+-- The name lookup works only for items the client has seen.
+local function linkOf(name)
+  local info = api("C_Item.GetItemInfo") or rawget(_G, "GetItemInfo")
+  local _, link = call(info, name)
+  return link
+end
+function Scan.priceOf(item)
+  local v1 = "Auctionator.API.v1."
+  local link = type(item) == "number" and ("item:" .. item) or linkOf(item)
+  if not link then return nil end
+  local id = tonumber(link:match("item:(%d+)"))
+  local ah = call(api(v1 .. "GetAuctionPriceByItemID"), "UpgradeFinder", id)
+    or call(api(v1 .. "GetAuctionPriceByItemLink"), "UpgradeFinder", link)
+  local vendor = call(api(v1 .. "GetVendorPriceByItemID"), "UpgradeFinder", id)
+  if vendor and vendor > 0 and (not ah or vendor < ah) then return vendor, "vendor" end
+  return ah, ah and "AH" or nil
+end
+
+-- What a recipe row costs to craft (the pattern, if it has an AH price,
+-- plus the reagents) and to buy the made item instead (nil for a bind on
+-- pickup item, or with no AH price).
+-- { total, pattern, reagents, parts = { {name, count, each, from} }, missing, buy, bop }
+function Scan.craftCost(c, patternPrice)
+  local out = { pattern = patternPrice, reagents = 0, parts = {}, missing = 0, bop = c.bop }
+  for _, r in ipairs(c.reagents or {}) do
+    local each, from = Scan.priceOf(r[1])
+    table.insert(out.parts, { r[1], r[2], each, from })
+    if each then out.reagents = out.reagents + each * r[2] else out.missing = out.missing + 1 end
+  end
+  out.total = (patternPrice or 0) + out.reagents
+  if not c.bop then out.buy = Scan.priceOf(c.name) end
+  return out
+end
+
 -- Rows for S.rank from the cache, with gains against what you wear now.
 function Scan.rows(sources)
   local rows = {}
@@ -464,7 +512,10 @@ function Scan.rows(sources)
       local base, note = S.replaced(c.loc, worn.value, worn.twoHander, worn.dualWield)
       local p = src == "AH" and (call(price, "UpgradeFinder", id)
         or call(api("Auctionator.API.v1.GetAuctionPriceByItemLink"), "UpgradeFinder", "item:" .. id)) or nil
-      table.insert(rows, { id = id, name = c.name, loc = c.loc, gain = c.value - (base or 0), price = p,
+      -- A recipe row costs the pattern plus the reagents.
+      local cost = c.recipe and Scan.craftCost(c, p) or nil
+      if cost then p = cost.total > 0 and cost.total or nil end
+      table.insert(rows, { id = id, name = c.name, loc = c.loc, gain = c.value - (base or 0), price = p, cost = cost,
         reqLevel = c.reqLevel, unusable = c.unusable, source = src, note = note, value = c.value,
         drop = Scan.dropOf(id), recipe = c.recipe, craft = c.craft })
     end

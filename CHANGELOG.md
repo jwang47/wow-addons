@@ -27,6 +27,10 @@ the same, and a test checks that every `.toc` version has a section here.
 - Patterns, plans and other recipes on the AH now show as the item they
   make (tagged "craft"), scored like any other item. A missing profession
   does not hide them; the tooltip names it.
+- Craft or buy: a recipe row's price is the pattern plus the reagents
+  (AH price, or the vendor's when lower). Its tooltip lists each reagent
+  and the made item's AH price, marked "cheaper" when buying it made
+  costs less, or "binds on pickup" when you can only craft it.
 - The row tooltip is easier to read: one stat per line, the name on the
   left and the change on the right, under Stats, Offense and Defense.
 - Each weight preset has an x button that deletes it.

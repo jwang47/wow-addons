@@ -132,7 +132,11 @@ slot, `+gain`, then the price, "bags", or the dungeon's short name such as
 gain per gold and what it replaces. Click searches the AH (when it is open;
 for a dungeon drop it names the boss in chat), Shift-click links it. A pattern, plan or other recipe on the AH shows
 as the gear it makes, tagged "craft" (its tooltip names the profession;
-Scan.lua reads the made item's slot and stats from the recipe tooltip).
+Scan.lua reads the made item's slot and stats from the recipe tooltip). Its
+price is the craft cost: the pattern plus the reagents (from the line after
+"Use: Teaches"), each at its Auctionator price or the vendor price when
+lower; a "+" marks a reagent with no price. The tooltip lists the parts and
+the price to buy the made item on the AH instead.
 
 - Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,

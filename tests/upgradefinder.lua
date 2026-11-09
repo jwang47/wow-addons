@@ -761,11 +761,21 @@ GetActionInfo, GetSpellInfo, GetSpellDescription, GetSpellBaseCooldown, GetSpell
 local Sc = ns.scan
 ITEMS[114] = { loc = "", class = 9, lines = { "Pattern: Frost Circlet", "Frost Circlet", "Binds when picked up",
   "Head", "+9 Intellect", "Requires Level 20", "Use: Teaches you how to craft Frost Circlet.",
-  "Bolt of Silk Cloth (8)", { "Requires Tailoring (125)", red = true } } }
+  "Bolt of Silk Cloth (8), Fine Thread (4), Bleach", { "Requires Tailoring (125)", red = true } } }
 ITEMS[115] = { loc = "", class = 9, lines = { "Plans: Iron Helm", "Iron Helm", "Head", { "Plate", red = true },
   "+8 Strength", { "Requires Blacksmithing (100)", red = true } } }
 ITEMS[116] = { loc = "", class = 9, lines = { "Recipe: Fish Stew", "Use: Teaches you how to cook Fish Stew." } }
-Sc.item(114) Sc.item(115) Sc.item(116)
+ITEMS[117] = { loc = "INVTYPE_CHEST", lines = { "Silk Robe", "Chest", "+4 Intellect" } }
+ITEMS[118] = { loc = "", class = 9, lines = { "Pattern: Silk Robe", "Silk Robe", "Chest", "+4 Intellect",
+  "Use: Teaches you how to craft Silk Robe.", "Fine Thread (2)", "Requires Tailoring (60)" } }
+-- Reagents by name (C_Item.GetItemInfo), priced from the AH or the vendor.
+local NAMES = { ["Bolt of Silk Cloth"] = 900, ["Fine Thread"] = 901, ["Silk Robe"] = 117 }
+C_Item.GetItemInfo = function(name) local id = NAMES[name] if id then return name, "item:" .. id end end
+local ahPrice = Auctionator.API.v1.GetAuctionPriceByItemID
+Auctionator.API.v1.GetAuctionPriceByItemID = function(c, id)
+  return ({ [900] = 5000, [901] = 300, [117] = 20000 })[id] or ahPrice(c, id) end
+Auctionator.API.v1.GetVendorPriceByItemID = function(_, id) return id == 901 and 100 or nil end
+Sc.item(114) Sc.item(115) Sc.item(116) Sc.item(118)
 local c114 = Sc.cache[114]
 check("recipe: scores the item it makes", c114 and c114.name == "Frost Circlet" and c114.loc == "INVTYPE_HEAD"
   and c114.value > 0 and c114.recipe == "Pattern: Frost Circlet" and c114.craft == "Tailoring (125)")
@@ -774,6 +784,15 @@ check("recipe: plate you cannot wear is unusable", Sc.cache[115] and Sc.cache[11
 check("recipe: no gear inside is skipped", Sc.cache[116] == false)
 local rr = Sc.rows({ [114] = "AH" })
 check("recipe: the row carries the pattern", rr[1] and rr[1].recipe == "Pattern: Frost Circlet" and rr[1].gain > 0)
+local cost = rr[1].cost
+-- Pattern 0 (no AH price) + 8 x 50s + 4 x 1s (vendor, cheaper than the AH) + Bleach unknown.
+check("recipe: reagents read from the tooltip", c114.reagents and #c114.reagents == 3
+  and c114.reagents[1][1] == "Bolt of Silk Cloth" and c114.reagents[1][2] == 8 and c114.reagents[3][2] == 1)
+check("recipe: craft cost from AH and vendor prices", cost and cost.total == 40400 and cost.missing == 1
+  and cost.parts[2][4] == "vendor" and rr[1].price == 40400)
+check("recipe: a bind on pickup item cannot be bought made", cost.bop and cost.buy == nil)
+local rb = Sc.rows({ [118] = "AH" })[1]
+check("recipe: buy the made item instead", rb and rb.cost.buy == 20000 and rb.cost.total == 200 and not rb.cost.bop)
 
 -- Row tooltip: one stat per line, label left, number right -------------------
 local doubles, singles = {}, {}
@@ -790,6 +809,9 @@ check("tooltip: an Upgrade line and a Crafted line", hasDouble("^Upgrade %+") ~=
 local intLine = hasDouble("^  Intellect$")
 check("tooltip: one stat per line", hasSingle("Stats") and intLine and intLine[2]:match("^%+%d") ~= nil)
 check("tooltip: no run-on Changes line", not hasSingle("Changes:"))
+local cl, bl = hasDouble("^Craft$"), hasDouble("^Buy it made$")
+check("tooltip: craft cost and buy line", cl and cl[2] == "4g 04s +?" and bl and bl[2] == "binds on pickup"
+  and hasDouble("^  Fine Thread x4$")[2] == "4s 00c (vendor)")
 
 print(failures == 0 and "all UpgradeFinder tests passed" or (failures .. " UpgradeFinder test(s) failed"))
 os.exit(failures == 0 and 0 or 1)
