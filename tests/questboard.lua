@@ -239,6 +239,18 @@ check("/qb hides", not QuestBoardFrame.shown and QuestBoardDB.shown == false)
 SlashCmdList.QUESTBOARD("")
 check("/qb shows again", QuestBoardFrame.shown)
 
+-- Dragging a row moves the board and saves the place; /qb lock stops it.
+local moved = 0
+QuestBoardFrame.StartMoving = function() moved = moved + 1 end
+QuestBoardFrame.GetPoint = function() return "TOPLEFT", nil, nil, 100, -200 end
+firstRow.scripts.OnDragStart(firstRow)
+firstRow.scripts.OnDragStop(firstRow)
+check("dragging a row moves the board", moved == 1 and QuestBoardDB.point[1] == "TOPLEFT" and QuestBoardDB.point[2] == 100)
+SlashCmdList.QUESTBOARD("lock")
+firstRow.scripts.OnDragStart(firstRow)
+check("/qb lock stops dragging", moved == 1 and QuestBoardDB.locked)
+SlashCmdList.QUESTBOARD("lock")
+
 -- Combat fades the board.
 local alpha
 QuestBoardFrame.SetAlpha = function(_, a) alpha = a end

@@ -279,7 +279,8 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   link the quest in chat. Right-click: open the quest log (your quests) or
   show the giver with Questie's map icon (pick-ups). Hover: XP, the
   estimate, the giver or finisher, the open objectives.
-- Click a group name to fold it. Alt-drag the board to move it; `/qb reset`
+- Click a group name to fold it. Drag the board (anywhere on it) to move it;
+  `/qb lock` stops that and `/qb reset`
   puts it back. In combat it fades to 35%.
 - `/qb tracker off` hides the game's quest tracker (and Questie's, if it
   is on); `/qb tracker on` brings it back. The game's tracker holds secure

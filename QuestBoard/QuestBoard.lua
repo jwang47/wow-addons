@@ -17,7 +17,8 @@ local defaults = {
   rows = { turnin = 6, log = 8, pickup = 8 },
   collapsed = {},
   combatAlpha = 0.35,
-  hideTrackers = false,  -- hide the game's quest tracker (and Questie's)
+  hideTrackers = false,
+  locked = false,        -- /qb lock: no dragging  -- hide the game's quest tracker (and Questie's)
   point = nil,           -- saved position { point, x, y }
 }
 
@@ -174,6 +175,23 @@ end
 ---------------------------------------------------------------------------
 -- Panel
 ---------------------------------------------------------------------------
+-- Dragging any part of the board (rows and group names too) moves it. A
+-- click without a drag still clicks.
+local function dragStart() if panel and not ns.db.locked then panel:StartMoving() end end
+local function dragStop()
+  if not panel then return end
+  panel:StopMovingOrSizing()
+  ns.dragEnded = rawget(_G, "GetTime") and GetTime() or nil
+  local p, _, _, x, y = panel:GetPoint(1)
+  ns.db.point = { p, x, y }
+end
+ns.dragStart, ns.dragStop = dragStart, dragStop
+local function draggable(f)
+  f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", dragStart)
+  f:SetScript("OnDragStop", dragStop)
+end
+
 local function makeRow(i)
   local r = CreateFrame("Button", nil, panel)
   r:SetHeight(ROW_H)
@@ -200,7 +218,12 @@ local function makeRow(i)
   r.hl:Hide()
   r:SetScript("OnEnter", function(self) self.hl:Show() tooltip(self) end)
   r:SetScript("OnLeave", function(self) self.hl:Hide() if GameTooltip then GameTooltip:Hide() end end)
-  r:SetScript("OnClick", function(self, button) ns.click(self.entry, button) end)
+  r:SetScript("OnClick", function(self, button)
+    -- The release that ends a drag is not a click.
+    if ns.dragEnded and rawget(_G, "GetTime") and GetTime() - ns.dragEnded < 0.2 then return end
+    ns.click(self.entry, button)
+  end)
+  draggable(r)
   rows[i] = r
   return r
 end
@@ -222,6 +245,7 @@ local function makeHead(kind)
     end
     ns.refresh()
   end)
+  draggable(h)
   heads[kind] = h
   return h
 end
@@ -323,11 +347,6 @@ local function tickFn(_, dt)
   end
 end
 
-local function savePos()
-  local p, _, _, x, y = panel:GetPoint(1)
-  ns.db.point = { p, x, y }
-end
-
 local function build()
   panel = CreateFrame("Frame", "QuestBoardFrame", UIParent)
   panel:SetWidth(W)
@@ -344,12 +363,9 @@ local function build()
   local p = ns.db.point
   if p then panel:SetPoint(p[1], UIParent, p[1], p[2], p[3])
   else panel:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -260) end
-  -- Alt-drag moves it.
   panel:SetMovable(true)
   panel:EnableMouse(true)
-  panel:RegisterForDrag("LeftButton")
-  panel:SetScript("OnDragStart", function(self) if IsAltKeyDown() then self:StartMoving() end end)
-  panel:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() savePos() end)
+  draggable(panel)
   panel:SetScript("OnUpdate", tickFn)
   ns.panel = panel
 end
@@ -434,7 +450,8 @@ end)
 -- /qb
 ---------------------------------------------------------------------------
 local help = {
-  "/qb - show or hide the board. Alt-drag it to move it.",
+  "/qb - show or hide the board. Drag it anywhere to move it.",
+  "/qb lock - stop dragging (again to undo)",
   "Click a group name to fold it; right-click it to sort by nearest or best XP.",
   "/qb range N - pick-ups at most N levels over you (now %d)",
   "/qb rows N - rows per group (now %d)",
@@ -467,6 +484,10 @@ SlashCmdList.QUESTBOARD = function(text)
       end
     end
     say(rest == "off" and "the game's quest tracker is hidden" or "the game's quest tracker is back")
+    return
+  elseif cmd == "lock" then
+    ns.db.locked = not ns.db.locked
+    say(ns.db.locked and "locked: dragging does not move the board" or "unlocked: drag the board to move it")
     return
   elseif cmd == "reset" then
     ns.db.point = nil
