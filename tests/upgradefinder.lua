@@ -41,6 +41,8 @@ local ITEMS = {
   [200] = { loc = "INVTYPE_FINGER", lines = { "Copper Band", "Finger", "+1 Intellect" } },
   [201] = { loc = "INVTYPE_FINGER", lines = { "Tin Band", "Finger", "+2 Intellect" } },
   [202] = { loc = "INVTYPE_2HWEAPON", lines = { "Old Staff", "Two-Hand", "+5 Intellect" } },
+  [111] = { loc = "INVTYPE_SHOULDER", lines = { "Cave Mantle", "Shoulder", "+5 Intellect" } }, -- a dungeon drop
+  [112] = { loc = nil, lines = { "An Unsent Letter", "Quest Item" } }, -- a dungeon drop, not gear
 }
 local WORN = { [1] = 100, [11] = 200, [12] = 201, [16] = 202 }
 local P = { level = 22, class = "MAGE", money = 50000, bagItem = 104 }
@@ -128,6 +130,24 @@ QuestieLoader = { ImportModule = function(_, name)
     QueryQuestSingle = function(id, k) if id == 300 and k == "name" then return "Hood Quest" end end } end
 end }
 C_Map = { GetAreaInfo = function(a) return AREAS[a] end }
+
+-- The real drop table: well formed. The tests use a small one.
+local real = {}
+assert(loadfile(root .. "UpgradeFinder/Dungeons.lua"))("UpgradeFinder", real)
+local okTable, nIDs = #real.DUNGEONS >= 20, 0
+for _, d in ipairs(real.DUNGEONS) do
+  okTable = okTable and type(d[1]) == "string" and type(d[2]) == "string" and #d[2] <= 8
+    and type(d[3]) == "number" and type(d[4]) == "number" and d[3] <= d[4] and #d >= 5
+  for i = 5, #d do
+    okTable = okTable and type(d[i][1]) == "string" and #d[i] >= 2
+    for j = 2, #d[i] do okTable = okTable and type(d[i][j]) == "number" nIDs = nIDs + 1 end
+  end
+end
+check("the dungeon table is well formed", okTable and nIDs > 1000)
+ns.DUNGEONS = {
+  { "The Deadmines", "DM", 10, 26, { "Edwin VanCleef", 105, 111, 112 } },
+  { "Shadowfang Keep", "SFK", 11, 30, { "Arugal", 111 } },
+}
 
 for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "UI.lua", "Weights.lua" }) do
   assert(loadfile(root .. "UpgradeFinder/" .. file))("UpgradeFinder", ns)
@@ -501,6 +521,35 @@ check("no slot name for a non-slot", S.groupName("INVTYPE_BAG") == nil)
 local sawSlot = false
 for _, t in ipairs(slotTexts) do if t == "Head" or t == "Ring" or t == "Weapon" then sawSlot = true end end
 check("rows show their slot", sawSlot)
+
+-- Dungeon drops --------------------------------------------------------------
+check("a dungeon drop knows its boss (the first one listed)",
+  ns.scan.dropOf(111) and ns.scan.dropOf(111).boss == "Edwin VanCleef" and ns.scan.dropOf(111).short == "DM")
+ns.db().opts.from = nil
+ns.rescan()
+runTimers()
+local mantle, staff, letter = row("Cave Mantle"), row("Oak Staff"), row("An Unsent Letter")
+check("a dungeon drop is a candidate", mantle and mantle.source == "dungeon" and mantle.drop.name == "The Deadmines")
+check("an item on the AH stays an AH row and knows where it drops",
+  staff and staff.source == "AH" and staff.drop and staff.drop.boss == "Edwin VanCleef")
+check("a dungeon drop that is not gear is not listed", letter == nil)
+ns.cycle("from")
+check("From: AH only", ns.db().opts.from == "AH" and row("Cave Mantle") == nil and row("Oak Staff") ~= nil)
+ns.cycle("from")
+local onlyDungeon = #ns.view.list > 0
+for _, r in ipairs(ns.view.list) do onlyDungeon = onlyDungeon and r.source == "dungeon" end
+check("From: Dungeons", ns.db().opts.from == "dungeon" and onlyDungeon)
+ns.cycle("from")
+check("From: Bags only", ns.db().opts.from == "bags" and row("Opal Ring") ~= nil and row("Cave Mantle") == nil)
+ns.cycle("from")
+check("From goes back to all sources", ns.db().opts.from == nil and row("Cave Mantle") ~= nil)
+SlashCmdList.UPGRADEFINDER("dungeons")
+runTimers()
+check("/uf dungeons turns them off", ns.db().opts.dungeons == false and row("Cave Mantle") == nil
+  and lastSay():find("off") ~= nil)
+SlashCmdList.UPGRADEFINDER("dungeons")
+runTimers()
+check("/uf dungeons turns them on again", ns.db().opts.dungeons == true and row("Cave Mantle") ~= nil)
 
 print(failures == 0 and "all UpgradeFinder tests passed" or (failures .. " UpgradeFinder test(s) failed"))
 os.exit(failures == 0 and 0 or 1)

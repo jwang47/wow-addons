@@ -9,8 +9,9 @@ Classic clients with the same APIs, but we test them only on Forever.
   Auctionator's prices, so it needs Auctionator.
 - **Omni**: one search box (Ctrl+Space) for your items, places, people,
   spells, quests and Questie NPCs.
-- **UpgradeFinder**: a short list of gear from your Auctionator scan and
-  your bags that beats what you wear, for any class and spec (`/uf`).
+- **UpgradeFinder**: a short list of gear from your Auctionator scan, your
+  bags and the dungeon drops that beats what you wear, for any class and
+  spec (`/uf`).
 
 Download page: https://jwang47.github.io/wow-addons/ (Windows installer).
 Releases: [GitHub releases](https://github.com/jwang47/wow-addons/releases)
@@ -124,15 +125,27 @@ group, not an error.
 
 UpgradeFinder is an addon for any class. `/uf`, the
 **Upgrades** button on the Auction House, or a key binding opens a short
-list: gear from your Auctionator scan and your bags that beats what you wear,
-biggest gain first. Each row is one line (icon, name, slot, `+gain`, price, or
-"bags"); hover a row for the item tooltip plus the score you wear, the gain
-per gold and what it replaces. Click searches the AH (when it is open),
-Shift-click links it.
+list: gear from your Auctionator scan, your bags and the dungeon drops that
+beats what you wear, biggest gain first. Each row is one line (icon, name,
+slot, `+gain`, then the price, "bags", or the dungeon's short name such as
+`DM` or `BRD`); hover a row for the item tooltip plus the score you wear, the
+gain per gold and what it replaces. Click searches the AH (when it is open;
+for a dungeon drop it names the boss in chat), Shift-click links it.
 
-- Four buttons: **Slot** (click for the next, right-click for the previous),
+- Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
-  **Any price / Can afford**. The choices are saved.
+  **Any price / Can afford**, and **All sources / AH only / Dungeons / Bags
+  only**. The choices are saved.
+- Dungeon drops: `UpgradeFinder/Dungeons.lua` lists the boss and trash drops
+  of the 25 Classic dungeons (Ragefire Chasm to Stratholme, no raids) by
+  item ID, with each dungeon's level range. The scan reads them like AH
+  items; IDs that are not gear (keys, quest items) drop out. The tooltip
+  says "Drops from BOSS in DUNGEON (levels A-B)". An item that is also on
+  the AH stays an AH row and gets the same line. Per gold puts dungeon drops
+  after your bag items and before AH items. `/uf dungeons` turns them off
+  and on. The table is game data and does not know Forever's own changes:
+  the stats always come from the client's tooltip, but a drop Forever moved
+  or removed still shows.
 - Usable: no red line on the tooltip (armor type, weapon skill, class); a red
   "Requires Level" only hides it until you are within the level window.
 - Score: a mage with MageMentor on uses MageMentor's score

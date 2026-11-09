@@ -1,10 +1,11 @@
 -- UpgradeFinder window: a short ranked list of gear that beats what you wear.
--- Each row is one line (icon, name, slot, gain, price); hover for the details.
+-- Each row is one line (icon, name, slot, gain, price or dungeon); hover for
+-- the details.
 local _, ns = ...
 local S, Scan = ns.score, ns.scan
 local call, api = ns.call, ns.api
 
-local ROWS, ROW_H, W = 14, 20, 440
+local ROWS, ROW_H, W = 14, 20, 484
 local frame, rows, status, title, buttons = nil, {}, nil, nil, {}
 local view = { list = {}, top = 1, all = {} }
 ns.view = view
@@ -35,7 +36,7 @@ end
 local function opts()
   local o = ns.db().opts
   return { group = S.GROUPS[o.group or 1], level = call(UnitLevel, "player") or 1, ahead = o.ahead or 0,
-    money = call(GetMoney) or 0, affordable = o.affordable, sort = o.sort }
+    money = call(GetMoney) or 0, affordable = o.affordable, sort = o.sort, from = o.from }
 end
 
 -- keep: stay at the same scroll place (the list grows while items load).
@@ -58,6 +59,7 @@ local function labels()
   buttons.level:SetText((o.ahead or 0) > 0 and ("Up to +" .. o.ahead .. " lvl") or "Usable now")
   buttons.sort:SetText(o.sort == "pergold" and "Per gold" or "Biggest gain")
   buttons.money:SetText(o.affordable and "Can afford" or "Any price")
+  buttons.from:SetText(ns.FROM_LABEL[o.from or "all"])
 end
 
 function ns.paint()
@@ -75,14 +77,16 @@ function ns.paint()
       row:Show()
       row.icon:SetTexture(call(api("C_Item.GetItemIconByID"), r.id) or 134400)
       -- Free elsewhere (quest, dungeon, vendor): a short tag after the name.
-      local tag = ns.where.tag(ns.where.of(r.id))
+      local tag = r.source ~= "dungeon" and ns.where.tag(ns.where.of(r.id)) or nil
       row.name:SetText(tag and (r.name .. "  |cff8cc7ff" .. tag .. "|r") or r.name)
       row.name:SetTextColor(qualityColor(r.id))
       local gain = string.format("+%.1f", r.gain)
       if (r.reqLevel or 0) > level then gain = "|cff9d9d9d" .. gain .. " @" .. r.reqLevel .. "|r" end
       row.slot:SetText(S.groupName(r.loc) or "")
       row.gain:SetText(gain)
-      row.price:SetText(r.source == "AH" and (r.price and ns.money(r.price) or "|cff9d9d9d?|r") or "|cff40ff40" .. r.source .. "|r")
+      row.price:SetText(r.source == "AH" and (r.price and ns.money(r.price) or "|cff9d9d9d?|r")
+        or r.source == "dungeon" and r.drop and ("|cff8cc7ff" .. r.drop.short .. "|r")
+        or "|cff40ff40" .. r.source .. "|r")
     else
       row:Hide()
     end
@@ -94,7 +98,7 @@ function ns.paint()
   elseif st.busy then
     status:SetText(string.format("Checking items... %d / %d", st.done, st.total))
   elseif #view.all == 0 and not st.ran then
-    status:SetText("Open to scan your Auctionator prices and bags.")
+    status:SetText("Open to scan your Auctionator prices, bags and dungeon drops.")
   else
     local more = #view.list > ROWS and string.format("  (scroll for %d more)", #view.list - ROWS) or ""
     status:SetText(string.format("%d upgrade%s%s", #view.list, #view.list == 1 and "" or "s", more)
@@ -128,13 +132,19 @@ local function showDetails(row)
   if r.note then tt:AddLine(r.note, 1, 0.82, 0) end
   -- The "Get it:" lines come from the item tooltip hook (Where.lua).
   local where = ns.where.of(r.id)
-  if r.source == "AH" and where and (where.quests[1] or where.dungeon) then
+  local drop = r.drop
+  if drop then
+    tt:AddLine(string.format("Drops from %s in %s (levels %d-%d)", drop.boss, drop.name, drop.min, drop.max), 0.55, 0.78, 1)
+    if r.source == "AH" then tt:AddLine("You may not need to buy it", 0.55, 0.78, 1) end
+  elseif r.source == "AH" and where and (where.quests[1] or where.dungeon) then
     tt:AddLine(where.quests[1] and "A quest gives it: you may not need to buy it"
       or ("Drops in " .. where.dungeon .. ": you may not need to buy it"), 0.55, 0.78, 1)
   end
   if r.perGold then tt:AddLine(string.format("%.2f per gold", r.perGold), 0.7, 0.7, 0.7) end
   if (r.reqLevel or 0) > (call(UnitLevel, "player") or 1) then tt:AddLine("Needs level " .. r.reqLevel, 1, 0.5, 0.3) end
-  tt:AddLine(r.source == "AH" and "Click: search the AH   Shift-click: link" or "In your bags   Shift-click: link", 0.6, 0.6, 0.6)
+  tt:AddLine(r.source == "AH" and "Click: search the AH   Shift-click: link"
+    or r.source == "dungeon" and "Dungeon drop   Shift-click: link"
+    or "In your bags   Shift-click: link", 0.6, 0.6, 0.6)
   tt:Show()
 end
 
@@ -146,18 +156,27 @@ local function click(row)
     if link and not call(rawget(_G, "ChatEdit_InsertLink"), link) then call(rawget(_G, "ChatFrame_OpenChat"), link) end
     return
   end
+  if r.source == "dungeon" and r.drop then
+    say(string.format("%s drops from %s in %s.", r.name, r.drop.boss, r.drop.name))
+    return
+  end
   local search = api("Auctionator.API.v1.MultiSearchExact")
   local ah = ns.ahFrame()
   if search and ah and ah.IsShown and ah:IsShown() then call(search, "UpgradeFinder", { r.name })
   else say(r.name .. ": open the Auction House to search for it.") end
 end
 
+-- The source filter: all, then AH only, dungeon drops only, bags only.
+ns.FROM_LABEL = { all = "All sources", AH = "AH only", dungeon = "Dungeons", bags = "Bags only" }
+ns.FROM_NEXT = { all = "AH", AH = "dungeon", dungeon = "bags", bags = nil }
+
 local function cycle(key)
   local o = ns.db().opts
   if key == "slot" then o.group = (o.group or 1) % #S.GROUPS + 1
   elseif key == "level" then o.ahead = ((o.ahead or 0) == 0) and 2 or 0
   elseif key == "sort" then o.sort = (o.sort == "pergold") and "gain" or "pergold"
-  elseif key == "money" then o.affordable = not o.affordable end
+  elseif key == "money" then o.affordable = not o.affordable
+  elseif key == "from" then o.from = ns.FROM_NEXT[o.from or "all"] end
   ns.apply()
 end
 ns.cycle = cycle
@@ -202,9 +221,9 @@ local function build()
   wbtn:SetScript("OnClick", function() ns.toggleWeights() end)
   ns.weightsButton = wbtn
 
-  -- Four toggle buttons in one row: slot, level, sort, price.
+  -- Five toggle buttons in one row: slot, level, sort, price, source.
   local x = 10
-  for _, spec in ipairs({ { "slot", 100 }, { "level", 92 }, { "sort", 86 }, { "money", 80 } }) do
+  for _, spec in ipairs({ { "slot", 100 }, { "level", 92 }, { "sort", 86 }, { "money", 80 }, { "from", 84 } }) do
     local b = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     b:SetSize(spec[2], 20)
     b:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -32)
@@ -311,6 +330,7 @@ local HELP = {
   "/uf save NAME - save your weights as a preset; /uf load NAME, /uf presets, /uf delete NAME",
   "/uf reset - forget the saved item scores (they are kept between sessions)",
   "/uf where - turn the \"Get it:\" lines on item tooltips on or off (needs Questie)",
+  "/uf dungeons - turn the dungeon drops in the list on or off (the From button filters them)",
 }
 local function copy(t) local c = {} for k, v in pairs(t or {}) do c[k] = v end return c end
 
@@ -417,6 +437,11 @@ function ns.slash(msg)
     local o = ns.db().opts
     o.where = o.where == false
     say("\"Get it:\" lines on item tooltips " .. (o.where and "on" or "off"))
+  elseif cmd == "dungeons" then
+    local o = ns.db().opts
+    o.dungeons = o.dungeons == false
+    say("dungeon drops in the list " .. (o.dungeons and "on" or "off"))
+    if frame and frame:IsShown() then ns.rescan() else view.all = {} end
   elseif cmd == "weight" and a == "reset" then
     ns.resetWeights()
     ns.reweigh("weights back to the default for " .. (spec or class:lower()))

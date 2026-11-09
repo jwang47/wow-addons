@@ -5,6 +5,17 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## UpgradeFinder 0.1.3
+
+- Dungeon drops are candidates too: the boss and trash loot of the 25
+  Classic dungeons, Ragefire Chasm to Stratholme. A dungeon row shows the
+  dungeon's short name (DM, SFK, BRD...) where an AH row shows the price,
+  and its tooltip names the boss and the level range. An AH item that also
+  drops in a dungeon gets the same line.
+- A fifth button filters the source: All sources, AH only, Dungeons, Bags
+  only. `/uf dungeons` turns the dungeon drops off and on.
+- The window is 44 px wider for the new button.
+
 ## UpgradeFinder 0.1.2
 
 - A **Weights** panel (the Weights button on the window, or `/uf config`):
