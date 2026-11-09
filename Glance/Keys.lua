@@ -130,7 +130,40 @@ function K.build(getBinding, hasAction, allBindings, take, prev)
     local s = table.remove(pool, 1)
     if s then map[mk] = { kind = "slot", slot = s, fresh = true } end
   end
+  K.markDuplicates(map, getBinding)
   return map
+end
+
+-- The key a stock binding puts on ACTIONBUTTONn: 1-9, 0, -, =.
+local STOCK = { ["1"] = 1, ["2"] = 2, ["3"] = 3, ["4"] = 4, ["5"] = 5, ["6"] = 6,
+  ["7"] = 7, ["8"] = 8, ["9"] = 9, ["0"] = 10, ["-"] = 11, ["="] = 12 }
+
+-- When two plain keys fire the same slot (you bound Q to action button 5
+-- and 5 still has its stock binding), the spell shows once: on the key
+-- you chose. The stock key gets dupOf = that key and is drawn dim.
+function K.markDuplicates(map, getBinding)
+  local byslot = {}
+  for _, key in ipairs(K.allKeys()) do
+    local e = map[key]
+    if e and e.kind == "slot" then
+      byslot[e.slot] = byslot[e.slot] or {}
+      table.insert(byslot[e.slot], key)
+    end
+  end
+  for slot, keys in pairs(byslot) do
+    if #keys > 1 then
+      local keep
+      for _, key in ipairs(keys) do
+        if not (STOCK[key] == slot and getBinding(key) == "ACTIONBUTTON" .. slot) then
+          keep = keep or key
+        end
+      end
+      keep = keep or keys[1]
+      for _, key in ipairs(keys) do
+        if key ~= keep then map[key].dupOf = keep end
+      end
+    end
+  end
 end
 
 -- A short label for a command key ("Target" for TARGETNEARESTENEMY).

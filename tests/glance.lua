@@ -70,7 +70,7 @@ C_Map = {
 
 -- Bindings as the player has them now.
 local BIND = {
-  ["1"] = "ACTIONBUTTON1", ["2"] = "ACTIONBUTTON2",
+  ["1"] = "ACTIONBUTTON1", ["2"] = "ACTIONBUTTON2", ["5"] = "ACTIONBUTTON5", R = "ACTIONBUTTON5",
   ["Q"] = "CLICK BT4Button13:Keybind", ["E"] = "MULTIACTIONBAR1BUTTON3",
   ["SHIFT-1"] = "MULTIACTIONBAR2BUTTON1",
   W = "MOVEFORWARD", A = "STRAFELEFT", S = "MOVEBACKWARD", D = "STRAFERIGHT",
@@ -86,7 +86,7 @@ function GetNumBindings() return #bindList end
 function GetBinding(i) return bindList[i][1], "cat", bindList[i][2] end
 
 -- Action slots that hold something.
-local ACTIONS = { [1] = 135846, [2] = 135812, [13] = 135736, [63] = 135865, [49] = 135808, [120] = 999 }
+local ACTIONS = { [5] = 135900, [1] = 135846, [2] = 135812, [13] = 135736, [63] = 135865, [49] = 135808, [120] = 999 }
 C_ActionBar = {
   HasAction = function(s) return ACTIONS[s] ~= nil end,
   GetActionTexture = function(s) return ACTIONS[s] end,
@@ -147,6 +147,7 @@ check("1 keeps slot 1", map["1"] and map["1"].slot == 1)
 check("Q keeps Bartender slot 13", map.Q and map.Q.slot == 13)
 check("E keeps bar slot 63", map.E and map.E.slot == 63)
 check("Shift-1 keeps slot 49", map["SHIFT-1"] and map["SHIFT-1"].slot == 49)
+check("5 marked as the same as R", map["5"].dupOf == "R" and not map.R.dupOf)
 check("W is movement", map.W and map.W.kind == "move")
 check("Shift-W left alone", map["SHIFT-W"] == nil)
 check("Tab is a command", map.TAB and map.TAB.kind == "command")
@@ -155,12 +156,12 @@ check("Z gets an empty slot", map.Z and map.Z.kind == "slot" and map.Z.fresh)
 check("free slots skip used and full ones", map.Z.slot ~= 120 and map.Z.slot ~= 48 and map.Z.slot ~= 63)
 local seen, dup = {}, false
 for _, e in pairs(map) do
-  if e.kind == "slot" then
+  if e.kind == "slot" and not e.dupOf then
     if seen[e.slot] then dup = true end
     seen[e.slot] = true
   end
 end
-check("no slot used twice", not dup)
+check("no slot used twice (copies aside)", not dup)
 
 -- Buttons and override bindings.
 local b1 = _G.GlanceKey1
@@ -173,6 +174,8 @@ check("Tab not taken", overrides.TAB == nil)
 check("Tab shows its command", _G.GlanceKeyTAB.note.text == "Target")
 check("Q shows its icon", _G.GlanceKeyQ.icon.shown)
 check("Z shows empty", _G.GlanceKeyZ.empty.shown)
+check("5 drawn as a copy of R", _G.GlanceKey5.note.text == "= R")
+check("R drawn plain", _G.GlanceKeyR.note.text == "")
 
 -- Shift flips the bar and drops go to the Shift layer.
 P.shift = true

@@ -57,6 +57,10 @@ local function paint(b)
     b.count:SetText(count)
     local current = api.IsCurrentAction and api.IsCurrentAction(slot)
     b.glow:SetShown(current and true or false)
+    -- Same spell as another key: dim, and name that key.
+    local dup = (not shiftDown()) and b.dupOf
+    b.icon:SetAlpha(dup and 0.3 or 1)
+    b.note:SetText(dup and ("= " .. keyText(dup)) or "")
   else
     b.icon:Hide()
     b.empty:Show()
@@ -154,6 +158,7 @@ function ns.keybar.apply()
     local plain, shift = map[key], map["SHIFT-" .. key]
     b.plainSlot = plain and plain.kind == "slot" and plain.slot or nil
     b.shiftSlot = shift and shift.kind == "slot" and shift.slot or nil
+    b.dupOf = plain and plain.dupOf or nil
     if b.plainSlot or b.shiftSlot then
       b.mode = "slot"
       b:SetAttribute("type", "action")
