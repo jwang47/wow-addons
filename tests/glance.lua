@@ -210,6 +210,16 @@ check("take Tab", ns.char.map.TAB.kind == "slot" and overrides.TAB == "GlanceKey
 SlashCmdList.GLANCE("free tab")
 check("free Tab", ns.char.map.TAB.kind == "command" and overrides.TAB == nil)
 
+-- take all: command keys become spell keys; Tab and movement stay.
+BIND.F = "ASSISTTARGET"
+SlashCmdList.GLANCE("import")
+check("F is a command", ns.char.map.F.kind == "command")
+SlashCmdList.GLANCE("take all")
+check("take all takes F", ns.char.map.F.kind == "slot" and overrides.F == "GlanceKeyF:LeftButton")
+check("take all leaves Tab", ns.char.map.TAB.kind == "command")
+check("take all leaves W", ns.char.map.W.kind == "move")
+check("taken F gets a Shift layer", ns.char.map["SHIFT-F"] and ns.char.map["SHIFT-F"].kind == "slot")
+
 -- Import in combat waits.
 P.combat = true
 SlashCmdList.GLANCE("import")

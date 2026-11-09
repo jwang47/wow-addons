@@ -284,7 +284,9 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
     works when the bar is locked. Nothing moves in combat (the game locks
     action buttons then).
   - `/glance take F` puts a key with another command on the bar;
-    `/glance free F` gives it back. `/glance import` reads your bindings
+    `/glance free F` gives it back. `/glance take all` takes every key with
+    another command (F: Assist, Z: Sheathe, C: Character and so on), except
+    Tab and the movement keys. `/glance import` reads your bindings
     again.
   - Glance's keys win over Bartender4's for the same key. Hide the
     Bartender bars you no longer need in Bartender's options.

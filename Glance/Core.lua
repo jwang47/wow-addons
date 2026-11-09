@@ -122,6 +122,7 @@ local help = {
   "/glance edit - unlock the keyboard bar: drag spells off keys (drop works always)",
   "/glance import - read your key bindings again and rebuild the keyboard bar",
   "/glance take KEY - put KEY on the keyboard bar even if it has another binding",
+  "/glance take all - the same for every key with another command, except Tab",
   "/glance free KEY - give KEY back to its normal binding",
   "/glance keybar|units|minimap on|off - turn a part on or off (reloads)",
   "/glance blizzard on|off - show or hide Blizzard's player, target and cast frames (reloads)",

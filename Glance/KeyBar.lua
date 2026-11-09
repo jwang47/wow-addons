@@ -270,8 +270,20 @@ end
 
 ns.commands.take = function(rest)
   local k = keyArg(rest)
-  if not k then return ns.print("/glance take KEY, for example /glance take F or /glance take SHIFT-TAB") end
-  ns.char.take[k] = true
+  if not k then return ns.print("/glance take KEY (for example F or SHIFT-TAB), or /glance take all") end
+  if k == "ALL" then
+    -- Every key with another command, except Tab (targeting) and movement.
+    local n = 0
+    for mk, e in pairs(ns.char.map or {}) do
+      if e.kind == "command" and mk ~= "TAB" and mk ~= "SHIFT-TAB" then
+        ns.char.take[mk] = true
+        n = n + 1
+      end
+    end
+    ns.print("Took " .. n .. " keys for spells. /glance free KEY gives one back.")
+  else
+    ns.char.take[k] = true
+  end
   ns.commands.import()
 end
 
