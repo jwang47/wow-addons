@@ -75,9 +75,30 @@
 
   /* ---- Body ---- */
   .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 40px 56px; padding: 56px 0 16px; align-items: start; }
-  @media (max-width: 900px) { .two { grid-template-columns: 1fr; padding-top: 40px; } }
-  h2 { font-size: 15px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 0 0 10px; }
+  /* Jump list: the three addons by name, right under the hero. */
+  .jump { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 40px 0 8px; }
+  .jump a { display: block; padding: 12px 16px; border: 1px solid var(--tip-line-dim); border-radius: 5px; background: rgba(7,8,26,.6);
+    color: var(--dim); text-decoration: none; font-size: 15px; }
+  .jump a b { display: block; color: var(--gold); font-size: 19px; font-weight: 600; }
+  .jump a:hover { border-color: var(--tip-line); }
+  @media (max-width: 700px) { .jump { grid-template-columns: 1fr; gap: 8px; padding-top: 28px; }
+    .jump a b { display: inline; margin-right: 8px; } }
+
+  /* One framed panel per addon: a header (name, how to open, what it needs), then text beside a picture. */
+  .addon { margin: 28px 0 0; border: 1px solid var(--tip-line-dim); border-radius: 6px; background: rgba(10,12,22,.75);
+    scroll-margin-top: 16px; }
+  .addon header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 24px;
+    padding: 16px 24px; border-bottom: 1px solid var(--tip-line-dim); background: rgba(7,8,26,.7); border-radius: 6px 6px 0 0; }
+  .addon h2 { margin: 0; color: var(--gold); font-size: 28px; font-weight: 600; line-height: 1.2; display: flex; align-items: center; gap: 12px; }
+  .addon h2 .n { font: 600 13px var(--mono); color: var(--dim); border: 1px solid var(--tip-line-dim); border-radius: 50%;
+    width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; }
+  .addon .meta { display: flex; flex-wrap: wrap; gap: 4px 20px; color: var(--dim); font-size: 14px; }
+  .addon .meta .need, .addon .meta .need a { color: var(--red); }
+  .addon .body { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 48px; padding: 24px; align-items: start; }
+  .addon .body .shot { width: 100%; max-width: 480px; height: auto; display: block; justify-self: center; border-radius: 4px;
+    box-shadow: 0 14px 40px rgba(0,0,0,.5); }
+  @media (max-width: 900px) { .addon .body { grid-template-columns: 1fr; padding: 18px; }
+    .addon header { padding: 14px 18px; } .addon h2 { font-size: 24px; } }
   .lede { font-size: 22px; line-height: 1.35; margin: 0 0 18px; color: var(--ink); }
   .lede b { color: #fff; font-weight: 600; }
   p { color: var(--dim); margin: 10px 0; }
@@ -102,15 +123,10 @@
   .filters { margin-top: 14px; font-size: 14.5px; color: var(--dim); }
 
   /* LootValue explained by the tooltip it lives in. */
-  .tt-stage { padding: 24px 0 8px; display: flex; justify-content: flex-start; }
+  .tt-stage { display: flex; justify-content: center; }
   @media (max-width: 900px) { .tt-stage { padding-top: 10px; } }
   .tt { width: min(100%, 340px); }
 
-  /* UpgradeFinder: text beside its real window. */
-  .uf { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 56px; padding: 48px 0 8px; align-items: center; }
-  @media (max-width: 900px) { .uf { grid-template-columns: 1fr; padding-top: 32px; } }
-  .uf img { width: 100%; max-width: 520px; height: auto; display: block; justify-self: center; border-radius: 4px;
-    box-shadow: 0 14px 40px rgba(0,0,0,.5); }
 
   /* FAQ */
   .faq { padding: 40px 0 8px; border-top: 1px solid #1e212b; margin-top: 40px; }
@@ -137,9 +153,9 @@
   <div class="tip hero-tip">
     <div class="name">Omni, LootValue &amp; UpgradeFinder</div>
     <div class="w">Three small addons for WoW Forever</div>
-    <div class="g">Use: Press <kbd>Ctrl</kbd>+<kbd>Space</kbd> and search your items, places, people, spells, NPCs and quests.</div>
-    <div class="g">Use: Shows on every item tooltip whether to vendor it, sell it on the AH, or disenchant it.</div>
-    <div class="g">Use: <code>/uf</code> lists the gear in the AH and your bags that beats what you wear.</div>
+    <div class="g"><b>Omni:</b> press <kbd>Ctrl</kbd>+<kbd>Space</kbd> and search your items, places, people, spells, NPCs and quests.</div>
+    <div class="g"><b>LootValue:</b> shows on every item tooltip whether to vendor it, sell it on the AH, or disenchant it.</div>
+    <div class="g"><b>UpgradeFinder:</b> <code>/uf</code> lists the gear in the AH and your bags that beats what you wear.</div>
     <div class="r">LootValue needs <a href="https://www.curseforge.com/wow/addons/auctionator">Auctionator</a>. Install that first.</div>
     <div class="cta">
       <a class="btn" href="update.cmd" download>Download the installer <small>Windows · update.cmd</small></a>
@@ -149,10 +165,22 @@
 </section>
 
 <main class="wrap">
-  <div class="two">
-    <section>
-      <h2>Omni</h2>
-      <p class="lede"><b>One search box</b> over everything you have and everywhere you go. Type a few letters; press <kbd>Enter</kbd>.</p>
+  <nav class="jump" aria-label="The three addons">
+    <a href="#omni"><b>Omni</b> search everything</a>
+    <a href="#lootvalue"><b>LootValue</b> sell or keep</a>
+    <a href="#upgradefinder"><b>UpgradeFinder</b> gear upgrades</a>
+  </nav>
+
+  <section class="addon" id="omni">
+    <header>
+      <h2><span class="n">1</span>Omni</h2>
+      <div class="meta"><span>Open: <kbd>Ctrl</kbd>+<kbd>Space</kbd> or <code>/omni</code></span><span>Needs: nothing. Questie and Auctionator add more.</span></div>
+    </header>
+    <div class="body">
+      <div>
+        <p class="lede"><b>One search box</b> over everything you have and everywhere you go. Type a few letters; press <kbd>Enter</kbd>.</p>
+        <p class="filters">Filters: <code>i:</code> items, <code>p:</code> places, <code>@</code> people, <code>s:</code> spells, <code>n:</code> NPCs, <code>q:</code> quests.</p>
+      </div>
       <div class="omni" aria-label="What Omni finds, shown as its own result list">
         <div class="box">dusk <span>Ctrl+Space</span></div>
         <div class="cat">Items</div>
@@ -167,12 +195,20 @@
         <div class="row"><span>Trainers, vendors, quest givers, quests</span><span class="m"><kbd>Enter</kbd> pins them on the map</span></div>
         <div class="foot">Enter: open the map  (more below)</div>
       </div>
-      <p class="filters">Filters: <code>i:</code> items, <code>p:</code> places, <code>@</code> people, <code>s:</code> spells, <code>n:</code> NPCs, <code>q:</code> quests. Or type <code>/omni</code>.</p>
-    </section>
+    </div>
+  </section>
 
-    <section>
-      <h2>LootValue</h2>
-      <p class="lede"><b>One line on each item tooltip:</b> vendor it, sell it on the AH, or disenchant it. Priced from your Auctionator scan.</p>
+  <section class="addon" id="lootvalue">
+    <header>
+      <h2><span class="n">2</span>LootValue</h2>
+      <div class="meta"><span>Open: nothing to open; it is on every item tooltip</span><span class="need">Needs: <a href="https://www.curseforge.com/wow/addons/auctionator">Auctionator</a></span></div>
+    </header>
+    <div class="body">
+      <div>
+        <p class="lede"><b>One line on each item tooltip:</b> vendor it, sell it on the AH, or disenchant it. Priced from your Auctionator scan.</p>
+        <p>It compares the AH price (after the cut, and the deposit you lose if it doesn't sell) with the vendor price and
+          disenchanting, and says when the market looks slow. Scan now and then so the prices stay fresh.</p>
+      </div>
       <div class="tt-stage">
         <!-- MOCK tooltip, not a screenshot. The item is real (Dusky Belt, vendor 4s 12c); the LootValue line is an example. -->
         <div class="tt tip" aria-label="Picture of an item tooltip with the LootValue line">
@@ -185,22 +221,23 @@
           <div class="y">LootValue: AH ~90s <span class="gr">(or vendor 4s 12c) · AH scan 3h ago</span></div>
         </div>
       </div>
-      <p>It compares the AH price (after the cut, and the deposit you lose if it doesn't sell) with the vendor price and
-        disenchanting, and says when the market looks slow. Scan now and then so the prices stay fresh.</p>
-      <p><span style="color:var(--red)">Needs <a href="https://www.curseforge.com/wow/addons/auctionator" style="color:inherit">Auctionator</a></span> for the prices.</p>
-    </section>
-  </div>
-
-  <section class="uf">
-    <div>
-      <h2>UpgradeFinder</h2>
-      <p class="lede"><b>The gear upgrades you can buy:</b> items in your Auctionator scan and your bags that beat what you wear, biggest gain first.</p>
-      <p>Open it with <code>/uf</code> or the <b>Upgrades</b> button at the Auction House. It works for any class, with simple
-        leveling weights for your spec. Pick a slot, usable now or soon, gain or gain per gold, and what you can afford.</p>
-      <p>With <a href="https://www.curseforge.com/wow/addons/questie">Questie</a> it also says where to get an item: a quest reward, a dungeon, a vendor or a drop.</p>
     </div>
-    <img src="upgradefinder.jpg" width="712" height="693" loading="lazy"
-      alt="The UpgradeFinder window in game: upgrades for a mage, with the gain and the AH price of each item">
+  </section>
+
+  <section class="addon" id="upgradefinder">
+    <header>
+      <h2><span class="n">3</span>UpgradeFinder</h2>
+      <div class="meta"><span>Open: <code>/uf</code> or <b>Upgrades</b> at the Auction House</span><span>Needs: nothing. Auctionator adds AH items, Questie adds where to get them.</span></div>
+    </header>
+    <div class="body">
+      <div>
+        <p class="lede"><b>The gear upgrades you can buy:</b> items in your Auctionator scan and your bags that beat what you wear, biggest gain first.</p>
+        <p>It works for any class, with simple leveling weights for your spec. Pick a slot, usable now or soon, gain or gain per gold,
+          and what you can afford. With Questie it also says where to get an item: a quest reward, a dungeon, a vendor or a drop.</p>
+      </div>
+      <img class="shot" src="upgradefinder.jpg" width="712" height="693" loading="lazy"
+        alt="The UpgradeFinder window in game: upgrades for a mage, with the gain and the AH price of each item">
+    </div>
   </section>
 
   <section class="faq" aria-label="Questions">
