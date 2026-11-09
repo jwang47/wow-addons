@@ -6,6 +6,16 @@ local S, Scan = ns.score, ns.scan
 local call, api = ns.call, ns.api
 
 local ROWS, ROW_H, W = 14, 20, 484
+-- The window can be resized from its bottom-right corner: up to MAX_ROWS
+-- rows, and as many show as fit (ns.visibleRows). The size is saved.
+local MAX_ROWS, MAX_W = 40, 900
+local function visible()
+  local f = ns.frame
+  local h = f and f.GetHeight and f:GetHeight() or 0
+  if not h or h <= 0 then return ROWS end
+  return math.max(1, math.min(MAX_ROWS, math.floor((h - 92) / ROW_H)))
+end
+ns.visibleRows = visible
 local frame, rows, status, title, buttons = nil, {}, nil, nil, {}
 local view = { list = {}, top = 1, all = {} }
 ns.view = view
@@ -42,7 +52,7 @@ end
 -- keep: stay at the same scroll place (the list grows while items load).
 function ns.apply(keep)
   view.list = S.rank(view.all, opts())
-  view.top = keep and math.max(1, math.min(view.top, #view.list - ROWS + 1)) or 1
+  view.top = keep and math.max(1, math.min(view.top, #view.list - visible() + 1)) or 1
   ns.paint()
 end
 
@@ -70,8 +80,9 @@ function ns.paint()
   local sub = spec and wname and (spec .. ", " .. wname) or spec or wname
   title:SetText(sub and ("Upgrades |cff9d9d9d(" .. sub .. ")|r") or "Upgrades")
   local level = call(UnitLevel, "player") or 1
+  local n = visible()
   for i, row in ipairs(rows) do
-    local r = view.list[view.top + i - 1]
+    local r = i <= n and view.list[view.top + i - 1] or nil
     row.data = r
     if r then
       row:Show()
@@ -102,7 +113,7 @@ function ns.paint()
   elseif #view.all == 0 and not st.ran then
     status:SetText("Open to scan your Auctionator prices, bags and dungeon drops.")
   else
-    local more = #view.list > ROWS and string.format("  (scroll for %d more)", #view.list - ROWS) or ""
+    local more = #view.list > n and string.format("  (scroll for %d more)", #view.list - n) or ""
     status:SetText(string.format("%d upgrade%s%s", #view.list, #view.list == 1 and "" or "s", more)
       .. (st.pending and st.pending > 0 and string.format(st.loading and "  |cff9d9d9dloading %d more...|r"
         or "  |cff9d9d9d%d did not load (Rescan)|r", st.pending) or "")
@@ -232,7 +243,8 @@ ns.cycle = cycle
 local function build()
   frame = CreateFrame("Frame", "UpgradeFinderFrame", UIParent, rawget(_G, "BackdropTemplateMixin") and "BackdropTemplate" or nil)
   ns.frame = frame
-  frame:SetSize(W, 92 + ROWS * ROW_H)
+  local size = ns.db().opts.size
+  frame:SetSize(size and size[1] or W, size and size[2] or (92 + ROWS * ROW_H))
   frame:SetPoint("CENTER", UIParent, "CENTER", 260, 40)
   frame:SetFrameStrata("HIGH")
   frame:SetClampedToScreen(true)
@@ -241,6 +253,27 @@ local function build()
   frame:RegisterForDrag("LeftButton")
   frame:SetScript("OnDragStart", frame.StartMoving)
   frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+  frame:SetResizable(true)
+  local minH, maxH = 92 + 6 * ROW_H, 92 + MAX_ROWS * ROW_H
+  if frame.SetResizeBounds then frame:SetResizeBounds(W, minH, MAX_W, maxH)
+  else
+    if frame.SetMinResize then frame:SetMinResize(W, minH) end
+    if frame.SetMaxResize then frame:SetMaxResize(MAX_W, maxH) end
+  end
+  frame:SetScript("OnSizeChanged", function() if ns.paint then ns.paint() end end)
+  local grip = CreateFrame("Button", nil, frame)
+  grip:SetSize(16, 16)
+  grip:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3, 3)
+  grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+  grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+  grip:SetScript("OnMouseDown", function() frame:StartSizing("BOTTOMRIGHT") end)
+  grip:SetScript("OnMouseUp", function()
+    frame:StopMovingOrSizing()
+    ns.db().opts.size = { math.floor(frame:GetWidth() + 0.5), math.floor(frame:GetHeight() + 0.5) }
+    ns.apply(true)
+  end)
+  frame.grip = grip
   if frame.SetBackdrop then
     frame:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
       edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
@@ -294,7 +327,7 @@ local function build()
     x = x + spec[2] + 4
   end
 
-  for i = 1, ROWS do
+  for i = 1, MAX_ROWS do
     local row = CreateFrame("Button", nil, frame)
     row:SetHeight(ROW_H)
     row:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -58 - (i - 1) * ROW_H)
@@ -330,7 +363,7 @@ local function build()
   end
   frame:EnableMouseWheel(true)
   frame:SetScript("OnMouseWheel", function(_, delta)
-    view.top = math.max(1, math.min(view.top - delta * 3, math.max(1, #view.list - ROWS + 1)))
+    view.top = math.max(1, math.min(view.top - delta * 3, math.max(1, #view.list - visible() + 1)))
     ns.paint()
   end)
   status = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")

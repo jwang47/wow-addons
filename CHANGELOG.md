@@ -5,6 +5,11 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## UpgradeFinder 0.1.7
+
+- The Upgrades window can be resized: drag its bottom-right corner. A
+  taller window shows more rows (up to 40). The size is saved.
+
 ## UpgradeFinder 0.1.6
 
 - A **Build** window (the Build button on Upgrades, or `/uf build`), in the
