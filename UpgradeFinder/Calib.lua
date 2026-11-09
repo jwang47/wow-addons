@@ -259,16 +259,17 @@ C.handlers = handlers
 for ev in pairs(handlers) do
   if ev ~= "COMBAT_LOG_EVENT_UNFILTERED" then pcall(frame.RegisterEvent, frame, ev) end
 end
-function C.logOn() return ns.db().opts.combatLog == true end
+-- On for this session only: it is never saved, so a client that forbids
+-- it cannot bring the pop-up back at the next login. (0.1.6 test builds
+-- saved it in opts.combatLog; that value is cleared here.)
+local logOn = false
+function C.logOn() return logOn end
 function C.setLog(on)
-  ns.db().opts.combatLog = on and true or false
+  logOn = on and true or false
   if on then pcall(frame.RegisterEvent, frame, "COMBAT_LOG_EVENT_UNFILTERED")
   else pcall(frame.UnregisterEvent, frame, "COMBAT_LOG_EVENT_UNFILTERED") end
 end
-local function onLogin()
-  if C.logOn() then pcall(frame.RegisterEvent, frame, "COMBAT_LOG_EVENT_UNFILTERED") end
-end
-handlers.PLAYER_LOGIN = onLogin
+handlers.PLAYER_LOGIN = function() ns.db().opts.combatLog = nil end
 pcall(frame.RegisterEvent, frame, "PLAYER_LOGIN")
 frame:SetScript("OnEvent", function(_, ev, ...) pcall(handlers[ev], ...) end)
 

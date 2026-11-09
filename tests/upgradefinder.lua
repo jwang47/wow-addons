@@ -17,6 +17,7 @@ local function widget(name)
   function w:SetText(t) self.text = t end
   function w:GetText() return self.text end
   function w:RegisterEvent(e) self.events = self.events or {} self.events[e] = true end
+  function w:UnregisterEvent(e) if self.events then self.events[e] = nil end end
   function w:CreateTexture() return widget() end
   function w:CreateFontString() return widget() end
   return setmetatable(w, { __index = function(_, k)
@@ -612,6 +613,10 @@ check("a forbidden call turns the combat log off", not Cal.logOn() and UpgradeFi
 SlashCmdList.UPGRADEFINDER("calib log")
 SlashCmdList.UPGRADEFINDER("calib log")
 check("/uf calib log again turns it off", not Cal.logOn())
+ns.db().opts.combatLog = true -- saved by a 0.1.6 test build
+Cal.handlers.PLAYER_LOGIN()
+check("a saved combat log setting is cleared at login, not registered",
+  not Cal.logOn() and ns.db().opts.combatLog == nil and not Cal.frame.events.COMBAT_LOG_EVENT_UNFILTERED)
 Cal.reset()
 local snaps = Cal.store().snaps
 -- Level 24: 24 Int per 1% crit, 10 health per Sta (+ 50), 15 mana per Int.

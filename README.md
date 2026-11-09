@@ -258,7 +258,7 @@ for a dungeon drop it names the boss in chat), Shift-click links it.
 - Addons may not use the combat log: registering for
   `COMBAT_LOG_EVENT_UNFILTERED` brings up "blocked from an action only
   available to the Blizzard UI" right after login. UpgradeFinder leaves it
-  off (`/uf calib log` turns it on for a client that allows it; confirmed
+  off (`/uf calib log` turns it on for this session only, for a client that allows it; confirmed
   in game on 2026-11-09: `forbidden: UNKNOWN()`, and a forbidden call turns
   it off again) and takes
   spell damage from the action bars instead. UpgradeFinder also says in
