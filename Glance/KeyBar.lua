@@ -163,6 +163,16 @@ local function makeButton(key, x, y)
   end)
   b:SetScript("OnLeave", function() GameTooltip:Hide() end)
   b:HookScript("PostClick", function() ns.keybar.paintAll() end)
+  -- Shift+key clicks its own hidden button. The game reads Shift again
+  -- when it runs the click (on key up by default), so a Shift released a
+  -- moment early fired the plain spell. A second button needs no Shift.
+  b.shiftButton = CreateFrame("Button", "GlanceKey" .. key .. "Shift", bar, "SecureActionButtonTemplate")
+  b.shiftButton:RegisterForClicks("AnyUp", "AnyDown")
+  b.shiftButton:SetSize(1, 1)
+  b.shiftButton:SetPoint("CENTER", b)
+  b.shiftButton:SetAlpha(0)
+  b.shiftButton:EnableMouse(false)
+  b.shiftButton:HookScript("PostClick", function() ns.keybar.paintAll() end)
   buttons[key] = b
   return b
 end
@@ -183,14 +193,18 @@ function ns.keybar.apply()
       -- Modified attributes need a button part: shift-action1 is Shift with
       -- the left button (a key binding clicks as LeftButton). A bare
       -- "shift-action" is never read, so Shift+key fired the plain spell.
+      -- (Mouse clicks only; Shift+key uses the Shift button below.)
       b:SetAttribute("shift-action1", b.shiftSlot)
       b:SetAttribute("shift-action*", b.shiftSlot)
+      b.shiftButton:SetAttribute("type", b.shiftSlot and "action" or nil)
+      b.shiftButton:SetAttribute("action", b.shiftSlot)
       b.bg:SetColorTexture(0, 0, 0, 0.35)
       b.note:SetText("")
       b.label:SetTextColor(1, 1, 1)
     else
       b.mode = (plain and plain.kind) or "none"
       b:SetAttribute("type", nil)
+      b.shiftButton:SetAttribute("type", nil)
       b.icon:Hide()
       b.empty:Hide()
       b.peek:Hide()
@@ -208,7 +222,10 @@ function ns.keybar.apply()
     for _, mod in ipairs(K.MODS) do
       local e = map[mod .. key]
       if e and e.kind == "slot" then
-        SetOverrideBindingClick(bar, false, mod .. key, b:GetName(), "LeftButton")
+        -- Priority bindings: Bartender4 keeps its own override bindings on
+        -- the number keys even while its bars are hidden.
+        local target = (mod == "SHIFT-") and b.shiftButton or b
+        SetOverrideBindingClick(bar, true, mod .. key, target:GetName(), "LeftButton")
       end
     end
   end

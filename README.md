@@ -352,6 +352,12 @@ your saved Key Bindings.
 - A secure button's modified attribute needs its button part:
   `shift-action1` (or `shift-action*`). A bare `shift-action` is never read,
   so Shift+key fired the unmodified action.
+- Do not rely on modified attributes for a Shift+key binding. The game reads
+  Shift again when it runs the click (on key up, unless
+  `ActionButtonUseKeyDown` is on), so a Shift let go early fires the plain
+  action. Bind `SHIFT-<key>` to its own hidden secure button instead, and
+  set the override bindings with priority: Bartender4 keeps its own override
+  bindings on the number keys while its bars are hidden.
 
 ## Develop
 

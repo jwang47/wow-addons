@@ -114,7 +114,10 @@ C_ActionBar = {
   IsConsumableAction = function() return false end,
 }
 local overrides = {}
-function SetOverrideBindingClick(owner, prio, key, button, mouse) overrides[key] = button .. ":" .. mouse end
+overridePrio = {}
+function SetOverrideBindingClick(owner, prio, key, button, mouse)
+  overrides[key] = button .. ":" .. mouse; overridePrio[key] = prio
+end
 function ClearOverrideBindings() overrides = {} end
 local placed
 function PlaceAction(s) placed = s end
@@ -187,7 +190,10 @@ check("button 1 action", b1:GetAttribute("type") == "action" and b1:GetAttribute
 check("button 1 shift action", b1:GetAttribute("shift-action1") == 49 and b1:GetAttribute("shift-action*") == 49)
 check("cooldown not on the secure button", b1.cooldown.parent == _G.GlanceKeyOverlay)
 check("1 bound to our button", overrides["1"] == "GlanceKey1:LeftButton")
-check("Shift-1 bound to our button", overrides["SHIFT-1"] == "GlanceKey1:LeftButton")
+check("Shift-1 bound to the Shift button", overrides["SHIFT-1"] == "GlanceKey1Shift:LeftButton")
+check("Shift button casts the Shift slot", _G.GlanceKey1Shift:GetAttribute("type") == "action"
+  and _G.GlanceKey1Shift:GetAttribute("action") == 49)
+check("bindings take priority", overridePrio["1"] == true and overridePrio["SHIFT-1"] == true)
 check("W not taken", overrides.W == nil)
 check("Tab not taken", overrides.TAB == nil)
 check("Tab shows its command", _G.GlanceKeyTAB.note.text == "Target")
