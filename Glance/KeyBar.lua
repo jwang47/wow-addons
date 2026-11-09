@@ -216,7 +216,29 @@ ns.module("keybar", function()
   bar = CreateFrame("Frame", "GlanceKeyBar", UIParent)
   ns.keybar.frame = bar
   bar:SetSize((7.25 - MIN_X + 1) * UNIT, 4 * UNIT)
-  bar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 14)
+  local pos = ns.db.barPos
+  if pos then
+    bar:SetPoint(pos[1], UIParent, pos[1], pos[2], pos[3])
+  else
+    bar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 14)
+  end
+  -- In edit mode, drag the bar by its empty space to move it.
+  bar:SetMovable(true)
+  bar:SetClampedToScreen(true)
+  bar:RegisterForDrag("LeftButton")
+  bar:SetScript("OnDragStart", function(self)
+    if ns.unlocked and not InCombatLockdown() then self:StartMoving() end
+  end)
+  bar:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    local point, _, _, x, y = self:GetPoint(1)
+    ns.db.barPos = { point, x, y }
+  end)
+  bar.edge = bar:CreateTexture(nil, "BACKGROUND")
+  bar.edge:SetPoint("TOPLEFT", -6, 6)
+  bar.edge:SetPoint("BOTTOMRIGHT", 6, -6)
+  bar.edge:SetColorTexture(1, 0.85, 0.3, 0.15)
+  bar.edge:Hide()
   bar:SetScale(ns.db.scale or 1)
   bar.shiftTag = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   bar.shiftTag:SetPoint("BOTTOMLEFT", bar, "TOPLEFT", 0, 4)
@@ -224,7 +246,7 @@ ns.module("keybar", function()
   bar.shiftTag:Hide()
   bar.editTag = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   bar.editTag:SetPoint("BOTTOM", bar, "TOP", 0, 4)
-  bar.editTag:SetText("Edit: drag spells on and off the keys. /glance edit to lock.")
+  bar.editTag:SetText("Edit: drag spells on and off the keys, drag the gold area to move the bar. /glance edit to lock.")
   bar.editTag:Hide()
 
   for y, row in ipairs(K.ROWS) do
@@ -251,9 +273,21 @@ end)
 ---------------------------------------------------------------------------
 ns.commands.edit = function()
   ns.unlocked = not ns.unlocked
-  if bar then bar.editTag:SetShown(ns.unlocked) end
+  if bar then
+    bar.editTag:SetShown(ns.unlocked)
+    bar.edge:SetShown(ns.unlocked)
+    bar:EnableMouse(ns.unlocked)
+  end
   ns.print(ns.unlocked and "Keyboard bar unlocked: drag spells off keys. Hold Shift to edit the Shift layer."
     or "Keyboard bar locked. Alt-drag still moves a spell.")
+end
+
+ns.commands.reset = function()
+  if InCombatLockdown() then return ns.print("Not in combat.") end
+  ns.db.barPos = nil
+  bar:ClearAllPoints()
+  bar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 14)
+  ns.print("Keyboard bar back at the bottom centre.")
 end
 
 ns.commands.import = function()

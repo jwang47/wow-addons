@@ -113,6 +113,7 @@ UnitPowerMax = function() return 60 end
 UnitPowerType = function() return 0, "MANA" end
 UnitClass = function() return "Mage", "MAGE" end
 UnitIsPlayer = function(u) return u == "player" end
+UnitIsUnit = function(a, b) return a == b end
 UnitIsTapDenied = function() return false end
 UnitReaction = function() return 2 end
 UnitCastingInfo = function() end
@@ -198,6 +199,15 @@ b1.scripts.OnReceiveDrag(b1)
 check("no drop in combat", placed == nil)
 P.combat = false
 
+-- Edit mode moves the bar and saves where.
+local kb = _G.GlanceKeyBar
+kb.GetPoint = function() return "BOTTOM", UIParent, "BOTTOM", 40, 200 end
+kb.scripts.OnDragStop(kb)
+check("bar position saved", ns.db.barPos[1] == "BOTTOM" and ns.db.barPos[3] == 200)
+SlashCmdList.GLANCE("reset")
+check("bar reset", ns.db.barPos == nil)
+SlashCmdList.GLANCE("edit")
+
 -- A spell dropped on a fresh key stays there after import.
 local zslot = map.Z.slot
 ACTIONS[zslot] = 1
@@ -233,6 +243,8 @@ check("target watched", _G.GlanceTarget and _G.GlanceTarget.watched)
 check("blizzard player frame hidden", PlayerFrame.parent == ns.hidden and not PlayerFrame.shown)
 local r = ns.units.healthColor("target")
 check("hostile is red", r > 0.8)
+local pr, pg = ns.units.healthColor("player")
+check("own health is green", pg > pr)
 
 -- Minimap.
 check("square shape", GetMinimapShape() == "SQUARE")

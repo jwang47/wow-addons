@@ -131,6 +131,9 @@ ns.module("minimap", function()
     hide(MinimapCluster.BorderTop)
     hide(MinimapCluster.ZoneTextButton)
     hide(MinimapCluster.Tracking)
+    -- Blizzard's own coordinates; ours are in the line under the map.
+    local box = MinimapCluster.MinimapContainer
+    if type(box) == "table" then hide(box.PlayerCoords) end
   end
   hide(Minimap.ZoomIn)
   hide(Minimap.ZoomOut)
@@ -148,18 +151,19 @@ ns.module("minimap", function()
     AddonCompartmentFrame:SetPoint("TOPRIGHT", holder, "TOPRIGHT", -2, -2)
   end
 
+  -- Line 1: zone (full width). Line 2: Addons tab left, coords and clock right.
   local zone = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   zone:SetPoint("TOPLEFT", holder, "BOTTOMLEFT", 0, -4)
-  zone:SetPoint("TOPRIGHT", holder, "BOTTOMRIGHT", -78, -4)
+  zone:SetPoint("TOPRIGHT", holder, "BOTTOMRIGHT", 0, -4)
   zone:SetJustifyH("LEFT")
   zone:SetWordWrap(false)
   local info = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  info:SetPoint("TOPRIGHT", holder, "BOTTOMRIGHT", 0, -4)
+  info:SetPoint("TOPRIGHT", zone, "BOTTOMRIGHT", 0, -5)
   info:SetTextColor(0.78, 0.8, 0.82)
   mm.zone, mm.info = zone, info
 
   mm.tab = chip(holder, "Addons")
-  mm.tab:SetPoint("TOPLEFT", zone, "BOTTOMLEFT", 0, -4)
+  mm.tab:SetPoint("TOPLEFT", zone, "BOTTOMLEFT", 0, -2)
   mm.drawer = CreateFrame("Frame", "GlanceAddonDrawer", holder)
   mm.drawer:SetPoint("TOPRIGHT", holder, "BOTTOMRIGHT", 0, -44)
   mm.drawer.bg = mm.drawer:CreateTexture(nil, "BACKGROUND")

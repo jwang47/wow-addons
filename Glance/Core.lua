@@ -119,7 +119,8 @@ end)
 -- /glance
 ---------------------------------------------------------------------------
 local help = {
-  "/glance edit - unlock the keyboard bar: drag spells off keys (drop works always)",
+  "/glance edit - unlock the keyboard bar: drag spells off keys, drag the bar to move it",
+  "/glance reset - put the keyboard bar back at the bottom centre",
   "/glance import - read your key bindings again and rebuild the keyboard bar",
   "/glance take KEY - put KEY on the keyboard bar even if it has another binding",
   "/glance take all - the same for every key with another command, except Tab",

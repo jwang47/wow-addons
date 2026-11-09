@@ -15,7 +15,8 @@ the same, and a test checks that every `.toc` version has a section here.
   Movement keys and keys with other commands stay as they are. Drag a spell
   onto a key to put it there; hold Shift to see and fill the Shift layer.
   `/glance edit` (or Alt-drag) takes spells off. `/glance take all` puts
-  every key with another command (except Tab) on the bar.
+  every key with another command (except Tab) on the bar. In edit mode the
+  bar can be dragged to another place (`/glance reset` puts it back).
 - Small player and target bars under your character, and a cast bar below
   them. They hide Blizzard's player, target and cast frames
   (`/glance blizzard on` brings those back).

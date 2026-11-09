@@ -26,8 +26,10 @@ local function classColor(unit)
   return 0.4, 0.8, 0.95
 end
 
--- Health colour: class for players, reaction for the rest, grey if tapped.
+-- Health colour: green for you (so it stands apart from mana), class for
+-- other players, reaction for the rest, grey if tapped.
 function ns.units.healthColor(unit)
+  if UnitIsUnit and UnitIsUnit(unit, "player") then return 0.3, 0.78, 0.35 end
   if UnitIsPlayer(unit) then return classColor(unit) end
   if UnitIsTapDenied and UnitIsTapDenied(unit) then return 0.55, 0.55, 0.55 end
   local r = UnitReaction(unit, "player")

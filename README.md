@@ -281,7 +281,8 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   - Hold Shift: the bar shows the Shift layer, and a drop goes there. The
     small icon in a key's corner is its spell on the other layer.
   - `/glance edit` unlocks the bar so a drag takes a spell off; Alt-drag
-    works when the bar is locked. Nothing moves in combat (the game locks
+    works when the bar is locked. In edit mode, drag the gold area around
+    the keys to move the bar; `/glance reset` puts it back. Nothing moves in combat (the game locks
     action buttons then).
   - `/glance take F` puts a key with another command on the bar;
     `/glance free F` gives it back. `/glance take all` takes every key with
