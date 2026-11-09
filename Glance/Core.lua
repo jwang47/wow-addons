@@ -11,6 +11,7 @@ local defaults = {
   keybar = true,        -- the keyboard bar
   units = true,         -- floating player/target frames and cast bar
   minimap = true,       -- square minimap restyle
+  chat = true,          -- chat windows in the Glance look
   hideBlizzard = true,  -- hide PlayerFrame, TargetFrame, cast bar
   scale = 1,
 }
@@ -138,7 +139,7 @@ local help = {
   "/glance take KEY - put KEY on the keyboard bar even if it has another binding",
   "/glance take all - the same for every key with another command, except Tab",
   "/glance free KEY - give KEY back to its normal binding",
-  "/glance keybar|units|minimap on|off - turn a part on or off (reloads)",
+  "/glance keybar|units|minimap|chat on|off - turn a part on or off (reloads)",
   "/glance blizzard on|off - show or hide Blizzard's player, target and cast frames (reloads)",
 }
 ns.commands = {}
@@ -147,7 +148,7 @@ SlashCmdList.GLANCE = function(text)
   local cmd, rest = (text or ""):match("^%s*(%S*)%s*(.-)%s*$")
   cmd = cmd:lower()
   if ns.commands[cmd] then return ns.commands[cmd](rest) end
-  if cmd == "keybar" or cmd == "units" or cmd == "minimap" or cmd == "blizzard" then
+  if cmd == "keybar" or cmd == "units" or cmd == "minimap" or cmd == "chat" or cmd == "blizzard" then
     local on = rest:lower() ~= "off"
     if cmd == "blizzard" then ns.db.hideBlizzard = not on else ns.db[cmd] = on end
     ns.print(cmd .. (on and " on" or " off") .. ". Reloading.")

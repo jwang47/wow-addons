@@ -299,8 +299,11 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   corner in `/glance edit`. The zone, coordinates and clock are under it, and the
   LibDBIcon addon buttons (Questie, Details and the rest) are in one
   drawer behind the Addons tab.
-- `/glance keybar off`, `/glance units off` and `/glance minimap off` turn
-  a part off (the game reloads).
+- **Chat**: Blizzard's chat in the same look: a faint panel, tabs that show
+  under the mouse, no side buttons, a plain edit box, and text that fades
+  after 30 quiet seconds (scroll or hover brings it back).
+- `/glance keybar off`, `/glance units off`, `/glance minimap off` and
+  `/glance chat off` turn a part off (the game reloads).
 
 The bar uses the game's secure action buttons and override bindings
 (`SetOverrideBindingClick`), so it only reads bindings; it never changes

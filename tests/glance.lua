@@ -49,6 +49,16 @@ MinimapCluster = widget("MinimapCluster")
 MinimapCluster.IndicatorFrame = widget()
 PlayerFrame, TargetFrame, PlayerCastingBarFrame = widget("PlayerFrame"), widget("TargetFrame"), widget("PlayerCastingBarFrame")
 GameTooltip = widget("GameTooltip")
+NUM_CHAT_WINDOWS = 2
+ChatFrame1, ChatFrame2 = widget("ChatFrame1"), widget("ChatFrame2")
+ChatFrame1Tab = widget("ChatFrame1Tab")
+ChatFrame1Tab.Left = widget()
+ChatFrame1ButtonFrame = widget("ChatFrame1ButtonFrame")
+ChatFrame1EditBox = widget("ChatFrame1EditBox")
+ChatFrameMenuButton = widget("ChatFrameMenuButton")
+CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA = 0.2
+local fadeSet
+function ChatFrame1:SetFading(v) fadeSet = v end
 DEFAULT_CHAT_FRAME = { AddMessage = function(_, m) table.insert(chat, m) end }
 SlashCmdList = {}
 function hooksecurefunc() end
@@ -283,6 +293,12 @@ check("addon button in drawer", lib.parent == _G.GlanceAddonDrawer)
 check("tab counts buttons", ns.minimap.tab.text.text == "Addons 1")
 _G.GlanceMinimap.scripts.OnUpdate(_G.GlanceMinimap, 1)
 check("minimap info line", ns.minimap.info.text == "23.4, 51.3  16:03")
+
+-- Chat.
+check("chat fades", fadeSet == true)
+check("chat side buttons hidden", not ChatFrame1ButtonFrame.shown and not ChatFrameMenuButton.shown)
+check("tabs hide without the mouse", CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA == 0)
+check("edit box restyled", ChatFrame1EditBox.glanceBg ~= nil)
 
 -- Resizing the minimap.
 SlashCmdList.GLANCE("map 260")
