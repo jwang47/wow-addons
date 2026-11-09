@@ -319,6 +319,17 @@ check("after combat it hides", not tracker.shown and tracker.alpha == 1)
 SlashCmdList.QUESTBOARD("tracker on")
 check("/qb tracker on brings it back", tracker.shown and not QuestBoardDB.hideTrackers)
 
+-- /qb far on raises the nameplate range and /qb far off puts the old one back.
+local cvars = { nameplateMaxDistance = "20", nameplateShowEnemies = "0" }
+C_CVar = { GetCVar = function(n) return cvars[n] end,
+  SetCVar = function(n, v) cvars[n] = math.min(tonumber(v), n == "nameplateMaxDistance" and 41 or 1) .. "" end }
+SlashCmdList.QUESTBOARD("far on")
+check("/qb far on: nameplates on, longest range the client takes", cvars.nameplateMaxDistance == "41" and cvars.nameplateShowEnemies == "1")
+check("/qb far on says the range", chat[#chat]:find("41 yards") ~= nil)
+SlashCmdList.QUESTBOARD("far on")
+SlashCmdList.QUESTBOARD("far off")
+check("/qb far off puts the old values back", cvars.nameplateMaxDistance == "20" and cvars.nameplateShowEnemies == "0")
+
 ---------------------------------------------------------------------------
 -- Without Questie: the log only, no errors.
 questieOn = false

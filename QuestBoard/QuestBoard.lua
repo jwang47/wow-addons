@@ -437,6 +437,39 @@ function ns.applyTrackers()
 end
 
 ---------------------------------------------------------------------------
+-- Far nameplates (/qb far on): enemy nameplates on, at the longest range the
+-- client takes, so quest monsters (and Questie's nameplate icons) show from
+-- further away. Only game settings; the old values are saved and put back
+-- by /qb far off. The game keeps settings itself, so this runs only once.
+---------------------------------------------------------------------------
+ns.FAR = { nameplateMaxDistance = "60", nameplateShowEnemies = "1" }
+local function getCVar(name)
+  return call(api("C_CVar.GetCVar"), name) or call(rawget(_G, "GetCVar"), name)
+end
+local function setCVar(name, value)
+  local set = api("C_CVar.SetCVar") or rawget(_G, "SetCVar")
+  return type(set) == "function" and pcall(set, name, value)
+end
+function ns.far(on)
+  if inCombat() then say("not in combat; try again after the fight") return false end
+  if on then
+    ns.db.farSaved = ns.db.farSaved or {}
+    for name, value in pairs(ns.FAR) do
+      if ns.db.farSaved[name] == nil then ns.db.farSaved[name] = getCVar(name) or false end
+      setCVar(name, value)
+    end
+    say("enemy nameplates on, range " .. tostring(getCVar("nameplateMaxDistance") or "?") .. " yards (the most this client takes)")
+  else
+    for name, value in pairs(ns.db.farSaved or {}) do
+      if value then setCVar(name, value) end
+    end
+    ns.db.farSaved = nil
+    say("nameplates back to range " .. tostring(getCVar("nameplateMaxDistance") or "?") .. " yards")
+  end
+  return true
+end
+
+---------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------
 local events = CreateFrame("Frame")
@@ -485,6 +518,7 @@ local help = {
   "/qb rows N - rows per group (now %d)",
   "/qb reset - put the board back under the minimap",
   "/qb tracker off - hide the game's quest tracker (on brings it back)",
+  "/qb far on - show enemy nameplates from as far as the game allows (off puts it back)",
 }
 SLASH_QUESTBOARD1, SLASH_QUESTBOARD2 = "/qb", "/questboard"
 SlashCmdList.QUESTBOARD = function(text)
@@ -512,6 +546,9 @@ SlashCmdList.QUESTBOARD = function(text)
       end
     end
     say(rest == "off" and "the game's quest tracker is hidden" or "the game's quest tracker is back")
+    return
+  elseif cmd == "far" and (rest == "on" or rest == "off") then
+    ns.far(rest == "on")
     return
   elseif cmd == "lock" then
     ns.db.locked = not ns.db.locked

@@ -288,6 +288,11 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   is on); `/qb tracker on` brings it back. The game's tracker holds secure
   quest-item buttons, so in combat it only turns see-through and hides when
   combat ends.
+- `/qb far on` turns on enemy nameplates at the longest range the client
+  takes (it asks for 60 yards and reports what the game kept), so quest
+  monsters and Questie's nameplate icons (`/questie`, Nameplates) show from
+  further away. `/qb far off` puts the old settings back. Addons cannot mark
+  monsters in the world or target them, so nameplates are the way.
 - XP per minute is an estimate: the run to the place at 7 yards a second
   (or your speed when faster), 90 s per open objective, 30 s at the giver
   and 60 s back. The numbers are in `QuestBoard/Data.lua`.
