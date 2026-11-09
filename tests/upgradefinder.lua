@@ -807,7 +807,13 @@ local function hasSingle(l) for _, t in ipairs(singles) do if t == l then return
 check("tooltip: an Upgrade line and a Crafted line", hasDouble("^Upgrade %+") ~= nil
   and hasSingle("Crafted: Pattern: Frost Circlet (Tailoring (125))"))
 local intLine = hasDouble("^  Intellect$")
-check("tooltip: one stat per line", hasSingle("Stats") and intLine and intLine[2]:match("^%+%d") ~= nil)
+check("tooltip: one stat per line, the item number then the change", hasSingle("Stats: this item (change vs worn)")
+  and intLine and intLine[2]:match("^%+9  %(%+%d+%)$") ~= nil)
+local sl = ns.stats.statList({ frost = 4, sp = -8 }, { frost = 14, sta = 5 })
+local function sline(l) for _, e in ipairs(sl) do if e[1] == l then return e end end end
+check("stat list: own number, then the change", sline("Frost damage")[2] == "+14  (+4)" and sline("Frost damage")[3] == true
+  and sline("Spell damage")[2] == "none  (-8)" and sline("Spell damage")[3] == false
+  and sline("Stamina")[2] == "+5  (same)" and sline("Stamina")[3] == nil)
 check("tooltip: no run-on Changes line", not hasSingle("Changes:"))
 local cl, bl = hasDouble("^Craft$"), hasDouble("^Buy it made$")
 check("tooltip: craft cost and buy line", cl and cl[2] == "4g 04s +?" and bl and bl[2] == "binds on pickup"

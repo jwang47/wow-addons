@@ -134,7 +134,9 @@ local function showDetails(row)
     if #list == 0 then return end
     tt:AddLine(title, 1, 0.82, 0)
     for _, e in ipairs(list) do
-      tt:AddDoubleLine("  " .. e[1], e[2], 0.9, 0.9, 0.9, e[3] and 0.25 or 1, e[3] and 1 or 0.38, 0.25)
+      local r_, g_, b_ = 0.25, 1, 0.25
+      if e[3] == false then r_, g_, b_ = 1, 0.38, 0.25 elseif e[3] == nil then r_, g_, b_ = 0.7, 0.7, 0.7 end
+      tt:AddDoubleLine("  " .. e[1], e[2], 0.9, 0.9, 0.9, r_, g_, b_)
     end
   end
   tt:AddLine(" ")
@@ -164,12 +166,12 @@ local function showDetails(row)
   end
   if r.note then tt:AddLine(r.note, 1, 0.82, 0) end
   -- What it changes (Stats.lua): stats, then offense and defense.
-  local ok, d, off, def = pcall(ns.stats.forRow, r)
+  local ok, d, off, def, new = pcall(ns.stats.forRow, r)
   if ok and d and next(d) then
     tt:AddLine(" ")
-    section("Stats", ns.stats.statList(d))
-    section("Offense", off)
-    section("Defense", def)
+    section("Stats: this item (change vs worn)", ns.stats.statList(d, new))
+    section("Offense (change)", off)
+    section("Defense (change)", def)
     tt:AddLine(" ")
   end
   -- The "Get it:" lines come from the item tooltip hook (Where.lua).

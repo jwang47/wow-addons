@@ -32,7 +32,8 @@ the same, and a test checks that every `.toc` version has a section here.
   and the made item's AH price, marked "cheaper" when buying it made
   costs less, or "binds on pickup" when you can only craft it.
 - The row tooltip is easier to read: one stat per line, the name on the
-  left and the change on the right, under Stats, Offense and Defense.
+  left; on the right the item's own number, then the change against what
+  you wear in brackets ("+14  (+4)"). Offense and Defense show changes.
 - Each weight preset has an x button that deletes it.
 
 ## UpgradeFinder 0.1.5

@@ -137,13 +137,22 @@ function St.statLine(d)
   return table.concat(parts, "  ")
 end
 
--- The stat change as entries { label, value, good }, one per stat, for a
--- tooltip with the label on the left and the number on the right.
-function St.statList(d)
+-- The stats as entries { label, value, good } for a tooltip with the label
+-- on the left: the item's own number, then the change against what you
+-- wear in brackets ("+14  (+4)"; "none  (-8)" for a stat only the worn
+-- item has). good: true better, false worse, nil no change.
+function St.statList(d, new)
   local out = {}
+  new = new or {}
   for _, k in ipairs(St.ORDER) do
-    local v = d[k]
-    if v then table.insert(out, { St.LONG[k] or St.NAMES[k], fmt(v, St.PCT[k]), v > 0 }) end
+    local v, own = d[k], new[k]
+    if v or own then
+      local item = own and fmt(own, St.PCT[k]) or "none"
+      local change = v and fmt(v, St.PCT[k]) or "same"
+      local good
+      if v then good = v > 0 end
+      table.insert(out, { St.LONG[k] or St.NAMES[k], item .. "  (" .. change .. ")", good })
+    end
   end
   return out
 end
@@ -265,7 +274,8 @@ function St.forRow(r)
   local class, w = ns.class(), ns.weights()
   local ctx = St.context(class, w)
   ctx.weaponDps = (St.role(class, w) == "ranged" and slotStats(18) or slotStats(16)).dps
-  local d = St.diff(S.parse(lines), olds)
+  local new = S.parse(lines)
+  local d = St.diff(new, olds)
   local off, def = St.derive(d, ctx, w, r.loc)
-  return d, off, def
+  return d, off, def, new
 end
