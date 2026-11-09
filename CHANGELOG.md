@@ -5,6 +5,13 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## QuestBoard 0.1.0
+
+- New: a floating board of the quests that matter now. Turn in (nearest
+  finisher first), your log (nearest objective first) and quests to pick up
+  that fit your level (best estimated XP per minute first). Click a row to
+  pin the place on the map. `/qb`.
+
 ## UpgradeFinder 0.1.8
 
 - Fix a Lua error when the Upgrades window opens for the first time

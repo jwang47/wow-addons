@@ -260,6 +260,38 @@ the price to buy the made item on the AH instead.
   (new Forever items) get nothing. Item keys used: `questRewards`,
   `npcDrops`, `vendors`, `objectDrops`, `itemDrops`.
 
+## QuestBoard (in development)
+
+A small floating list, under the minimap, of the quests that matter now.
+It is not in the release yet (not in `tools/release.py` `ADDONS`); try it
+with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
+
+| Group | What | Sorted by |
+| --- | --- | --- |
+| Turn in | quests in your log that are complete | nearest quest giver |
+| In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
+| Pick up | quests Questie shows as available ("!") that give XP and are at most 3 levels over you (`/qb range N`) | best estimated XP per minute (right-click the group: nearest) |
+
+- The level number is in the quest log colours (grey, green, yellow,
+  orange, red). Each row shows the distance and an arrow that turns with
+  you.
+- Click a row: set and track the game's map pin at the place. Shift-click:
+  link the quest in chat. Right-click: open the quest log (your quests) or
+  show the giver with Questie's map icon (pick-ups). Hover: XP, the
+  estimate, the giver or finisher, the open objectives.
+- Click a group name to fold it. Alt-drag the board to move it; `/qb reset`
+  puts it back. In combat it fades to 35%.
+- XP per minute is an estimate: the run to the place at 7 yards a second
+  (or your speed when faster), 90 s per open objective, 30 s at the giver
+  and 60 s back. The numbers are in `QuestBoard/Data.lua`.
+- Data: Questie, when it is loaded (`QuestieDB.GetQuest`,
+  `DistanceUtils`, `ActiveQuests`, `AvailableQuests.__availableQuests`,
+  `QuestXP`, `ZoneDB` and HereBeDragons). Questie has no public API, so every
+  call is guarded and a failing one only drops that piece. Without Questie
+  the board shows your log only, with no places or XP.
+- It refreshes on quest events and every 3 s for distances; each pass
+  works at most 3 ms a frame (`ns.data.BUDGET_MS`).
+
 ## Forever client notes
 
 - Addons may not use the combat log: registering for
@@ -293,9 +325,10 @@ Checks, from the repo root (Lua 5.1 and Python 3):
 | `lua5.1 tests/lootvalue.lua` | LootValue against a mock of the game and Auctionator APIs |
 | `lua5.1 tests/omni.lua` | Omni against a mock of the game API |
 | `lua5.1 tests/upgradefinder.lua` | UpgradeFinder against a mock of the game API |
+| `lua5.1 tests/questboard.lua` | QuestBoard against a mock of the game API and Questie |
 | `python3 -m unittest tests/test_release.py` | Zips, manifest, version guard, changelog, page |
 
-The `tests` workflow runs all four on each push and pull request. The real
+The `tests` workflow runs them all on each push and pull request. The real
 check is in game.
 
 ### Dev mode: try a checkout in the game
