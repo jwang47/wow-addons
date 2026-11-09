@@ -127,7 +127,8 @@ local function makeButton(key, x, y)
 
   b:SetScript("OnDragStart", function(self)
     if InCombatLockdown() or self.mode ~= "slot" then return end
-    if ns.unlocked or (IsAltKeyDown and IsAltKeyDown()) then
+    -- Plain drag moves a spell, unless /glance lock asks for Alt.
+    if not ns.db.lockDrag or ns.unlocked or (IsAltKeyDown and IsAltKeyDown()) then
       PickupAction(currentSlot(self))
       ns.keybar.paintAll()
     end
@@ -248,7 +249,7 @@ ns.module("keybar", function()
   bar.shiftTag:Hide()
   bar.editTag = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   bar.editTag:SetPoint("BOTTOM", bar, "TOP", 0, 4)
-  bar.editTag:SetText("Edit: drag spells on and off the keys, drag the gold area to move the bar. /glance edit to lock.")
+  bar.editTag:SetText("Edit: drag the gold area to move the bar. /glance edit when done.")
   bar.editTag:Hide()
 
   for y, row in ipairs(K.ROWS) do
@@ -281,8 +282,14 @@ ns.commands.edit = function()
     bar.edge:SetShown(ns.unlocked)
     bar:EnableMouse(ns.unlocked)
   end
-  ns.print(ns.unlocked and "Keyboard bar unlocked: drag spells off keys. Hold Shift to edit the Shift layer."
-    or "Keyboard bar locked. Alt-drag still moves a spell.")
+  ns.print(ns.unlocked and "Edit mode: drag the gold area to move the bar, the gold corner to size the map."
+    or "Edit mode off.")
+end
+
+ns.commands.lock = function()
+  ns.db.lockDrag = not ns.db.lockDrag
+  ns.print(ns.db.lockDrag and "Keys locked: Alt-drag (or /glance edit) moves a spell."
+    or "Keys unlocked: drag a spell to move it, drop it on another key to swap.")
 end
 
 ns.commands.reset = function()

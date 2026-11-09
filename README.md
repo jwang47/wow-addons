@@ -280,9 +280,11 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
     That is the whole binding: no Key Bindings window.
   - Hold Shift: the bar shows the Shift layer, and a drop goes there. The
     small icon in a key's corner is its spell on the other layer.
-  - `/glance edit` unlocks the bar so a drag takes a spell off; Alt-drag
-    works when the bar is locked. In edit mode, drag the gold area around
-    the keys to move the bar; `/glance reset` puts it back. Nothing moves in combat (the game locks
+  - Drag a spell from one key to another to move it; drop it on a key that
+    has a spell and the two swap. `/glance lock` makes drags need Alt, so a
+    stray drag cannot move anything.
+  - `/glance edit`: drag the gold area around the keys to move the bar;
+    `/glance reset` puts it back. Nothing moves in combat (the game locks
     action buttons then).
   - `/glance take F` puts a key with another command on the bar;
     `/glance free F` gives it back. `/glance take all` takes every key with

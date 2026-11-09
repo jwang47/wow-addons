@@ -132,7 +132,9 @@ end)
 -- /glance
 ---------------------------------------------------------------------------
 local help = {
-  "/glance edit - unlock the keyboard bar: drag spells off keys, drag the bar to move it",
+  "Drag a spell from one key to another to move it (drop on a full key to swap). Out of combat only.",
+  "/glance lock - make spell drags need Alt (again to undo)",
+  "/glance edit - move the keyboard bar and size the minimap",
   "/glance reset - put the keyboard bar back at the bottom centre",
   "/glance bars hide - hide the old action bars and gryphons (show brings them back)",
   "/glance map SIZE - minimap size in pixels (120-400); or drag its corner in /glance edit",

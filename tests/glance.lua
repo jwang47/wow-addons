@@ -206,10 +206,15 @@ b1.scripts.OnReceiveDrag(b1)
 check("drop on plain layer", placed == 1)
 placed = nil
 b1.scripts.OnDragStart(b1)
-check("locked bar keeps spells", placed == nil)
+check("plain drag picks up", placed == -1)
+SlashCmdList.GLANCE("lock")
+placed = nil
+b1.scripts.OnDragStart(b1)
+check("locked keys keep spells", placed == nil)
 SlashCmdList.GLANCE("edit")
 b1.scripts.OnDragStart(b1)
-check("unlocked bar picks up", placed == -1)
+check("edit mode picks up", placed == -1)
+SlashCmdList.GLANCE("lock")
 P.combat = true
 placed = nil
 b1.scripts.OnReceiveDrag(b1)
