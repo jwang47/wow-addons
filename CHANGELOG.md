@@ -5,6 +5,11 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## Omni 0.1.1
+
+- Nearby is always the first group in the results.
+- With an empty search, Omni shows the 5 nearest NPCs above Recent.
+
 ## UpgradeFinder 0.1.8
 
 - Fix a Lua error when the Upgrades window opens for the first time
