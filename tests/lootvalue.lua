@@ -41,7 +41,9 @@ Auctionator = {
     GetAuctionPriceByItemLink = function(caller, link) assert(caller == "LootValue") return AH[idOf(link)] end,
     GetAuctionPriceByItemID = function(caller, id) assert(caller == "LootValue") return AH[id] end,
     GetDisenchantPriceByItemLink = function(_, link) return DE[idOf(link)] end,
-    GetVendorPriceByItemLink = function() return nil end,  -- falls back to C_Item's sell price
+    -- What a vendor charges, not what it pays: LootValue must not use it.
+    GetVendorPriceByItemLink = function() return 90000 end,
+    GetVendorPriceByItemID = function() return 90000 end,
     GetAuctionAgeByItemLink = function(_, link) return AGE[idOf(link)] end,
   } },
   Database = { GetPriceHistory = function(_, key) return HIST[key] end },
@@ -64,6 +66,8 @@ check("ahWins: slow market needs 2x", LV.ahWins(400, 0, 250, false) and not LV.a
 
 -- Advice line --------------------------------------------------------------
 local robe = LV.adviceLine("|Hitem:9001:0|h", true, CTX)
+check("vendor is the game's sell price, not Auctionator's buy price", has(robe, "(or vendor 8s")
+  and not has(robe, "9g"))
 check("no Enchanting: AH beats vendor", has(robe, "LootValue: AH ~42s") and has(robe, "(or vendor 8s)"))
 check("bound copy: no AH option", LV.adviceLine("|Hitem:9001:0|h", true, { bound = true }) == nil)
 check("without tooltip context the AH says if tradable", has(LV.adviceLine("|Hitem:9001:0|h", true), "AH if tradable"))

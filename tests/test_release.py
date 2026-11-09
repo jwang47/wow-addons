@@ -61,6 +61,12 @@ class ReleaseTest(unittest.TestCase):
         p.write_bytes(p.read_bytes().replace(b"\n", b"\r\n"))
         self.assertEqual(pub.build_zip(self.root / "Omni"), a)
 
+    def test_binary_files_are_not_changed(self):
+        blob = bytes(range(256)) * 4  # holds \n and \r\n bytes
+        (self.root / "Omni" / "icon.tga").write_bytes(blob)
+        with zipfile.ZipFile(io.BytesIO(pub.build_zip(self.root / "Omni"))) as z:
+            self.assertEqual(z.read("Omni/icon.tga"), blob)
+
     def test_version_guard(self):
         m, files = pub.build(self.root, self.out)
         self.assertEqual(pub.same_version_changes(m, None), [])  # first release
