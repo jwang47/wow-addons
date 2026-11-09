@@ -757,6 +757,20 @@ check("build: delete", #Bd.names() == 0)
 Bd.reset()
 GetActionInfo, GetSpellInfo, GetSpellDescription, GetSpellBaseCooldown, GetSpellPowerCost = nil, nil, nil, nil, nil
 
+-- Resizable window --------------------------------------------------------------
+local F = UpgradeFinderFrame
+local fh = 92 + 14 * 20
+F.GetHeight = function() return fh end
+F.GetWidth = function() return 600 end
+check("window: 14 rows at the start size", ns.visibleRows() == 14)
+fh = 92 + 25 * 20
+F.grip.scripts.OnMouseUp(F.grip)
+check("window: a taller window shows more rows, and the size is saved", ns.visibleRows() == 25
+  and UpgradeFinderDB.opts.size[1] == 600 and UpgradeFinderDB.opts.size[2] == fh)
+fh = 10000
+check("window: at most 40 rows", ns.visibleRows() == 40)
+F.GetHeight, F.GetWidth, UpgradeFinderDB.opts.size = nil, nil, nil
+
 -- Recipes: a pattern scores as the item it makes ------------------------------
 local Sc = ns.scan
 ITEMS[114] = { loc = "", class = 9, lines = { "Pattern: Frost Circlet", "Frost Circlet", "Binds when picked up",

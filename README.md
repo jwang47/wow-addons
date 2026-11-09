@@ -130,7 +130,8 @@ beats what you wear, biggest gain first. Each row is one line (icon, name,
 slot, `+gain`, then the price, "bags", or the dungeon's short name such as
 `DM` or `BRD`); hover a row for the item tooltip plus the score you wear, the
 gain per gold and what it replaces. Click searches the AH (when it is open;
-for a dungeon drop it names the boss in chat), Shift-click links it. A pattern, plan or other recipe on the AH shows
+for a dungeon drop it names the boss in chat), Shift-click links it. Drag the
+bottom-right corner to resize the window; a taller one shows more rows. A pattern, plan or other recipe on the AH shows
 as the gear it makes, tagged "craft" (its tooltip names the profession;
 Scan.lua reads the made item's slot and stats from the recipe tooltip). Its
 price is the craft cost: the pattern plus the reagents (from the line after
