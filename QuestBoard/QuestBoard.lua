@@ -17,6 +17,7 @@ local defaults = {
   rows = { turnin = 6, log = 8, pickup = 8 },
   collapsed = {},
   combatAlpha = 0.35,
+  hideTrackers = false,  -- hide the game's quest tracker (and Questie's)
   point = nil,           -- saved position { point, x, y }
 }
 
@@ -359,6 +360,39 @@ function ns.show(on)
 end
 
 ---------------------------------------------------------------------------
+-- Hiding the other quest trackers (/qb tracker off). The game's tracker
+-- holds secure quest-item buttons, so it is hidden only out of combat; in
+-- combat it goes see-through and hides when combat ends.
+---------------------------------------------------------------------------
+ns.TRACKERS = { "ObjectiveTrackerFrame", "WatchFrame", "QuestWatchFrame", "Questie_BaseFrame" }
+local hooked = {}
+local function inCombat() return rawget(_G, "InCombatLockdown") and InCombatLockdown() end
+
+local function hideTracker(f)
+  if not (ns.db and ns.db.hideTrackers) then return end
+  if inCombat() then f:SetAlpha(0) return end
+  f:Hide()
+  f:SetAlpha(1)
+end
+
+function ns.applyTrackers()
+  for _, name in ipairs(ns.TRACKERS) do
+    local f = rawget(_G, name)
+    if type(f) == "table" and f.Hide then
+      if not hooked[name] and f.HookScript then
+        hooked[name] = true
+        f:HookScript("OnShow", hideTracker)
+      end
+      if ns.db.hideTrackers then
+        hideTracker(f)
+      elseif not inCombat() and f.SetAlpha then
+        f:SetAlpha(1)
+      end
+    end
+  end
+end
+
+---------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------
 local events = CreateFrame("Frame")
@@ -379,13 +413,20 @@ events:SetScript("OnEvent", function(_, event)
     ns.db = QuestBoardDB
     build()
     ns.show(ns.db.shown)
+    ns.applyTrackers()
     -- Questie builds its quest lists a few seconds after login.
-    if C_Timer then C_Timer.After(5, ns.refresh) C_Timer.After(15, ns.refresh) end
+    if C_Timer then
+      C_Timer.After(5, function() ns.refresh() ns.applyTrackers() end)
+      C_Timer.After(15, ns.refresh)
+    end
     return
   end
   if not panel then return end
   if event == "PLAYER_REGEN_DISABLED" then panel:SetAlpha(ns.db.combatAlpha) return end
-  if event == "PLAYER_REGEN_ENABLED" then panel:SetAlpha(1) end
+  if event == "PLAYER_REGEN_ENABLED" then
+    panel:SetAlpha(1)
+    if ns.db.hideTrackers then ns.applyTrackers() end
+  end
   ns.refresh()
 end)
 
@@ -398,6 +439,7 @@ local help = {
   "/qb range N - pick-ups at most N levels over you (now %d)",
   "/qb rows N - rows per group (now %d)",
   "/qb reset - put the board back under the minimap",
+  "/qb tracker off - hide the game's quest tracker (on brings it back)",
 }
 SLASH_QUESTBOARD1, SLASH_QUESTBOARD2 = "/qb", "/questboard"
 SlashCmdList.QUESTBOARD = function(text)
@@ -413,6 +455,19 @@ SlashCmdList.QUESTBOARD = function(text)
     n = math.max(1, math.min(20, math.floor(n)))
     for k in pairs(ns.db.rows) do ns.db.rows[k] = n end
     return ns.refresh()
+  elseif cmd == "tracker" and (rest == "off" or rest == "on") then
+    ns.db.hideTrackers = rest == "off"
+    if rest == "on" and inCombat() then say("the tracker comes back after combat") end
+    ns.applyTrackers()
+    if rest == "on" then
+      for _, name in ipairs(ns.TRACKERS) do
+        local f = rawget(_G, name)
+        -- Questie's tracker shows itself only when Questie's own option is on.
+        if type(f) == "table" and f.Show and name ~= "Questie_BaseFrame" and not inCombat() then f:Show() end
+      end
+    end
+    say(rest == "off" and "the game's quest tracker is hidden" or "the game's quest tracker is back")
+    return
   elseif cmd == "reset" then
     ns.db.point = nil
     panel:ClearAllPoints()

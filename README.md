@@ -281,6 +281,10 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   estimate, the giver or finisher, the open objectives.
 - Click a group name to fold it. Alt-drag the board to move it; `/qb reset`
   puts it back. In combat it fades to 35%.
+- `/qb tracker off` hides the game's quest tracker (and Questie's, if it
+  is on); `/qb tracker on` brings it back. The game's tracker holds secure
+  quest-item buttons, so in combat it only turns see-through and hides when
+  combat ends.
 - XP per minute is an estimate: the run to the place at 7 yards a second
   (or your speed when faster), 90 s per open objective, 30 s at the giver
   and 60 s back. The numbers are in `QuestBoard/Data.lua`.

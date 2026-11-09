@@ -247,6 +247,29 @@ check("combat fades the board", alpha == 0.35)
 fire("PLAYER_REGEN_ENABLED")
 check("out of combat it is solid", alpha == 1)
 
+-- /qb tracker off hides the game's tracker, also when it shows again;
+-- in combat it only goes see-through.
+local tracker = CreateFrame("Frame", "ObjectiveTrackerFrame")
+tracker.alpha = 1
+function tracker:SetAlpha(a) self.alpha = a end
+function tracker:HookScript(what, fn) self.hooks = self.hooks or {} self.hooks[what] = fn end
+function tracker:Show() self.shown = true if self.hooks and self.hooks.OnShow then self.hooks.OnShow(self) end end
+tracker:Show()
+local combat = false
+function InCombatLockdown() return combat end
+SlashCmdList.QUESTBOARD("tracker off")
+check("/qb tracker off hides it", not tracker.shown and QuestBoardDB.hideTrackers)
+tracker:Show()
+check("it stays hidden when the game shows it", not tracker.shown)
+combat = true
+tracker:Show()
+check("in combat it goes see-through", tracker.shown and tracker.alpha == 0)
+combat = false
+fire("PLAYER_REGEN_ENABLED")
+check("after combat it hides", not tracker.shown and tracker.alpha == 1)
+SlashCmdList.QUESTBOARD("tracker on")
+check("/qb tracker on brings it back", tracker.shown and not QuestBoardDB.hideTrackers)
+
 ---------------------------------------------------------------------------
 -- Without Questie: the log only, no errors.
 questieOn = false
