@@ -13,7 +13,7 @@
 param(
   [Parameter(Position = 0, ValueFromRemainingArguments = $true)][string[]]$Addons = @(),
   [string]$Client = '',
-  [string]$Source = $PSScriptRoot,
+  [string]$Source = '',   # default: this script's folder (set below: $PSScriptRoot is empty in a 5.1 param default)
   [switch]$Off,
   [switch]$Status
 )
@@ -25,6 +25,7 @@ if (-not $Client -or -not (Test-Path (Join-Path $Client 'Interface'))) {
 }
 $addonsDir = Join-Path $Client 'Interface\AddOns'
 $parked = Join-Path $Client 'wow-addons-prod'
+if (-not $Source) { $Source = Split-Path -Parent $MyInvocation.MyCommand.Path }
 $Source = (Resolve-Path $Source).Path
 
 # The addons this checkout has: folders with <name>\<name>.toc.
