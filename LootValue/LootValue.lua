@@ -253,10 +253,12 @@ function LV.adviceLine(link, isGear, ctx)
     if not de or de <= 0 then de = LV.estimateDisenchant(link) end
     if de and de > 0 then table.insert(options, { "Disenchant", de }) else deUnknown = true end
   end
-  local vendor = call("GetVendorPriceByItemLink", link) or call("GetVendorPriceByItemID", id)
-  if not vendor and C_Item and C_Item.GetItemInfo then
+  -- The game's sell price. Not Auctionator's GetVendorPrice*: that is what a
+  -- vendor charges you (Rune of Teleportation: 9s to buy, 2s50c to sell).
+  local vendor
+  if C_Item and C_Item.GetItemInfo then
     local ok, _, _, _, _, _, _, _, _, _, _, sell = pcall(C_Item.GetItemInfo, link)
-    if ok then vendor = sell end
+    if ok and type(sell) == "number" then vendor = sell end
   end
   if vendor and vendor > 0 then table.insert(options, { "Vendor", vendor }) end
   table.sort(options, function(a, b) return a[2] > b[2] end)

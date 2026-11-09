@@ -19,12 +19,36 @@ ns.MAX_ROWS = MAX_ROWS
 ---------------------------------------------------------------------------
 -- Index
 ---------------------------------------------------------------------------
+local reported = {}
 function ns.rebuild()
   local npcs, quests, qitems = S.questieLists()
+  -- One source that trips on unexpected data gives an empty group (and one
+  -- chat line), not an error on every Ctrl+Space.
+  local function safe(name, fn, ...)
+    local ok, list = pcall(fn, ...)
+    if ok and type(list) == "table" then return list end
+    if not ok and not reported[name] then
+      reported[name] = true
+      ns.say(name .. " error: " .. tostring(list))
+    end
+    return {}
+  end
   -- Order matters: the first source to give a key wins (owned items before
   -- Questie's copy of the same item; S.items keeps its Questie flag).
-  lists = { S.commands(), S.questLog(), S.spells(), S.items(qitems), S.places(), S.people(), qitems, S.nearby(), npcs, quests }
+  lists = { safe("commands", S.commands), safe("quest log", S.questLog), safe("spells", S.spells),
+    safe("items", S.items, qitems), safe("places", S.places), safe("people", S.people), qitems or {},
+    safe("nearby", S.nearby), npcs or {}, quests or {} }
   return lists
+end
+
+-- Keep the newest RECENT_KEPT keys, so SavedVariables does not grow forever.
+ns.RECENT_KEPT = 200
+function ns.trimRecent(recent)
+  local keys = {}
+  for k in pairs(recent) do table.insert(keys, k) end
+  if #keys <= ns.RECENT_KEPT then return end
+  table.sort(keys, function(a, b) return (recent[a] or 0) > (recent[b] or 0) end)
+  for i = ns.RECENT_KEPT + 1, #keys do recent[keys[i]] = nil end
 end
 
 function ns.search(text)
@@ -354,7 +378,9 @@ function ns.act(alt, index)
   end
   if not (r and r.entry) then return end
   local e = r.entry
-  ns.db().recent[e.key] = call(time) or 0
+  local recent = ns.db().recent
+  recent[e.key] = call(time) or 0
+  ns.trimRecent(recent)
   local ok, close = pcall(A.run, e, alt)
   if not ok then ns.say("error: " .. tostring(close)) close = false end
   if close then ns.close() else ns.refresh() end
@@ -465,7 +491,10 @@ function ns.close()
 end
 
 function Omni_Toggle()
-  if frame and frame:IsShown() then ns.close() else ns.open() end
+  local ok, err = pcall(function()
+    if frame and frame:IsShown() then ns.close() else ns.open() end
+  end)
+  if not ok then ns.say("error: " .. tostring(err)) end
 end
 
 ---------------------------------------------------------------------------

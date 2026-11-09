@@ -824,5 +824,28 @@ do
     and narrowed[1].best == full[1].best)
 end
 
+-- A source that throws gives an empty group and one chat line, not an error.
+do
+  local S = ns.sources
+  local real = S.people
+  S.people = function() error("bad level") end
+  local before = #chat
+  local ok = pcall(ns.rebuild)
+  check("a failing source does not break the box", ok and #chat == before + 1 and chat[#chat]:find("people error") ~= nil)
+  pcall(ns.rebuild)
+  check("a failing source is reported once", #chat == before + 1)
+  S.people = real
+end
+
+-- Recent keys are trimmed to the newest ns.RECENT_KEPT.
+do
+  local recent = {}
+  for k = 1, ns.RECENT_KEPT + 50 do recent["k" .. k] = k end
+  ns.trimRecent(recent)
+  local n = 0
+  for _ in pairs(recent) do n = n + 1 end
+  check("recent is trimmed", n == ns.RECENT_KEPT and recent["k" .. (ns.RECENT_KEPT + 50)] and not recent.k1)
+end
+
 print(failures == 0 and "all Omni tests passed" or (failures .. " Omni test(s) failed"))
 os.exit(failures == 0 and 0 or 1)

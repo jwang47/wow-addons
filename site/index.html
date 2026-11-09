@@ -38,23 +38,9 @@
     background: rgba(240,160,75,.1); border: 1px solid rgba(240,160,75,.35); font-size: 15px; }
   .req b { color: var(--warn); }
 
-  /* The search box mock-up (drawn in HTML, not a game screenshot). */
-  .omni { background: rgba(16,13,10,.96); border: 2px solid #7a6440; border-radius: 8px; padding: 10px 10px 8px;
-    box-shadow: 0 30px 80px rgba(0,0,0,.55); font: 14px/1.35 var(--sans); transform: rotate(-.6deg); }
-  .omni .box { border: 1px solid #5b4a30; background: #0b0908; border-radius: 4px; padding: 7px 10px; color: #fff;
-    font-size: 15px; margin-bottom: 6px; }
-  .omni .box .caret { display: inline-block; width: 1px; height: 15px; background: #fff; vertical-align: -2px;
-    animation: blink 1.1s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
-  .omni .h { color: #ffd100; font-size: 12.5px; padding: 6px 6px 2px; }
-  .omni .h span { color: var(--grey); }
-  .omni .r { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 3px; }
-  .omni .r.sel { background: rgba(230,180,80,.22); }
-  .omni .ic { width: 17px; height: 17px; border-radius: 3px; flex: none; border: 1px solid rgba(0,0,0,.6); }
-  .omni .n { flex: 1; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .omni .d { color: #b3b3b3; font-size: 12.5px; white-space: nowrap; }
-  .omni .d .g { color: #40ff40; }
-  .omni .f { color: #9d9d9d; font-size: 12px; padding: 7px 6px 0; border-top: 1px solid #2b241a; margin-top: 6px; }
+  /* A real game screenshot of Omni (WoW Forever, 2026-11-09). */
+  .shot { display: block; width: 100%; max-width: 560px; height: auto; border-radius: 8px;
+    border: 2px solid #7a6440; box-shadow: 0 30px 80px rgba(0,0,0,.55); }
 
   section { padding: 56px 0; border-top: 1px solid var(--line); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
@@ -127,18 +113,8 @@
         Install that first.</span></div>
     </div>
 
-    <div class="omni" aria-label="Picture of the Omni search box">
-      <div class="box">dusk<span class="caret"></span></div>
-      <div class="h">Places</div>
-      <div class="r sel"><span class="ic" style="background:#3c5a3a"></span><span class="n">Duskwood</span>
-        <span class="d"><span class="g">18-30</span>  zone, Eastern Kingdoms</span></div>
-      <div class="h">NPCs (Questie)</div>
-      <div class="r"><span class="ic" style="background:#5a4632"></span><span class="n">Duskwood Scout</span><span class="d">Night Watch</span></div>
-      <div class="h">Items <span>+3 more</span></div>
-      <div class="r"><span class="ic" style="background:#2d4f7a"></span><span class="n">Dusky Belt</span><span class="d">bags 1  AH 1g 12s</span></div>
-      <div class="r"><span class="ic" style="background:#4a3a6a"></span><span class="n">Dusky Leather</span><span class="d">bank 14  AH 18s</span></div>
-      <div class="f">Enter: open the map</div>
-    </div>
+    <img class="shot" src="omni-dusk.jpg" width="844" height="759"
+      alt="Omni in game: searching dusk lists Duskwood, items with their AH prices, and Questie NPCs">
   </header>
 
   <div class="addons">
@@ -179,7 +155,9 @@
     <summary>Windows warns me about the file</summary>
     <div>Windows asks before it runs any downloaded script. The installer downloads the addons from this project's
       <a href="https://github.com/jwang47/wow-addons/releases">GitHub releases</a>, checks each
-      file's SHA-256, and changes only the <code>Omni</code> and <code>LootValue</code> folders in <code>Interface\AddOns</code>.</div>
+      file's SHA-256, and changes only the <code>Omni</code> and <code>LootValue</code> folders in <code>Interface\AddOns</code>.
+      It also keeps two small files in <code>%LOCALAPPDATA%\wow-addons</code> (your WoW folder and what it installed),
+      and uses a short-lived <code>wow-addons-staging-…</code> folder in your WoW folder while it works.</div>
   </details>
   <details>
     <summary>Install by hand</summary>

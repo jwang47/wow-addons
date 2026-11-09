@@ -1,25 +1,39 @@
-# A pushed tag "release-YYYY-MM-DD" makes a GitHub release with one zip per
-# addon (<Addon>-<version>.zip), addons.json, update.ps1 and update.cmd, and
-# the CHANGELOG.md as notes. update.cmd reads the latest release, so pushing
-# the tag publishes to every friend: it needs Jiahua's OK.
+# Makes a GitHub release with one zip per addon (<Addon>-<version>.zip),
+# addons.json, update.ps1 and update.cmd, and CHANGELOG.md as notes. Start it
+# by pushing a tag "release-YYYY-MM-DD", or by hand (Actions > release > Run
+# workflow) with that tag name: then the tag is made on the commit it runs on.
+# update.cmd reads the latest release, so this publishes to every friend: it
+# needs Jiahua's OK.
 name: release
 on:
   push:
     tags: ["release-*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to make, for example release-2026-11-09"
+        required: true
 permissions:
   contents: write
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+      - run: |
+          case "$TAG" in release-*) ;; *) echo "tag must start with release-"; exit 1 ;; esac
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
       - run: lua5.1 tests/lootvalue.lua && lua5.1 tests/omni.lua
       - run: python3 -m unittest tests/test_release.py
-      - run: python3 tools/release.py check --tag "$GITHUB_REF_NAME"
+      - run: python3 tools/release.py check --tag "$TAG"
+      # A draft first, so no friend sees a release whose files are still
+      # uploading; it becomes the latest release only when all are there.
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd logs/wow-addons
-          gh release create "$GITHUB_REF_NAME" *.zip addons.json update.ps1 update.cmd \
-            --title "$GITHUB_REF_NAME" --notes-file ../../CHANGELOG.md
+          gh release create "$TAG" *.zip addons.json update.ps1 update.cmd \
+            --draft --target "$GITHUB_SHA" --title "$TAG" --notes-file ../../CHANGELOG.md
+          gh release edit "$TAG" --draft=false --latest

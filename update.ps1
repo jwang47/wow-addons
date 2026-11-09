@@ -94,9 +94,35 @@ $failed = @()
 $fresh = $false   # a folder that did not exist before needs a game restart
 # Staging sits in the WoW folder, on the same drive as AddOns: Move-Item
 # cannot move a folder to another drive (%TEMP% is usually on C:).
+# Directory.Delete removes a junction or link inside the folder, not its target
+# (Remove-Item -Recurse in PowerShell 5.1 can follow it).
+function Remove-Dir([string]$path) { if (Test-Path -LiteralPath $path) { [IO.Directory]::Delete($path, $true) } }
+
+# A run that stopped between its two moves (window closed, power cut) left the
+# old addon in a staging folder. Put it back if the addon is missing, then
+# remove the staging folder.
+if (-not $Check) {
+  foreach ($s in @(Get-ChildItem -LiteralPath $Client -Directory -Filter 'wow-addons-staging-*' -ErrorAction SilentlyContinue)) {
+    $restored = $true
+    foreach ($o in @(Get-ChildItem -LiteralPath $s.FullName -Directory -Filter '*.old' -ErrorAction SilentlyContinue)) {
+      $back = Join-Path $addons ($o.Name -replace '\.old$', '')
+      if (-not (Test-Path -LiteralPath $back)) {
+        try { Move-Item -LiteralPath $o.FullName $back; Write-Host "  Put back $($o.Name -replace '\.old$', '') from an unfinished update." }
+        catch { $restored = $false; Write-Host "  An unfinished update left $($o.FullName); move it to $back by hand." -ForegroundColor Yellow }
+      }
+    }
+    if ($restored) { try { Remove-Dir $s.FullName } catch { } }
+  }
+}
+
 $tmp = Join-Path $Client ('wow-addons-staging-' + [Guid]::NewGuid().ToString('N'))
 $keepTmp = $false   # true when a backup could not be put back: never delete it
-if (-not $Check) { New-Item -ItemType Directory -Force $tmp | Out-Null }
+if (-not $Check) {
+  try { New-Item -ItemType Directory -Force $tmp | Out-Null }
+  catch {
+    throw "Cannot write in $Client ($($_.Exception.Message)). Run update.cmd as administrator, or move WoW out of Program Files."
+  }
+}
 try {
   foreach ($a in $m.addons) {
     $name = [string]$a.name
@@ -131,6 +157,9 @@ try {
       if ($k -and (Test-Path (Join-Path $dst $k))) { Copy-Item (Join-Path $dst $k) (Join-Path $new $k) -Force }
     }
     if (Test-Path $dst) {
+      if ((Get-Item -LiteralPath $dst -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        throw "$dst is a link (a developer copy?). It was not changed."
+      }
       $old = Join-Path $tmp "$name.old"
       Move-Item $dst $old
     } else { $fresh = $true }
@@ -157,7 +186,7 @@ try {
     }
   }
 } finally {
-  if (-not $keepTmp) { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
+  if (-not $keepTmp) { try { Remove-Dir $tmp } catch { } }
 }
 Write-Host ''
 if ($Check) {

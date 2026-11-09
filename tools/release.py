@@ -40,6 +40,7 @@ KEEP = {}
 # "## Dependencies:"). The updater says so when one is missing.
 REQUIRES = {"LootValue": ["Auctionator"]}
 UA = "wow-addons-release (github.com/jwang47/wow-addons)"
+TEXT = {".lua", ".toc", ".xml", ".txt"}
 ZIP_TIME = (2020, 1, 1, 0, 0, 0)  # fixed, so the same files give the same zip
 
 
@@ -67,8 +68,11 @@ def build_zip(folder: Path) -> bytes:
             info = zipfile.ZipInfo(rel, ZIP_TIME)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            # Windows line endings, as a Windows git checkout gives them.
-            data = p.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+            data = p.read_bytes()
+            # Windows line endings for text, as a Windows git checkout gives
+            # them; images and fonts stay as they are.
+            if p.suffix.lower() in TEXT:
+                data = data.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             z.writestr(info, data)
     return buf.getvalue()
 

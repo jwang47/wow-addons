@@ -480,7 +480,10 @@ function S.buildQuestie(onDone)
     { "item", ids(qdb.ItemPointers), qdb.QueryItemSingle },
   }
   local j, i = 1, 1
-  local function step()
+  -- A timer callback has no error guard: one bad row must not leave the
+  -- state "busy" forever.
+  local step
+  local function body()
     local budget = S.QUESTIE_SLICE
     while budget > 0 and j <= #jobs do
       local kind, list, query = jobs[j][1], jobs[j][2], jobs[j][3]
@@ -501,6 +504,13 @@ function S.buildQuestie(onDone)
     else
       questie.state = "done"
       if onDone then onDone() end
+    end
+  end
+  step = function()
+    local ok, err = pcall(body)
+    if not ok then
+      questie.state = "none"
+      print("|cffffd100Omni|r: Questie read stopped: " .. tostring(err))
     end
   end
   step()
@@ -530,7 +540,10 @@ function S.buildNearby(onDone)
   end
   near.state = "busy"
   local mapOf, list, i = {}, questie.npc, 1
-  local function step()
+  -- A timer callback has no error guard: one bad row must not leave the
+  -- state "busy" forever.
+  local step
+  local function body()
     local budget = S.NEARBY_SLICE
     while budget > 0 and i <= #list do
       local e = list[i]
@@ -543,7 +556,7 @@ function S.buildNearby(onDone)
           if mapID and type(points) == "table" then
             local pts = {}
             for _, p in ipairs(points) do
-              if type(p) == "table" and type(p[1]) == "number" and p[1] >= 0 then table.insert(pts, { p[1] / 100, p[2] / 100 }) end
+              if type(p) == "table" and type(p[1]) == "number" and p[1] >= 0 and type(p[2]) == "number" then table.insert(pts, { p[1] / 100, p[2] / 100 }) end
             end
             cost = cost + #points / 4 -- the slice budget counts spawn points too
             if #pts > 0 then
@@ -560,6 +573,13 @@ function S.buildNearby(onDone)
     else
       near.state = "done"
       if onDone then onDone() end
+    end
+  end
+  step = function()
+    local ok, err = pcall(body)
+    if not ok then
+      near.state = "none"
+      print("|cffffd100Omni|r: Nearby read stopped: " .. tostring(err))
     end
   end
   step()

@@ -110,8 +110,8 @@ spell, uses an item or sends a key: the game blocks addons from that
 outside a click on a secure button, so Enter puts a spell on the cursor
 instead.
 
-Check: `lua5.1 tests/omni.lua` from the repo root (a mock of the game API,
-like `tests/run.lua`). The API calls follow the `forever` branch of
+Check: `lua5.1 tests/omni.lua` from the repo root (a mock of the game API).
+The API calls follow the `forever` branch of
 Gethe/wow-ui-source: Forever has the newer `C_Container`, `C_SpellBook`
 (skill lines and `GetSpellBookItemInfo` tables), `C_Map` and
 `C_FriendList` APIs. Each call is guarded, so a missing one gives an empty
@@ -149,7 +149,8 @@ check is in game.
 1. In the PR: raise `## Version` in each changed addon's `.toc` and add its
    section to `CHANGELOG.md`. A test checks that each version has a section.
 2. After the merge, with Jiahua's OK (it publishes to every friend): push a
-   tag `release-YYYY-MM-DD` on that commit. The `release` workflow runs the
+   tag `release-YYYY-MM-DD` on that commit, or run the `release` workflow by
+   hand with that tag name (it makes the tag on `main`). The `release` workflow runs the
    tests and `tools/release.py check` (it refuses an addon whose files
    changed since the latest release under the same version), then makes the
    GitHub release with `<Addon>-<version>.zip`, `addons.json`, `update.ps1`
