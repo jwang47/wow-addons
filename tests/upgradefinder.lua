@@ -149,7 +149,7 @@ ns.DUNGEONS = {
   { "Shadowfang Keep", "SFK", 11, 30, { "Arugal", 111 } },
 }
 
-for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "UI.lua", "Weights.lua" }) do
+for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Stats.lua", "UI.lua", "Weights.lua" }) do
   assert(loadfile(root .. "UpgradeFinder/" .. file))("UpgradeFinder", ns)
 end
 local S = ns.score
@@ -550,6 +550,50 @@ check("/uf dungeons turns them off", ns.db().opts.dungeons == false and row("Cav
 SlashCmdList.UPGRADEFINDER("dungeons")
 runTimers()
 check("/uf dungeons turns them on again", ns.db().opts.dungeons == true and row("Cave Mantle") ~= nil)
+
+-- Stat changes, offense and defense (Stats.lua) ----------------------------
+local St = ns.stats
+local d = St.diff({ int = 11, sta = 11, sp = 34, dps = 18.4 }, { { int = 5, spi = 3, dps = 12 } })
+check("diff: new minus old", d.int == 6 and d.sta == 11 and d.spi == -3 and d.sp == 34 and math.abs(d.dps - 6.4) < 1e-9)
+check("diff drops zeros", St.diff({ int = 2 }, { { int = 2 } }).int == nil)
+check("diff: a two-hander minus both hands", St.diff({ int = 10 }, { { int = 3 }, { int = 4 } }).int == 3)
+check("role: mage is a caster", St.role("MAGE", S.weightsFor("MAGE")) == "caster")
+check("role: holy priest heals", St.role("PRIEST", S.weightsFor("PRIEST", nil, 2)) == "healer")
+check("role: protection warrior tanks", St.role("WARRIOR", S.weightsFor("WARRIOR", nil, 3)) == "tank")
+check("role: hunter is ranged", St.role("HUNTER", S.weightsFor("HUNTER")) == "ranged")
+check("role: rogue is melee", St.role("ROGUE", S.weightsFor("ROGUE")) == "melee")
+check("fmt", St.fmt(12.4) == "+12" and St.fmt(-3) == "-3" and St.fmt(1.5) == "+1.5" and St.fmt(0.42, true) == "+0.4%")
+local function find(list, label) for _, e in ipairs(list) do if e[1] == label then return e end end end
+local mw = S.weightsFor("MAGE")
+local off, def = St.derive({ int = 24, sta = 2, sp = 10 }, { class = "MAGE", level = 24, sp = 20, spcrit = 5, armor = 300 }, mw,
+  "INVTYPE_HEAD")
+check("caster: spell damage", find(off, "Spell damage") and find(off, "Spell damage")[2] == "+10")
+check("caster: Int gives spell crit (24 Int at 24 = about 1%)", find(off, "Spell crit") and find(off, "Spell crit")[2] == "+1.0%")
+check("caster: an estimated DPS gain", find(off, "Est. DPS") and find(off, "Est. DPS")[3] == true)
+check("caster: health and mana", find(def, "Health")[2] == "+20" and find(def, "Mana")[2] == "+360")
+off, def = St.derive({ int = -10, sta = -5 }, { class = "MAGE", level = 24 }, mw, "INVTYPE_HEAD")
+check("a loss is red (not good)", find(off, "Est. DPS")[3] == false and find(def, "Health")[3] == false)
+local ww = S.weightsFor("WARRIOR")
+off, def = St.derive({ str = 10, agi = 4, dps = 3, armor = 100 }, { class = "WARRIOR", level = 30, ap = 200, crit = 5,
+  armor = 1000, weaponDps = 20 }, ww, "INVTYPE_2HWEAPON")
+check("melee: Str gives AP", find(off, "Attack power")[2] == "+20")
+check("melee: a weapon shows its DPS change", find(off, "Weapon DPS")[2] == "+3")
+check("melee: armor (with Agi) shows less damage taken",
+  find(def, "Armor") and find(def, "Armor")[2]:match("^%+108 %(%+[%d%.]+%% less damage%)$") ~= nil)
+check("melee: no mana line for a warrior", find(def, "Mana") == nil)
+off = St.derive({ str = 10, dps = 3 }, { class = "WARRIOR", level = 30 }, ww, "INVTYPE_HEAD")
+check("melee: weapon DPS only for a weapon", find(off, "Weapon DPS") == nil)
+check("stat line is colored and ordered", strip(St.statLine({ sta = -2, int = 5 })) == "-2 Sta  +5 Int")
+-- A real row: Silk Hood over Worn Cap (+3 Int) in the mock game.
+P.level = 22
+local hoodRow = { id = 101, loc = "INVTYPE_HEAD" }
+local wasHead = WORN[1]
+WORN[1] = 100
+ns.scan.readWorn()
+local rd, roff = St.forRow(hoodRow)
+WORN[1] = wasHead
+ns.scan.readWorn()
+check("forRow: Silk Hood vs Worn Cap", rd and rd.int == 3 and rd.sta == 4 and find(roff, "Est. DPS") ~= nil)
 
 print(failures == 0 and "all UpgradeFinder tests passed" or (failures .. " UpgradeFinder test(s) failed"))
 os.exit(failures == 0 and 0 or 1)
