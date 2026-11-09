@@ -1,5 +1,5 @@
 -- UpgradeFinder scoring: stats from tooltip text, stat weights per class,
--- slots, and the ranking. No frames here, so tests/upgrades.lua tests it
+-- slots, and the ranking. No frames here, so tests/upgradefinder.lua tests it
 -- offline.
 local _, ns = ...
 local S = {}
@@ -147,6 +147,13 @@ S.GROUPS = {
   { "Ranged", INVTYPE_RANGED = true, INVTYPE_RANGEDRIGHT = true, INVTYPE_WAND = true, INVTYPE_THROWN = true,
     INVTYPE_RELIC = true },
 }
+
+-- The slot group name for an equip location ("Ring" for INVTYPE_FINGER), or nil.
+function S.groupName(loc)
+  for i = 2, #S.GROUPS do
+    if S.GROUPS[i][loc] then return S.GROUPS[i][1] end
+  end
+end
 
 -- What an item with this equip location replaces, given the value of each
 -- equipped slot (slotValue[slot], nil = empty) and whether the main hand

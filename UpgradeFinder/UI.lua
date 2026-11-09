@@ -1,10 +1,10 @@
 -- UpgradeFinder window: a short ranked list of gear that beats what you wear.
--- Each row is one line (icon, name, gain, price); hover for the details.
+-- Each row is one line (icon, name, slot, gain, price); hover for the details.
 local _, ns = ...
 local S, Scan = ns.score, ns.scan
 local call, api = ns.call, ns.api
 
-local ROWS, ROW_H, W = 14, 20, 380
+local ROWS, ROW_H, W = 14, 20, 440
 local frame, rows, status, title, buttons = nil, {}, nil, nil, {}
 local view = { list = {}, top = 1, all = {} }
 ns.view = view
@@ -78,6 +78,7 @@ function ns.paint()
       row.name:SetTextColor(qualityColor(r.id))
       local gain = string.format("+%.1f", r.gain)
       if (r.reqLevel or 0) > level then gain = "|cff9d9d9d" .. gain .. " @" .. r.reqLevel .. "|r" end
+      row.slot:SetText(S.groupName(r.loc) or "")
       row.gain:SetText(gain)
       row.price:SetText(r.source == "AH" and (r.price and ns.money(r.price) or "|cff9d9d9d?|r") or "|cff40ff40" .. r.source .. "|r")
     else
@@ -231,9 +232,13 @@ local function build()
     row.gain:SetWidth(62)
     row.gain:SetJustifyH("RIGHT")
     row.gain:SetTextColor(0.25, 1, 0.25)
+    row.slot = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    row.slot:SetPoint("RIGHT", row.gain, "LEFT", -6, 0)
+    row.slot:SetWidth(56)
+    row.slot:SetJustifyH("LEFT")
     row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
-    row.name:SetPoint("RIGHT", row.gain, "LEFT", -6, 0)
+    row.name:SetPoint("RIGHT", row.slot, "LEFT", -6, 0)
     row.name:SetJustifyH("LEFT")
     row:RegisterForClicks("LeftButtonUp")
     row:SetScript("OnEnter", showDetails)

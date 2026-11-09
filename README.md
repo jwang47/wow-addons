@@ -125,7 +125,7 @@ group, not an error.
 UpgradeFinder is an addon for any class. `/uf`, the
 **Upgrades** button on the Auction House, or a key binding opens a short
 list: gear from your Auctionator scan and your bags that beats what you wear,
-biggest gain first. Each row is one line (icon, name, `+gain`, price, or
+biggest gain first. Each row is one line (icon, name, slot, `+gain`, price, or
 "bags"); hover a row for the item tooltip plus the score you wear, the gain
 per gold and what it replaces. Click searches the AH (when it is open),
 Shift-click links it.
