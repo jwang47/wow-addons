@@ -308,6 +308,10 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   drawer behind the Addons tab. Amber chips under it show what you can spend
   or fix: unspent talent points, Legacy points, keys with an old spell rank
   and full bags. Click one to open that window; it hides when done.
+- **Party**: in a group, each party member gets a large class-coloured
+  name above their nameplate, and friendly player nameplates are on.
+  Your own nameplate settings come back when you leave the group.
+  `/glance party off` turns it off.
 - **Old bars**: `/glance bars hide` hides Bartender4's bottom action bars
   (1, 2 and 5-10; the right-edge bars 3 and 4 stay),
   Blizzard's bottom bars, the gryphon art and the old XP bar, and draws a

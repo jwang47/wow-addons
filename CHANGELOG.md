@@ -9,6 +9,8 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - New addon, a lighter HUD (`/glance`). Not in the releases yet: try it
   with `dev.ps1 Glance`.
+- Party members are easy to find: a large class-coloured name above each
+  one's nameplate while you are in a group (`/glance party off`).
 - Alerts under the minimap: unspent talents, Legacy points, old ranks and
   full bags, each a chip that opens the window.
 - Old spell ranks: an amber corner on the key, and `/glance ranks` swaps

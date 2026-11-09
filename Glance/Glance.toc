@@ -14,3 +14,4 @@ Minimap.lua
 Alerts.lua
 Chat.lua
 Bars.lua
+Party.lua

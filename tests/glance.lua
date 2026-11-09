@@ -389,6 +389,30 @@ ToggleLegacySystemUI = function() opened = "legacy" end
 A.chips.legacy.scripts.OnClick()
 check("legacy chip opens the Legacy window", opened == "legacy")
 
+-- Party: names over party members, group CVars on and back.
+local cvars = { nameplateShowFriendlyPlayers = "0", nameplateShowFriendlyClassColor = "0", UnitNameFriendlyPlayerName = "0" }
+function GetCVar(k) return cvars[k] end
+function SetCVar(k, v) cvars[k] = tostring(v) end
+local grouped = true
+function IsInGroup() return grouped end
+UnitIsPlayer = function() return true end
+UnitInParty = function(u) return u == "nameplate2" end
+UnitClass = function() return "Mage", "MAGE" end
+RAID_CLASS_COLORS = { MAGE = { r = 0.25, g = 0.78, b = 0.92 } }
+local plates = { nameplate2 = widget("Plate2"), nameplate3 = widget("Plate3") }
+C_NamePlate = { GetNamePlateForUnit = function(u) return plates[u] end }
+fire("GROUP_ROSTER_UPDATE")
+check("friendly plates on in a group", cvars.nameplateShowFriendlyPlayers == "1")
+fire("NAME_PLATE_UNIT_ADDED", "nameplate2")
+fire("NAME_PLATE_UNIT_ADDED", "nameplate3")
+check("party member labelled", ns.party.labels.nameplate2 and ns.party.labels.nameplate2.shown)
+check("stranger not labelled", not (ns.party.labels.nameplate3 and ns.party.labels.nameplate3.shown))
+fire("NAME_PLATE_UNIT_REMOVED", "nameplate2")
+check("label hides with its plate", not ns.party.labels.nameplate2.shown)
+grouped = false
+fire("GROUP_ROSTER_UPDATE")
+check("your plate settings come back", cvars.nameplateShowFriendlyPlayers == "0" and ns.db.partySaved == nil)
+
 -- Resizing the minimap.
 SlashCmdList.GLANCE("map 260")
 check("map size saved", ns.db.mapSize == 260)
