@@ -13,6 +13,7 @@ jobs:
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
       - run: lua5.1 tests/lootvalue.lua
       - run: lua5.1 tests/omni.lua
+      - run: lua5.1 tests/upgradefinder.lua
       - run: python3 -m unittest tests/test_release.py
   updater:
     # update.ps1 in Windows PowerShell 5.1, against a local test build.

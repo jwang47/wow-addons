@@ -39,3 +39,20 @@ results.
 - Typing searches run in slices with a 4 ms target per frame.
 - Item rows show how old the AH price is ("today", "3d old"), and the item
   tooltip adds the last AH scan time ("AH scan 2h ago").
+
+## UpgradeFinder 0.1.0
+
+First release. Any class. Works alone; Auctionator adds AH items,
+Questie adds where to get them, and MageMentor's weights are used for a mage.
+
+- `/uf`, a key binding or the **Upgrades** button on the Auction House opens
+  a short list of gear from your Auctionator scan and your bags that beats
+  what you wear, biggest gain first.
+- Buttons pick the slot, usable now or up to 2 levels ahead, biggest gain or
+  gain per gold, and any price or what you can afford.
+- Scores use simple leveling weights for your spec (the talent tree with the
+  most points). `/uf weight STAT N` changes a weight.
+- The scan reads items in slices and asks the server for unloaded items in
+  batches; scores are saved, so a /reload shows the list at once.
+- With Questie, rows and gear tooltips say where to get an item: a quest
+  reward, a dungeon, a vendor or a drop.

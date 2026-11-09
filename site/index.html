@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Omni &amp; LootValue — addons for WoW Forever</title>
-<meta name="description" content="Two small addons for WoW Forever: one search box for everything, and a sell-or-keep line on every item.">
+<title>Omni, LootValue &amp; UpgradeFinder — addons for WoW Forever</title>
+<meta name="description" content="Three small addons for WoW Forever: one search box for everything, a sell-or-keep line on every item, and the gear upgrades you can buy.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='13' cy='13' r='8' fill='none' stroke='%23e8b64c' stroke-width='3.5'/%3E%3Cpath d='M19 19l8 8' stroke='%23e8b64c' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
   /* Direction A: "In-game". The page borrows the game's own UI: the hero text is an
@@ -106,6 +106,12 @@
   @media (max-width: 900px) { .tt-stage { padding-top: 10px; } }
   .tt { width: min(100%, 340px); }
 
+  /* UpgradeFinder: text beside its real window. */
+  .uf { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 56px; padding: 48px 0 8px; align-items: center; }
+  @media (max-width: 900px) { .uf { grid-template-columns: 1fr; padding-top: 32px; } }
+  .uf img { width: 100%; max-width: 520px; height: auto; display: block; justify-self: center; border-radius: 4px;
+    box-shadow: 0 14px 40px rgba(0,0,0,.5); }
+
   /* FAQ */
   .faq { padding: 40px 0 8px; border-top: 1px solid #1e212b; margin-top: 40px; }
   details { border-bottom: 1px solid #1e212b; }
@@ -129,10 +135,11 @@
   <img src="omni-dusk.jpg" width="1291" height="756"
     alt="Omni in game: searching dusk lists Duskwood, items with their AH prices and price age, and Questie NPCs, with a tooltip for the selected place">
   <div class="tip hero-tip">
-    <div class="name">Omni &amp; LootValue</div>
-    <div class="w">Two small addons for WoW Forever</div>
+    <div class="name">Omni, LootValue &amp; UpgradeFinder</div>
+    <div class="w">Three small addons for WoW Forever</div>
     <div class="g">Use: Press <kbd>Ctrl</kbd>+<kbd>Space</kbd> and search your items, places, people, spells, NPCs and quests.</div>
     <div class="g">Use: Shows on every item tooltip whether to vendor it, sell it on the AH, or disenchant it.</div>
+    <div class="g">Use: <code>/uf</code> lists the gear in the AH and your bags that beats what you wear.</div>
     <div class="r">LootValue needs <a href="https://www.curseforge.com/wow/addons/auctionator">Auctionator</a>. Install that first.</div>
     <div class="cta">
       <a class="btn" href="update.cmd" download>Download the installer <small>Windows · update.cmd</small></a>
@@ -184,6 +191,18 @@
     </section>
   </div>
 
+  <section class="uf">
+    <div>
+      <h2>UpgradeFinder</h2>
+      <p class="lede"><b>The gear upgrades you can buy:</b> items in your Auctionator scan and your bags that beat what you wear, biggest gain first.</p>
+      <p>Open it with <code>/uf</code> or the <b>Upgrades</b> button at the Auction House. It works for any class, with simple
+        leveling weights for your spec. Pick a slot, usable now or soon, gain or gain per gold, and what you can afford.</p>
+      <p>With <a href="https://www.curseforge.com/wow/addons/questie">Questie</a> it also says where to get an item: a quest reward, a dungeon, a vendor or a drop.</p>
+    </div>
+    <img src="upgradefinder.jpg" width="712" height="693" loading="lazy"
+      alt="The UpgradeFinder window in game: upgrades for a mage, with the gain and the AH price of each item">
+  </section>
+
   <section class="faq" aria-label="Questions">
     <details>
       <summary>What Omni finds</summary>
@@ -218,7 +237,7 @@
       <summary>Windows warns me about the file</summary>
       <div>Windows asks before it runs any downloaded script. The installer downloads the addons from this project's
         <a href="https://github.com/jwang47/wow-addons/releases">GitHub releases</a>, checks each
-        file's SHA-256, and changes only the <code>Omni</code> and <code>LootValue</code> folders in <code>Interface\AddOns</code>.
+        file's SHA-256, and changes only the <code>Omni</code>, <code>LootValue</code> and <code>UpgradeFinder</code> folders in <code>Interface\AddOns</code>.
         It also keeps two small files in <code>%LOCALAPPDATA%\wow-addons</code> (your WoW folder and what it installed),
         and uses a short-lived <code>wow-addons-staging-…</code> folder in your WoW folder while it works.</div>
     </details>

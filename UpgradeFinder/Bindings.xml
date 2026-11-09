@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="UPGRADEFINDER_TOGGLE" header="UPGRADEFINDER" category="ADDONS">
+    UpgradeFinder_Toggle()
+  </Binding>
+</Bindings>

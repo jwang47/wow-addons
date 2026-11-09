@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: UpgradeFinder
+## Notes: Gear from your Auctionator scan and your bags that beats what you wear, for your class. /uf or the Upgrades button on the Auction House.
+## Author: jwang47
+## Version: 0.1.0
+## SavedVariables: UpgradeFinderDB
+## OptionalDeps: Auctionator, MageMentor, Questie
+
+Score.lua
+Scan.lua
+Where.lua
+UI.lua

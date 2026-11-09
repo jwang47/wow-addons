@@ -1,6 +1,6 @@
-# wow-addons: LootValue and Omni
+# wow-addons: LootValue, Omni and UpgradeFinder
 
-Two small World of Warcraft addons for the WoW Forever client (a
+Three small World of Warcraft addons for the WoW Forever client (a
 Classic-based client, interface 16001). They should also work on other
 Classic clients with the same APIs, but we test them only on Forever.
 
@@ -9,6 +9,8 @@ Classic clients with the same APIs, but we test them only on Forever.
   Auctionator's prices, so it needs Auctionator.
 - **Omni**: one search box (Ctrl+Space) for your items, places, people,
   spells, quests and Questie NPCs.
+- **UpgradeFinder**: a short list of gear from your Auctionator scan and
+  your bags that beats what you wear, for any class and spec (`/uf`).
 
 Download page: https://jwang47.github.io/wow-addons/ (Windows installer).
 Releases: [GitHub releases](https://github.com/jwang47/wow-addons/releases)
@@ -25,8 +27,9 @@ folder. Run it again whenever you want updates.
 
 **By hand:** download the zips from the latest release and unzip each one
 into `Interface\AddOns\` in your client folder, so that you get
-`Interface\AddOns\LootValue\LootValue.toc` and
-`Interface\AddOns\Omni\Omni.toc`.
+`Interface\AddOns\LootValue\LootValue.toc`,
+`Interface\AddOns\Omni\Omni.toc` and
+`Interface\AddOns\UpgradeFinder\UpgradeFinder.toc`.
 
 Then restart the game fully. `/reload` does not find a new addon folder.
 
@@ -117,6 +120,65 @@ Gethe/wow-ui-source: Forever has the newer `C_Container`, `C_SpellBook`
 `C_FriendList` APIs. Each call is guarded, so a missing one gives an empty
 group, not an error.
 
+## UpgradeFinder
+
+UpgradeFinder is an addon for any class. `/uf`, the
+**Upgrades** button on the Auction House, or a key binding opens a short
+list: gear from your Auctionator scan and your bags that beats what you wear,
+biggest gain first. Each row is one line (icon, name, `+gain`, price, or
+"bags"); hover a row for the item tooltip plus the score you wear, the gain
+per gold and what it replaces. Click searches the AH (when it is open),
+Shift-click links it.
+
+- Four buttons: **Slot** (click for the next, right-click for the previous),
+  **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
+  **Any price / Can afford**. The choices are saved.
+- Usable: no red line on the tooltip (armor type, weapon skill, class); a red
+  "Requires Level" only hides it until you are within the level window.
+- Score: a mage with MageMentor on uses MageMentor's score
+  (`MageMentorAPI`), so the numbers match its tooltips. Everyone else uses
+  simple leveling weights for their spec (`UpgradeFinder/Score.lua`): the
+  talent tree with the most points picks them (for example a Protection
+  warrior gets tank weights, a Holy priest healer weights; below level 10
+  the class row applies). The window title shows the spec. `/uf weight STAT N`
+  changes a weight for your current spec and `/uf weights` lists them. A new
+  talent point that changes your spec starts a new scan.
+- It reads every item ID in Auctionator's price database (gear can be keyed
+  `g:ID:level`; the first number is the ID) through a hidden tooltip, 60 a
+  frame. Items the client has not loaded come from the server: it asks for
+  150 per pass, looks again every 1.5 s and adds upgrades as they arrive
+  (footer "loading N more..."). It stops after 4 passes with nothing new;
+  the footer then says how many did not load, and Rescan tries again.
+  Gains are shown only once your own gear has loaded too: an equipped item
+  whose tooltip is not ready (often just after login) would count as 0 and
+  make every item for that slot look bigger. Random-suffix items ("of the
+  Owl") are scored with their base stats.
+- Rings and trinkets replace your weaker one; a two-hander replaces both
+  hands; a one-hand or off-hand over a two-hander says so. A one-hand weapon
+  counts for the off hand only once the game says you can dual wield
+  (`CanDualWield`).
+- Damage to one spell school ("Frost spells and effects") is its own stat,
+  weighted per class and spec: a priest gets nothing for Frost damage.
+- Changing gear or bags updates the list (also while it is closed, or at the
+  end of a scan); an item you equip from your bags is no longer listed as
+  free. An AH item with no known price never counts as affordable.
+
+- Saved scores: item scores live in `UpgradeFinderDB.items`, so a /reload
+  or the next login shows the list without reading the tooltips again.
+  They are kept while the weights stay the same (the key holds the weight
+  set, `Scan.VERSION`, and for a mage a fingerprint of MageMentor's
+  weights). Worn gear scores are saved per item link, so the scan does not
+  wait for your own gear after a login. Items that never loaded are skipped
+  for a day; **Rescan** tries them again, `/uf reset` clears everything.
+- Where to get it (with Questie on, `UpgradeFinder/Where.lua`): a row gets a
+  blue tag when the item is free elsewhere: `quest` (a quest reward), the
+  dungeon name (all its droppers are in that dungeon; Questie gives
+  instance spawns as -1, -1), or `vendor`. Gear tooltips everywhere get
+  "Get it:" lines (quest reward, drops from NPC (zone), world drop, sold by,
+  chest, container); `/uf where` turns them off. Items Questie does not know
+  (new Forever items) get nothing. Item keys used: `questRewards`,
+  `npcDrops`, `vendors`, `objectDrops`, `itemDrops`.
+
 ## Forever client notes
 
 - There is no global `GetItemInfo`; use `C_Item.GetItemInfo` or
@@ -139,9 +201,10 @@ Checks, from the repo root (Lua 5.1 and Python 3):
 | --- | --- |
 | `lua5.1 tests/lootvalue.lua` | LootValue against a mock of the game and Auctionator APIs |
 | `lua5.1 tests/omni.lua` | Omni against a mock of the game API |
+| `lua5.1 tests/upgradefinder.lua` | UpgradeFinder against a mock of the game API |
 | `python3 -m unittest tests/test_release.py` | Zips, manifest, version guard, changelog, page |
 
-The `tests` workflow runs all three on each push and pull request. The real
+The `tests` workflow runs all four on each push and pull request. The real
 check is in game.
 
 ## Release
@@ -161,7 +224,7 @@ check is in game.
    changes on `main` (or run it by hand).
 
 **Test build:** `python3 tools/release.py build --root <folder with
-LootValue\ and Omni\>` writes `logs/wow-addons/` in the release layout;
+LootValue\, Omni\ and UpgradeFinder\>` writes `logs/wow-addons/` in the release layout;
 then `update.ps1 -Client <test folder> -Manifest logs\wow-addons\addons.json`.
 
 These addons started in Jiahua's private monorepo (`jwang47/scratch`,
