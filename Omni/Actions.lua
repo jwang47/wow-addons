@@ -347,6 +347,10 @@ function A.fullScanToday()
   return full >= now - (t.hour or 0) * 3600 - (t.min or 0) * 60 - (t.sec or 0)
 end
 
+-- The skill-up colour of a recipe you know, as the profession window shows it.
+A.SKILL_UP = { optimal = { "|cffff8040", "skill-up" }, medium = { "|cffffff00", "skill-up likely" },
+  easy = { "|cff40bf40", "skill-up rare" }, trivial = { "|cff808080", "no skill-up" } }
+
 -- The right-hand text of a row, worked out only for rows on screen.
 function A.detail(e)
   local k = e.kind
@@ -355,7 +359,16 @@ function A.detail(e)
     local r = e.recipe
     if r then
       -- A recipe: the skill it needs, then the profit of one craft.
-      if r.skill then table.insert(parts, "|cffffd100" .. r.skill .. (r.rank and (" " .. r.rank) or "") .. "|r") end
+      if r.source == "known" then
+        local c = A.SKILL_UP[r.kind]
+        if c then table.insert(parts, c[1] .. c[2] .. "|r") end
+      elseif r.source == "trainer" then
+        local low = r.req and r.rank and r.rank < r.req
+        table.insert(parts, (low and "|cffff6060" or "|cffffd100") .. r.prof .. (r.req and (" " .. r.req) or "") .. "|r")
+        if r.price and r.price > 0 then table.insert(parts, "learn " .. ns.money(r.price)) end
+      elseif r.skill then
+        table.insert(parts, "|cffffd100" .. r.skill .. (r.rank and (" " .. r.rank) or "") .. "|r")
+      end
       if r.profit then
         table.insert(parts, (r.profit >= 0 and "|cff40ff40+" or "|cffff6060-") .. ns.money(math.abs(r.profit))
           .. (r.unknown and " ?" or "") .. "|r")

@@ -39,11 +39,19 @@ function M.parse(text)
     if M.RECIPE_WORDS[w] then found = true else table.insert(rest, w) end
   end
   if found then return "recipe", table.concat(rest, " ") end
+  -- "tailoring", "tailoring bag": a profession lists its recipes too.
+  for w in q:gmatch("%S+") do
+    if M.PROFESSIONS[w] then return "recipe", q end
+  end
   return nil, q
 end
 
 M.RECIPE_WORDS = { recipe = true, recipes = true, pattern = true, patterns = true, formula = true, formulas = true,
   plans = true, schematic = true, schematics = true }
+-- Profession words ("tailoring" or "tailor") -> the game's profession name.
+M.PROFESSIONS = { tailoring = "Tailoring", tailor = "Tailoring", leatherworking = "Leatherworking",
+  blacksmithing = "Blacksmithing", alchemy = "Alchemy", engineering = "Engineering", enchanting = "Enchanting",
+  cooking = "Cooking", mining = "Mining" }
 -- Words that also match other names: "bag" finds packs and pouches.
 M.SYNONYMS = { bag = { "bag", "pack", "pouch", "satchel", "sack", "quiver" } }
 

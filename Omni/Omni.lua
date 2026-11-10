@@ -376,7 +376,7 @@ function ns.startSearch(text)
     return showLoot(text, q, function(query)
       local groups, loading = S.recipes(lists, query)
       if #groups == 0 then
-        ns.emptyText = "No recipe matches. Omni knows the recipes in your bags, bank, mail and the AH scan."
+        ns.emptyText = "No recipe matches. Omni knows the recipes from your profession and trainer windows, and recipe items in your bags, bank, mail and the AH scan."
       end
       return groups, loading
     end)

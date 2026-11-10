@@ -392,6 +392,11 @@ UpgradeFinderAPI = {
     local ok, out = pcall(ns.craft.summary, id)
     if ok then return out end
   end,
+  -- The recipes you know and your trainer's (see C.known).
+  known = function()
+    local ok, out = pcall(ns.craft.known)
+    if ok then return out end
+  end,
 }
 
 -- A button on the Auction House window.

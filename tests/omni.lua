@@ -986,6 +986,33 @@ do
   check("a recipe still loading is retried", loading == true)
   check("recipe row: skill and profit", strip(ns.actions.detail(g[1].entries[1])):find("^Tailoring 150  %+50s 0c") ~= nil)
   check("recipe row: a loss", strip(ns.actions.detail(g[1].entries[2])):find("^Tailoring 45  %-2s 0c") ~= nil)
+  -- "tailoring": the recipes you know, then your trainer's, then recipe items.
+  check("a profession word lists recipes", select(1, M.parse("tailoring bag")) == "recipe"
+    and select(2, M.parse("tailoring bag")) == "tailoring bag")
+  local KNOWN = {
+    { prof = "Tailoring", name = "Linen Bag", product = 4238, source = "known", kind = "trivial", rank = 140, max = 150,
+      profit = 300 },
+    { prof = "Tailoring", name = "Small Silk Pack", product = 4245, source = "known", kind = "optimal", rank = 140,
+      max = 150, profit = 2500 },
+    { prof = "Tailoring", name = "Green Woolen Bag", product = 4241, source = "trainer", req = 145, price = 900,
+      rank = 140, max = 150, profit = 800 },
+    { prof = "Mining", name = "Copper Bar", product = 2840, source = "known", kind = "optimal", profit = 10 },
+  }
+  UpgradeFinderAPI = { recipe = function(id) return SUM[id] end, known = function() return KNOWN end }
+  g = ns.sources.recipes({ list }, "tailoring bag")
+  local titles = {}
+  for _, x in ipairs(g) do table.insert(titles, x.title) end
+  check("tailoring bag: known, trainer, items", #g == 3 and g[1].title == "Tailoring you know (skill 140/150), best profit first"
+    and g[1].entries[1].name == "Small Silk Pack" and g[1].entries[2].name == "Linen Bag"
+    and g[2].entries[1].name == "Green Woolen Bag" and g[3].title:find("^Recipe items") ~= nil)
+  check("known row: skill-up colour and profit", strip(ns.actions.detail(g[1].entries[1])):find("^skill%-up  %+25s 0c") ~= nil
+    and strip(ns.actions.detail(g[1].entries[2])):find("^no skill%-up  %+3s 0c") ~= nil)
+  check("trainer row: skill needed, cost to learn, profit",
+    strip(ns.actions.detail(g[2].entries[1])):find("^Tailoring 145  learn 9s 0c  %+8s 0c") ~= nil)
+  g = ns.sources.recipes({ list }, "mining")
+  check("another profession: only its recipes", g[1].entries[1].name == "Copper Bar" and #g[1].entries == 1)
+  g = ns.sources.recipes({ list }, "cooking")
+  check("a profession not seen yet: says to open its window", g[#g].title:find("Open your Cooking window") ~= nil)
   UpgradeFinderAPI = nil
   g = ns.sources.recipes({ list }, "")
   check("without UpgradeFinder: recipes by name, title says why", #g[1].entries == 4 and g[1].title:find("UpgradeFinder") ~= nil)

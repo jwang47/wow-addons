@@ -984,6 +984,26 @@ GetTradeSkillNumMade = function() return 1, 1 end
 Cr.readTradeSkills()
 check("transform: recipes learned from the profession window", UpgradeFinderDB.recipes[2840]
   and UpgradeFinderDB.recipes[2840].reagents[1][1] == 2770)
+-- Known recipes and the trainer's list, for Omni ("tailoring").
+GetTradeSkillLine = function() return "Mining", 60, 75 end
+Cr.readTradeSkills()
+GetNumTrainerServices = function() return 3 end
+GetTrainerServiceInfo = function(i) return ({ "Bolt of Silk Cloth", "Copper Bar", "Mining" })[i], "", i == 3 and "header" or "available" end
+GetTrainerServiceSkillReq = function(i) if i == 1 then return "Tailoring", 125 elseif i == 2 then return "Mining", 1 end end
+GetTrainerServiceItemLink = function(i) return ({ "|Hitem:4305::|h[Bolt]|h", "|Hitem:2840::|h[Bar]|h" })[i] end
+GetTrainerServiceNumReagents = function(i) return i == 1 and 1 or 0 end
+GetTrainerServiceReagentInfo = function() return "Silk Cloth", "icon", 4, 0 end
+GetTrainerServiceReagentLink = function() return "|Hitem:4306::|h[Silk Cloth]|h" end
+GetTrainerServiceCost = function() return 900 end
+Cr.readTrainer()
+local kn, byName = UpgradeFinderAPI.known(), {}
+for _, r in ipairs(kn or {}) do byName[r.name] = r end
+local bar, bolt = byName["Copper Bar"], byName["Bolt of Silk Cloth"]
+check("known: a profession window recipe with rank and skill-up colour", bar and bar.source == "known"
+  and bar.prof == "Mining" and bar.kind == "optimal" and bar.rank == 60 and bar.max == 75 and bar.profit == -50)
+check("known: a trainer recipe with its skill and price", bolt and bolt.source == "trainer" and bolt.prof == "Tailoring"
+  and bolt.req == 125 and bolt.price == 900 and bolt.cost == 4000 and bolt.profit == 750)
+check("known: a trainer recipe you know is left out", #kn == 2)
 tt = fakeTooltip("FakeTipK", "item:2770")
 Cr.onTooltip(tt)
 check("transform: a loss shows red", tt:find("Make into Copper Bar (1 each)") == "-50c (1s 00c -> 50c)")

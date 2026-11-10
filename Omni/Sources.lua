@@ -584,32 +584,90 @@ local function isRecipe(id)
   return recipeClass[id]
 end
 
--- Groups and whether any recipe is still loading its tooltip.
+-- Splits a profession word off q: ("Tailoring", "bag") from "tailoring bag".
+local function professionOf(q)
+  local prof, rest = nil, {}
+  for w in q:gmatch("%S+") do
+    if not prof and ns.match.PROFESSIONS[w] then prof = ns.match.PROFESSIONS[w] else table.insert(rest, w) end
+  end
+  return prof, table.concat(rest, " ")
+end
+
+local function byProfit(a, b)
+  local pa, pb = a.recipe and a.recipe.profit or nil, b.recipe and b.recipe.profit or nil
+  if (pa ~= nil) ~= (pb ~= nil) then return pa ~= nil end
+  if pa and pb and pa ~= pb then return pa > pb end
+  return a.name < b.name
+end
+
+local function group(title, hits)
+  table.sort(hits, byProfit)
+  local g = { kind = "recipe", title = title, entries = {}, more = math.max(0, #hits - S.RECIPES_MAX) }
+  for i = 1, math.min(#hits, S.RECIPES_MAX) do g.entries[i] = hits[i] end
+  return g
+end
+
+-- Groups and whether any recipe is still loading its tooltip. Three
+-- groups: the recipes you know (from your profession windows), the ones
+-- your trainer teaches (from the trainer window), and recipe items in your
+-- bags, bank, mail and the AH scan.
 function S.recipes(lists, q)
   local uf = rawget(_G, "UpgradeFinderAPI")
   local recipe = type(uf) == "table" and type(uf.recipe) == "function" and uf.recipe
-  local hits, seen, loading = {}, {}, false
+  local known = type(uf) == "table" and type(uf.known) == "function" and uf.known() or {}
+  local prof, words = professionOf(q)
+  local mine, trainer, profs = {}, {}, {}
+  for _, r in ipairs(known) do
+    if r.product and (not prof or r.prof == prof) and ns.match.allWords(norm(r.name), words) then
+      local hits = r.source == "trainer" and trainer or mine
+      local e = entry("item", r.product, r.name, { recipe = r })
+      e.key = r.source .. ":" .. r.prof .. ":" .. r.name
+      table.insert(hits, e)
+    end
+    if r.source == "known" then profs[r.prof] = r end
+  end
+  local items, seen, loading = {}, {}, false
   for _, src in ipairs(lists) do
     for _, e in ipairs(src) do
-      if e.kind == "item" and not seen[e.id] and isRecipe(e.id) and ns.match.allWords(e.lname, q) then
-        seen[e.id] = true
+      if e.kind == "item" and not seen[e.id] and isRecipe(e.id) then
         local sum = recipe and recipe(e.id)
-        if recipe and not sum then loading = true end
-        table.insert(hits, entry("item", e.id, e.name, { where = e.where, owned = e.owned, recipe = sum or false }))
+        local hay = e.lname .. (sum and sum.skill and (" " .. norm(sum.skill)) or "")
+        if ns.match.allWords(hay, words) and (not prof or not sum or sum.skill == prof) then
+          seen[e.id] = true
+          if recipe and not sum then loading = true end
+          table.insert(items, entry("item", e.id, e.name, { where = e.where, owned = e.owned, recipe = sum or false }))
+        end
       end
     end
   end
-  table.sort(hits, function(a, b)
-    local pa, pb = a.recipe and a.recipe.profit or nil, b.recipe and b.recipe.profit or nil
-    if (pa ~= nil) ~= (pb ~= nil) then return pa ~= nil end
-    if pa and pb and pa ~= pb then return pa > pb end
-    return a.name < b.name
-  end)
-  if #hits == 0 then return {}, loading end
-  local g = { kind = "recipe", title = recipe and "Recipes, best profit first" or "Recipes (load UpgradeFinder for the profit)",
-    entries = {}, more = math.max(0, #hits - S.RECIPES_MAX) }
-  for i = 1, math.min(#hits, S.RECIPES_MAX) do g.entries[i] = hits[i] end
-  return { g }, loading
+  local groups = {}
+  -- "tailoring" is also a MageMentor command: commands that match stay on top.
+  if prof then
+    local cmds = {}
+    for _, src in ipairs(lists) do
+      for _, e in ipairs(src) do
+        if e.kind == "command" and ns.match.allWords(e.lname, q) then table.insert(cmds, e) end
+      end
+    end
+    if #cmds > 0 then table.insert(groups, { kind = "command", title = "Commands", entries = cmds }) end
+  end
+  local p = prof and profs[prof]
+  local mineTitle = (prof or "Recipes") .. " you know"
+    .. (p and p.rank and (" (skill " .. p.rank .. (p.max and ("/" .. p.max) or "") .. ")") or "") .. ", best profit first"
+  if #mine > 0 then table.insert(groups, group(mineTitle, mine)) end
+  if #trainer > 0 then table.insert(groups, group("From your trainer, best profit first", trainer)) end
+  if #items > 0 then
+    local title = recipe and "Recipe items (bags, bank, mail, AH), best profit first"
+      or "Recipe items (load UpgradeFinder for the profit)"
+    table.insert(groups, group(title, items))
+  end
+  -- A profession whose window you have not opened yet: say how to add it
+  -- (a header row with no entries).
+  if prof and not p and recipe then
+    table.insert(groups, { kind = "recipe", entries = {},
+      title = "|cff9d9d9dOpen your " .. prof .. " window (and its trainer) once, so Omni knows your recipes|r" })
+  end
+  return groups, loading
 end
 
 ---------------------------------------------------------------------------
