@@ -178,7 +178,8 @@ local NPC = { [234] = { name = "Gryan Stoutmantle", subName = "The People's Mili
   [235] = { name = "Salma Saldean", spawns = { [40] = { { 56.0, 31.2 } }, [10] = { { 1, 1 } } } },
   [639] = { name = "Edwin VanCleef", spawns = { [1581] = { { -1, -1 } } } } }
 local QUEST = { [65] = { name = "The Defias Brotherhood", startedBy = { { 234 } }, questLevel = 18 },
-  [6563] = { name = "The Essence of Aku'Mai", startedBy = { { 12736 } }, questLevel = 22, zoneOrSort = 719 } }
+  [6563] = { name = "The Essence of Aku'Mai", startedBy = { { 12736 } }, questLevel = 22, zoneOrSort = 719 },
+  [6921] = { name = "Amongst the Ruins", questLevel = 27, zoneOrSort = 10020 } }
 local ITEM = { [3307] = { name = "Gnoll Paw", npcDrops = { 235 } }, [4306] = { name = "Silk Cloth" },
   [7000] = { name = "Heartwood Girdle", questRewards = { 6563 } } }
 local AREA = { [40] = 1436, [10] = 1431, [1581] = 9002 }
@@ -200,7 +201,7 @@ QuestieLoader = { ImportModule = function(_, name)
   if name == "QuestieDB" then
     if questieReady then
       QuestieDB.NPCPointers = { [234] = 1, [235] = 1, [639] = 1 }
-      QuestieDB.QuestPointers = { 65, 6563 }
+      QuestieDB.QuestPointers = { 65, 6563, 6921 }
       QuestieDB.ItemPointers = { [3307] = 1, [4306] = 1, [7000] = 1 }
     end
     return QuestieDB
@@ -891,7 +892,8 @@ do
   check("boss drops are items", loot[1].entries[1].kind == "item" and loot[1].entries[1].id == 6907)
   check("unknown item names wait for the client", loot[1].entries[1].name == "item 6907" and lastCall("request") ~= nil)
   check("loot: by full name", #ns.search("loot: blackfathom deeps") > 0)
-  local quest = loot[#loot]
+  check("a quest under an alternate area ID is found too", loot[#loot].title == "Quest: Amongst the Ruins (27)")
+  local quest = loot[#loot - 1]
   check("dungeon quest after the bosses, with its level", quest.title == "Quest: The Essence of Aku'Mai (22)")
   check("dungeon quest row, then its reward item", quest.entries[1].kind == "quest" and quest.entries[2].kind == "item"
     and quest.entries[2].id == 7000)

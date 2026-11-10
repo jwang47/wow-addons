@@ -533,19 +533,25 @@ end
 
 function S.questieLists() return questie.npc, questie.quest, questie.item end
 
--- AreaTable IDs of the dungeons (Questie's zoneOrSort), by short name. The
--- wings of one instance share an ID.
-S.DUNGEON_AREAS = { RFC = 2437, WC = 718, DM = 1581, SFK = 209, BFD = 719, Stocks = 717, Gnomer = 721,
-  RFK = 491, ["SM GY"] = 796, ["SM Lib"] = 796, ["SM Arm"] = 796, ["SM Cath"] = 796, RFD = 722,
-  Ulda = 1337, ZF = 1176, Mara = 2100, ST = 1477, BRD = 1584, LBRS = 1583, UBRS = 1583,
-  ["DM East"] = 2557, ["DM West"] = 2557, ["DM North"] = 2557, Scholo = 2057, Strat = 2017 }
+-- AreaTable IDs of the dungeons (Questie's zoneOrSort), by short name: the
+-- main ID, then the alternate IDs some quests use (QuestieDB's dungeons.lua;
+-- Gnomeregan's quests use 133, Uldaman's 1517). Wings share their IDs.
+local SM, BRS, DIRE = { 796, 6109, 6386, 10008, 10009, 10010 }, { 1583, 10003, 10004, 10005, 10006, 10007 }, { 2557 }
+S.DUNGEON_AREAS = { RFC = { 2437 }, WC = { 718 }, DM = { 1581, 10029 }, SFK = { 209, 10014, 10015, 10016, 10017, 10018, 10019 },
+  BFD = { 719, 10020, 10021 }, Stocks = { 717 }, Gnomer = { 721, 133, 10030, 10031, 10032 }, RFK = { 491, 1717 },
+  ["SM GY"] = SM, ["SM Lib"] = SM, ["SM Arm"] = SM, ["SM Cath"] = SM, RFD = { 722 }, Ulda = { 1337, 1517, 10033 },
+  ZF = { 1176, 978 }, Mara = { 2100, 10000 }, ST = { 1477, 1417 }, BRD = { 1584, 1585 }, LBRS = BRS, UBRS = BRS,
+  ["DM East"] = DIRE, ["DM West"] = DIRE, ["DM North"] = DIRE, Scholo = { 2057, 10011, 10012, 10013 }, Strat = { 2017 } }
 
 -- Quests set in a dungeon: { entry, level, rewards = { itemID... } }, by level.
 function S.questsByZone(short)
   local list = {}
-  local area = S.DUNGEON_AREAS[short]
+  local quests = {}
+  for _, area in ipairs(S.DUNGEON_AREAS[short] or {}) do
+    for _, e in ipairs(questie.byZone[area] or {}) do table.insert(quests, e) end
+  end
   local qdb = S.questieDB()
-  for _, e in ipairs(area and questie.byZone[area] or {}) do
+  for _, e in ipairs(quests) do
     local level = qdb and call(qdb.QueryQuestSingle, e.id, "questLevel")
     local rewards = {}
     for _, id in ipairs(questie.rewards[e.id] or {}) do table.insert(rewards, id) end
