@@ -193,7 +193,8 @@ the price to buy the made item on the AH instead.
   reports the made item, so that gives its price. A recipe names its
   reagents only by name, and the game finds an item by name only once the
   client has seen it; so UpgradeFinder learns the names of the items in the
-  Auctionator scan in the background (150 per 1.5 s) and saves them in
+  Auctionator scan in the background, starting 5 s after login (names the
+  client knows at once, others asked from the server 150 per 1.5 s), and saves them in
   `UpgradeFinderDB.names`. A reagent that shows "No price" at first gets
   its price on the next hover. `/uf craft` turns the lines off and on.
 - Five buttons: **Slot** (click for the next, right-click for the previous),

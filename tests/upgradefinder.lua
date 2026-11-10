@@ -950,6 +950,8 @@ tt = fakeTooltip("FakeTipI", "|Hitem:121::|h[Earthen Hood]|h")
 tt:AddLine("Pattern: Earthen Hood")
 Cr.onTooltip(tt)
 check("craft: the learned name gives the price", tt:find("Cost to craft") == "42s 00c" and tt:find("Profit") == "+43s 50c")
+SlashCmdList.UPGRADEFINDER("craft names")
+check("/uf craft names says how many names it knows", chat[#chat]:match("item names: %d+ learned") ~= nil)
 C_Item.GetItemInfo = infoNow
 SlashCmdList.UPGRADEFINDER("craft")
 tt = fakeTooltip("FakeTipD", "item:118")

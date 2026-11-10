@@ -55,7 +55,9 @@ function C.idByName(name)
   return nil
 end
 
-C.NAME_BATCH, C.NAME_WAIT, C.NAME_TRIES, C.NAME_COOLDOWN = 150, 1.5, 3, 60
+-- Per step: up to NAME_LOOKUPS names read from the client cache (cheap) and
+-- up to NAME_BATCH items asked from the server.
+C.NAME_BATCH, C.NAME_LOOKUPS, C.NAME_WAIT, C.NAME_TRIES, C.NAME_COOLDOWN = 150, 2000, 1.5, 3, 60
 local learning = nil -- { queue, tries } while the names load
 local learnedAt = nil -- when the last pass ended; a new scan can add names
 function C.learnNames()
@@ -74,15 +76,16 @@ function C.learnNames()
   learning = { queue = queue, tries = {} }
   local function step()
     local q, again = learning.queue, {}
-    local n = 0
-    while #q > 0 and n < C.NAME_BATCH do
+    local n, looked = 0, 0
+    while #q > 0 and n < C.NAME_BATCH and looked < C.NAME_LOOKUPS do
       local id = table.remove(q)
-      n = n + 1
+      looked = looked + 1
       local it = info(id)
       if it and it.name then C.learn(it.name, id)
       else
         learning.tries[id] = (learning.tries[id] or 0) + 1
         if learning.tries[id] <= C.NAME_TRIES then
+          n = n + 1
           call(api("C_Item.RequestLoadItemDataByID"), id)
           table.insert(again, id)
         end
@@ -94,6 +97,14 @@ function C.learnNames()
     else learning, learnedAt = nil, call(rawget(_G, "time")) end
   end
   step()
+end
+
+-- "names: 1234 learned, 56 still loading" for /uf craft names.
+function C.namesStatus()
+  local n = 0
+  for _ in pairs(names()) do n = n + 1 end
+  local left = learning and #learning.queue or 0
+  return string.format("item names: %d learned%s", n, left > 0 and (", " .. left .. " still loading") or "")
 end
 
 -- What the reagents cost: { total, missing = { names }, parts }. Each
@@ -367,9 +378,14 @@ function C.hook()
   local f = CreateFrame("Frame")
   f:SetScript("OnEvent", function(_, ev, name)
     if ev == "PLAYER_EQUIPMENT_CHANGED" then C.wornChanged()
+    elseif ev == "PLAYER_LOGIN" then
+      -- Learn the names soon after login, before the first recipe hover.
+      local after = api("C_Timer.After")
+      if after then after(5, function() C.guard(C.learnNames) end) end
     elseif name == "Blizzard_TradeSkillUI" then C.hookRows() end
   end)
   pcall(f.RegisterEvent, f, "ADDON_LOADED")
   pcall(f.RegisterEvent, f, "PLAYER_EQUIPMENT_CHANGED")
+  pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
 end
 C.hook()
