@@ -515,6 +515,26 @@ fire("NAME_PLATE_UNIT_REMOVED", "nameplate2")
 check("label hides with its plate", not ns.party.labels.nameplate2.shown)
 grouped = false
 fire("GROUP_ROSTER_UPDATE")
+-- Minimap edge pointers (checked before leaving the group).
+local function vec(x, y) return { GetXY = function() return x, y end } end
+local where = { player = vec(0.5, 0.5), party1 = vec(0.5, 0.2) }
+C_Map = { GetBestMapForUnit = function() return 1429 end,
+  GetPlayerMapPosition = function(_, u) return where[u] end,
+  GetMapWorldSize = function() return 3000, 2000 end,
+  GetUserWaypoint = function() return { uiMapID = 1429, position = vec(0.52, 0.5) } end }
+C_Minimap = { GetViewRadius = function() return 200 end }
+GetNumSubgroupMembers = function() return 1 end
+UnitName = function(u) return u == "party1" and "Friend" or "Ded" end
+grouped = true
+ns.minimap.updatePointers()
+local P1 = ns.minimap.pointers[1]
+check("party pointer on the rim", P1 and P1.shown and P1.label.text == "Friend 600", P1 and P1.label.text)
+check("pin on the map gets no pointer", not ns.minimap.pointers[2] or not ns.minimap.pointers[2].shown)
+local ox, oy, yd = ns.minimap.offsetFor({ x = 0.5, y = 0.2 }, 0.5, 0.5, 3000, 2000, 200, 95)
+check("party member north of you", math.abs(ox) < 0.01 and oy > 95 and math.floor(yd + 0.5) == 600)
+local ox2 = ns.minimap.offsetFor({ x = 0.52, y = 0.5 }, 0.5, 0.5, 3000, 2000, 200, 95)
+check("pin to the east, 60 yd, on the map", ox2 > 0 and ox2 < 95)
+grouped = false
 check("your plate settings come back", cvars.nameplateShowFriendlyPlayers == "0" and ns.db.partySaved == nil)
 
 -- Resizing the minimap.

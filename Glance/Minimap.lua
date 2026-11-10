@@ -279,3 +279,139 @@ ns.module("minimap", function()
     for _, t in ipairs({ 1, 4, 10 }) do C_Timer.After(t, mm.layoutDrawer) end
   end)
 end)
+
+---------------------------------------------------------------------------
+-- Edge pointers: arrows on the minimap's rim for things off the map, so
+-- you see which way to go. Party members (class colours) built in; other
+-- addons add their own points with Glance.minimap.addPointerSource(fn),
+-- where fn() returns { { mapID, x, y, r, g, b, label }, ... } in map
+-- coordinates (0-1). QuestBoard uses it for quest targets.
+---------------------------------------------------------------------------
+mm.pointerSources = {}
+function mm.addPointerSource(fn) table.insert(mm.pointerSources, fn) end
+
+local function partyPoints()
+  local out = {}
+  if not (IsInGroup and IsInGroup()) then return out end
+  local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+  if not mapID then return out end
+  local n = GetNumSubgroupMembers and GetNumSubgroupMembers() or 0
+  for i = 1, n do
+    local u = "party" .. i
+    local pos = C_Map.GetPlayerMapPosition(mapID, u)
+    if pos then
+      local x, y = pos:GetXY()
+      x, y = ns.plain(x), ns.plain(y)
+      if x and y then
+        local _, class = UnitClass(u)
+        local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class] or { r = 0.4, g = 0.9, b = 1 }
+        table.insert(out, { mapID = mapID, x = x, y = y, r = c.r, g = c.g, b = c.b, label = UnitName(u) })
+      end
+    end
+  end
+  return out
+end
+mm.addPointerSource(partyPoints)
+
+-- Your map pin (the waypoint you set on the world map) and your corpse.
+mm.addPointerSource(function()
+  local out = {}
+  local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+  if C_Map and C_Map.GetUserWaypoint then
+    local wp = C_Map.GetUserWaypoint()
+    if wp and wp.position then
+      local x, y = wp.position:GetXY()
+      table.insert(out, { mapID = wp.uiMapID, x = x, y = y, r = 1, g = 0.85, b = 0.3, label = "Pin" })
+    end
+  end
+  if mapID and UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") and C_DeathInfo and C_DeathInfo.GetCorpseMapPosition then
+    local pos = C_DeathInfo.GetCorpseMapPosition(mapID)
+    if pos then
+      local x, y = pos:GetXY()
+      table.insert(out, { mapID = mapID, x = x, y = y, r = 0.85, g = 0.85, b = 0.85, label = "Corpse" })
+    end
+  end
+  return out
+end)
+
+local pointers = {}
+mm.pointers = pointers
+local function pointer(i)
+  local p = pointers[i]
+  if p then return p end
+  p = CreateFrame("Frame", nil, mm.pointerLayer)
+  p:SetSize(18, 18)
+  p.arrow = p:CreateTexture(nil, "OVERLAY")
+  p.arrow:SetAllPoints()
+  p.arrow:SetTexture("Interface\\Minimap\\MinimapArrow")
+  p.label = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  p.label:SetPoint("CENTER", 0, 0)
+  pointers[i] = p
+  return p
+end
+
+-- Where a point sits on the minimap, in pixels from its centre, or nil.
+function mm.offsetFor(pt, px, py, worldW, worldH, radius, half, facing)
+  local dx = (pt.x - px) * worldW            -- yards east
+  local dy = (pt.y - py) * worldH            -- yards south
+  local sx, sy = dx, -dy                     -- screen: right, up
+  if facing then
+    local c, s = math.cos(facing), math.sin(facing)
+    sx, sy = sx * c - sy * s, sx * s + sy * c
+  end
+  local k = half / radius
+  return sx * k, sy * k, math.sqrt(dx * dx + dy * dy)
+end
+
+function mm.updatePointers()
+  for _, p in ipairs(pointers) do p:Hide() end
+  if not (mm.holder and C_Map and C_Map.GetBestMapForUnit) then return end
+  local mapID = C_Map.GetBestMapForUnit("player")
+  local me = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
+  if not me then return end
+  local px, py = me:GetXY()
+  px, py = ns.plain(px), ns.plain(py)
+  if not (px and py) then return end
+  local w, h = C_Map.GetMapWorldSize(mapID)
+  w, h = ns.plain(w), ns.plain(h)
+  if not (w and h and w > 0) then return end
+  local radius = C_Minimap and C_Minimap.GetViewRadius and ns.plain(C_Minimap.GetViewRadius()) or 200
+  local half = (ns.db.mapSize or SIZE) / 2
+  local facing
+  if GetCVar and GetCVar("rotateMinimap") == "1" and GetPlayerFacing then facing = ns.plain(GetPlayerFacing()) end
+  local i = 0
+  for _, src in ipairs(mm.pointerSources) do
+    local ok, list = pcall(src)
+    for _, pt in ipairs(ok and list or {}) do
+      if pt.mapID == mapID then
+        local ox, oy, yards = mm.offsetFor(pt, px, py, w, h, radius, half, facing)
+        local edge = half - 8
+        if math.max(math.abs(ox), math.abs(oy)) > edge then
+          -- Off the map: clamp to the square's rim, point outwards.
+          local m = edge / math.max(math.abs(ox), math.abs(oy))
+          i = i + 1
+          local p = pointer(i)
+          p:ClearAllPoints()
+          p:SetPoint("CENTER", mm.holder, "CENTER", ox * m, oy * m)
+          p.arrow:SetRotation(math.atan2(-ox, oy))
+          p.arrow:SetVertexColor(pt.r or 1, pt.g or 0.85, pt.b or 0.3)
+          p.label:ClearAllPoints()
+          p.label:SetPoint("CENTER", p, "CENTER", -ox * m / edge * 18, -oy * m / edge * 14)
+          p.label:SetText(string.format("%s %d", pt.label or "", yards + 0.5))
+          p.label:SetTextColor(pt.r or 1, pt.g or 0.85, pt.b or 0.3)
+          p:Show()
+        end
+      end
+    end
+  end
+end
+
+ns.module("pointers", function()
+  if not mm.holder then return end
+  mm.pointerLayer = CreateFrame("Frame", "GlanceMinimapPointers", mm.holder)
+  mm.pointerLayer:SetAllPoints(mm.holder)
+  mm.pointerLayer:SetFrameStrata("HIGH")
+  if C_Timer and C_Timer.NewTicker then
+    C_Timer.NewTicker(0.1, function() ns.safe("pointers", mm.updatePointers) end)
+  end
+end)

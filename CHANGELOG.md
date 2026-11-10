@@ -16,6 +16,8 @@ the same, and a test checks that every `.toc` version has a section here.
   members and a yard bracket for anyone else.
 - Party members are easy to find: a large class-coloured name above each
   one's nameplate while you are in a group (`/glance party off`).
+- Edge pointers on the minimap for party members, your map pin and your
+  corpse when they are off the map; addons can add their own.
 - The game's Edit Mode unlocks Glance too: move the bar and the minimap,
   size the minimap.
 - A Reload button under the minimap.

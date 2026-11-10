@@ -301,6 +301,11 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
 - **Unit frames**: small player and target bars under your character and a
   cast bar below them. They replace Blizzard's player, target and cast
   frames (`/glance blizzard on` keeps those).
+- **Edge pointers**: arrows on the minimap's rim for things off the map,
+  with the name and yards: party members (class colours), your map pin and
+  your corpse. Other addons add points with
+  `Glance.minimap.addPointerSource(fn)`; `fn()` returns
+  `{ { mapID, x, y, r, g, b, label }, ... }` in map coordinates.
 - **Edit mode**: the game's Edit Mode (Esc, Edit Mode) also unlocks Glance,
   the same as `/glance edit`: drag the keyboard bar or the minimap to move
   them, and the minimap's gold corner to size it. `/glance reset` puts both
