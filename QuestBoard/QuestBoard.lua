@@ -261,7 +261,7 @@ local function tooltip(r)
   if e.party and #e.party > 0 then
     tip:AddLine((e.kind == "party" and "Your party has it: " or "With ") .. D.partyText(e.party), 0.6, 0.8, 1)
   end
-  if e.kind == "log" or e.kind == "nearby" or e.kind == "active" then
+  if ns.pinnable(e) then
     tip:AddLine(e.pinned and "Alt-click: no longer doing it" or "Alt-click: I'm doing this (keep it in Active)", 0.5, 0.5, 0.5)
   end
   if e.kind ~= "pickup" and e.kind ~= "party" then tip:AddLine("Right-click: open the quest log", 0.5, 0.5, 0.5)
@@ -386,7 +386,7 @@ function ns.showGiver(e)
   ns.pin(e)
 end
 
--- Alt-click marks a quest in your log as one you are doing (Active), or
+-- Alt-click marks any quest (log, hand-in or pick-up) as one you are doing (Active), or
 -- takes the mark off.
 function ns.toggleDoing(e)
   ns.db.doing = ns.db.doing or {}
@@ -399,12 +399,15 @@ function ns.toggleDoing(e)
   ns.refresh()
 end
 
--- The quests in an area that you can mark as doing (the ones in your log
--- that are not done yet).
+-- Quest entries (not areas or town rows) can be marked as doing.
+function ns.pinnable(e) return e and e.id and e.kind ~= "area" and e.kind ~= "town" and true or false end
+
+-- The quests in an area that you can mark as doing: every stop there
+-- (objectives, hand-ins and pick-ups).
 function ns.areaQuests(a)
   local list = {}
   for _, s in ipairs(a.stops or {}) do
-    if (s.kind == "log" or s.kind == "nearby" or s.kind == "active") and not s.done then table.insert(list, s) end
+    if ns.pinnable(s) then table.insert(list, s) end
   end
   return list
 end
@@ -427,7 +430,7 @@ end
 
 function ns.click(e, button)
   if not e then return end
-  if rawget(_G, "IsAltKeyDown") and IsAltKeyDown() and (e.kind == "log" or e.kind == "nearby" or e.kind == "active") then
+  if rawget(_G, "IsAltKeyDown") and IsAltKeyDown() and ns.pinnable(e) then
     return ns.toggleDoing(e)
   end
   if rawget(_G, "IsAltKeyDown") and IsAltKeyDown() and e.kind == "area" then return ns.toggleArea(e) end

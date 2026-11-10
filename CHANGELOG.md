@@ -5,6 +5,13 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## QuestBoard 0.1.2
+
+- Alt-click pins any quest, not only the ones you are working on: a
+  hand-in or a pick-up goes to Active with a gold star too. A pinned
+  pick-up stays pinned when you take it; a pin goes when you hand the
+  quest in. Alt-click on an area pins its hand-ins and pick-ups as well.
+
 ## GroupUp 0.1.0
 
 - New: a panel that helps you decide whether to group up (`/gu`). It

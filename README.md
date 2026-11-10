@@ -364,7 +364,7 @@ A small floating list, under the minimap, of the quests that matter now.
 
 | Group | What | Sorted by |
 | --- | --- | --- |
-| Active | quests you are doing: the kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or you Alt-clicked it. It stays while you are within 600 yards (`STAY_YARDS`) or make progress, and 10 minutes after the last of either (`GRACE_SECS`) | most recent first, then nearest |
+| Active | quests you are doing: the kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or you Alt-clicked it (any quest, also a hand-in or a pick-up). It stays while you are within 600 yards (`STAY_YARDS`) or make progress, and 10 minutes after the last of either (`GRACE_SECS`) | most recent first, then nearest |
 | Nearby | other quests in your log whose open objective is within 300 yards (`HERE_YARDS`) | nearest |
 | Areas | places where 2 or more stops (objectives, hand-ins, givers) are within 250 yards of each other (`AREA_YARDS`), so one trip does several quests; the row says what is there ("2 hand in, 1 objective") | best XP per minute: the XP you earn there (hand-ins and objectives, not pick-ups) over the run there and the work |
 | Turn in | quests in your log that are complete | nearest quest giver |
@@ -435,7 +435,7 @@ A small floating list, under the minimap, of the quests that matter now.
   bottom of its row (each objective weighs the same): gold in Active,
   blue elsewhere.
 - A quest you Alt-clicked (pinned) has a gold star before its name.
-  Alt-click an area to pin every quest in your log there at once (again
+  Alt-click an area to pin every quest there at once (again
   to unpin them); the area gets the star when all of them are pinned.
 - "Nearest" sorting goes by distance only up to 1000 yards
   (`D.MID_YARDS`). Quests further away, in another zone or on another
@@ -469,8 +469,9 @@ A small floating list, under the minimap, of the quests that matter now.
   they are placed by screen position (not anchored to the board, which
   would lock the board too), and a change made in combat waits for the
   fight to end.
-- Alt-click a quest in your log: "I'm doing this" (it stays in Active until
-  you Alt-click it again or hand it in).
+- Alt-click any quest row: "I'm doing this" (it stays in Active until
+  you Alt-click it again or hand it in). This works for hand-ins and
+  pick-ups too: a pinned pick-up waits in Active until you take it.
 - Click a group name to fold it. Drag the board (anywhere on it) to move it;
   `/qb lock` stops that and `/qb reset`
   puts it back. In combat it fades to 35%.

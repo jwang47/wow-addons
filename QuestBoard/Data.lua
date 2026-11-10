@@ -752,7 +752,10 @@ function D.collect(opts)
     if D.questItem then e.item = D.questItem(e) end
     local pinned = opts.doing and opts.doing[e.id]
     e.pinned = pinned and true or nil
-    if not e.done and D.isActive(e, D.noteProgress(e, clock), clock, pinned) then
+    local recent = D.noteProgress(e, clock)
+    if e.done and pinned then
+      table.insert(out.active, e)   -- a hand-in you pinned stays in Active
+    elseif not e.done and D.isActive(e, recent, clock, pinned) then
       table.insert(out.active, e)
     elseif not e.done and e.dist and e.dist <= D.HERE_YARDS then
       table.insert(out.nearby, e)
@@ -778,7 +781,8 @@ function D.collect(opts)
             local e = D.pickup(id, level, nil, "party")
             if e and not e.far then
               e.party = who
-              table.insert(out.party, D.finish(e, level))
+              e.pinned = opts.doing and opts.doing[id] and true or nil
+              table.insert(e.pinned and out.active or out.party, D.finish(e, level))
             end
           end
         end
@@ -790,12 +794,26 @@ function D.collect(opts)
     local avail = {}
     for _, id in ipairs(D.availableIDs()) do avail[id] = true end
     for _, e in ipairs(out.party) do e.canTake = avail[e.id] or nil end
+    for _, e in ipairs(out.active) do if e.kind == "party" then e.canTake = avail[e.id] or nil end end
     for _, id in ipairs(D.availableIDs()) do
       if not inLog[id] then
         local e = D.pickup(id, level, opts.maxAbove)
-        if e and not e.far then table.insert(out.pickup, D.finish(e, level)) end
+        if e and not e.far then
+          -- A pick-up you pinned waits in Active until you take it.
+          e.pinned = opts.doing and opts.doing[id] and true or nil
+          table.insert(e.pinned and out.active or out.pickup, D.finish(e, level))
+        end
       end
       tick()
+    end
+    -- Pins of quests you handed in (or can no longer take) go.
+    if opts.doing then
+      local party = {}
+      for _, e in ipairs(out.active) do if e.kind == "party" then party[e.id] = true end end
+      for _, e in ipairs(out.party) do party[e.id] = true end
+      for id in pairs(opts.doing) do
+        if not (inLog[id] or avail[id] or party[id]) then opts.doing[id] = nil end
+      end
     end
   end
   -- Recent progress first (newest first), then the ones you stand in.
