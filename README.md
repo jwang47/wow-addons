@@ -312,6 +312,12 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   Questie's `nextQuestInChain` and, once per session, reads every Questie
   item's `questRewards` (a slice per frame) to find each quest's rewards.
   It does not yet say whether the gear is an upgrade for you.
+- Quest items: a column of buttons just left of the board, one per usable
+  quest item (the game's `GetQuestLogSpecialItemInfo`, else Questie's
+  `sourceItemId` when you carry it and it has a use), Active quests first,
+  then Nearby, then the rest; at most 6. Click one to use it; hover for the
+  item and its quest. The buttons are secure, so the game locks them in
+  combat: a change made in combat waits for the fight to end.
 - Alt-click a quest in your log: "I'm doing this" (it stays in Active until
   you Alt-click it again or hand it in).
 - Click a group name to fold it. Drag the board (anywhere on it) to move it;

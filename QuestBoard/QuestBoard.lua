@@ -165,6 +165,7 @@ local function tooltip(r)
   end
   tip:AddLine(" ")
   tip:AddLine("Click: show it on the map   Shift-click: link", 0.5, 0.5, 0.5)
+  if e.item then tip:AddLine("Quest item: the button left of the board uses it", 0.6, 0.8, 1) end
   local c = e.chain
   if c then
     if c.best and c.best.gear then
@@ -333,6 +334,7 @@ local function dragStop()
   panel.isMoving = false
   ns.dragEnded = rawget(_G, "GetTime") and GetTime() or nil
   ns.pinTop()
+  if ns.updateItems then ns.updateItems(state) end   -- the item column follows (after combat if in it)
 end
 
 -- Keeps the board's top edge in place: it is anchored by its top-left
@@ -497,6 +499,7 @@ local function step()
   elseif coroutine.status(job) == "dead" then
     job = nil
     ns.render()
+    if ns.updateItems then ns.updateItems(state) end
     if again then again = false ns.refresh() end
   end
   if not job then runner:SetScript("OnUpdate", nil) end
@@ -588,6 +591,7 @@ end
 function ns.show(on)
   ns.db.shown = on
   if on then panel:Show() ns.refresh() else panel:Hide() end
+  if ns.updateItems then ns.updateItems(state) end
 end
 
 ---------------------------------------------------------------------------
@@ -662,7 +666,7 @@ end
 local events = CreateFrame("Frame")
 ns.events = events
 for _, e in ipairs({ "PLAYER_LOGIN", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "QUEST_ACCEPTED",
-  "PLAYER_LEVEL_UP", "ZONE_CHANGED_NEW_AREA", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED" }) do
+  "PLAYER_LEVEL_UP", "ZONE_CHANGED_NEW_AREA", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "BAG_UPDATE_COOLDOWN", "BAG_UPDATE_DELAYED" }) do
   events:RegisterEvent(e)
 end
 events:SetScript("OnEvent", function(_, event)
@@ -691,6 +695,10 @@ events:SetScript("OnEvent", function(_, event)
   end
   if not panel then return end
   if event == "PLAYER_REGEN_DISABLED" then panel:SetAlpha(ns.db.combatAlpha) ns.render() return end
+  if event == "BAG_UPDATE_COOLDOWN" then
+    if ns.updateItemState then ns.updateItemState() end
+    return
+  end
   if event == "PLAYER_REGEN_ENABLED" then
     panel:SetAlpha(1)
     if ns.db.hideTrackers then ns.applyTrackers() end

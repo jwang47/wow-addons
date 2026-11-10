@@ -583,6 +583,7 @@ function D.collect(opts)
   for _, e in ipairs(D.logQuests()) do
     inLog[e.id] = true
     D.finish(D.placeLog(e), level)
+    if D.questItem then e.item = D.questItem(e) end
     local pinned = opts.doing and opts.doing[e.id]
     e.pinned = pinned and true or nil
     if not e.done and D.isActive(e, D.noteProgress(e, clock), clock, pinned) then

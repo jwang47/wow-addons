@@ -20,6 +20,7 @@ local function widget(name)
   function w:SetText(t) self.text = t end
   function w:GetText() return self.text end
   function w:SetRotation(r) self.rotation = r end
+  function w:SetAttribute(k, v) self.attrs = self.attrs or {} self.attrs[k] = v end
   function w:RegisterEvent(e) self.events = self.events or {} self.events[e] = true end
   function w:CreateTexture() return widget() end
   function w:CreateFontString() return widget() end
@@ -136,7 +137,9 @@ local HBD = {
 function LibStub(name) if name == "HereBeDragonsQuestie-2.0" then return HBD end end
 
 local ns = {}
-for _, file in ipairs({ "Data.lua", "Chain.lua", "QuestBoard.lua" }) do
+-- Quest 122 (log index 3) has a usable quest item.
+function GetQuestLogSpecialItemInfo(i) if i == 3 then return "|Hitem:5000|h[Vial]|h", 134400, 1 end end
+for _, file in ipairs({ "Data.lua", "Chain.lua", "QuestBoard.lua", "Items.lua" }) do
   local chunk = assert(loadfile(root .. "QuestBoard/" .. file))
   chunk("QuestBoard", ns)
 end
@@ -248,6 +251,22 @@ for _ = 1, 50 do ns.step() end
 check("board built and shown", QuestBoardFrame and QuestBoardFrame.shown)
 local st = ns.state()
 check("state after login", st and #st.turnin == 1 and #st.pickup == 2)
+-- Quest items: a secure item button for each, left of the board.
+local itemBtn = QuestBoardItem1
+check("quest item gets a button", itemBtn and itemBtn.shown and itemBtn.attrs.type == "item" and itemBtn.attrs.item == "item:5000")
+check("the button knows its quest", itemBtn.info.quest.id == 122)
+check("only one item button", not QuestBoardItem2)
+local combatNow = true
+local realLockdown = InCombatLockdown
+InCombatLockdown = function() return combatNow end
+itemBtn.attrs.item = "unchanged"
+ns.updateItems(ns.state())
+check("in combat the item buttons wait", itemBtn.attrs.item == "unchanged" and ns.itemsPending())
+combatNow = false
+ns.updateItems(ns.state())
+check("after combat they update", itemBtn.attrs.item == "item:5000" and not ns.itemsPending())
+InCombatLockdown = realLockdown
+
 -- Focus (the default): only Next and Active until the mouse is over the board.
 local function countRows()
   local n = 0
