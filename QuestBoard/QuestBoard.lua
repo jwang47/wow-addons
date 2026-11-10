@@ -5,7 +5,7 @@
 -- map. /qb for the commands.
 local addonName, ns = ...
 QuestBoard = ns                     -- global, for /dump
-ns.VERSION = "0.1.0"
+ns.VERSION = "0.1.1"
 local D = ns.data
 local call, api = D.call, D.api
 
@@ -122,10 +122,10 @@ function ns.meta(e, kind)
   if e.kind == "log" and not e.done and kind == "active" and e.left and #e.left > 0 then
     table.insert(parts, "~" .. D.mins(D.travelSecs(e.dist) + D.workSecs(e)))
   end
-  if e.kind == "turnin" and e.xp then table.insert(parts, D.short(e.xp) .. " xp") end
+  if e.kind == "turnin" and e.xp then table.insert(parts, D.tierText(e, D.short(e.xp) .. " xp")) end
   -- A hand-in: the run there, so you can weigh the trip against the XP.
   if e.kind == "turnin" and e.dist then table.insert(parts, D.mins(D.travelSecs(e.dist))) end
-  if (e.kind == "pickup" or e.kind == "area") and e.rate then table.insert(parts, "~" .. D.short(e.rate) .. " xp/m") end
+  if (e.kind == "pickup" or e.kind == "area") and e.rate then table.insert(parts, D.tierText(e, "~" .. D.short(e.rate) .. " xp/m")) end
   if e.dist then table.insert(parts, D.yardsText(e.dist))
   elseif e.far then table.insert(parts, "|cff909090far|r")
   elseif e.fromItem then table.insert(parts, "item") end

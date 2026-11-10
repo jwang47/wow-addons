@@ -705,6 +705,11 @@ function D.collect(opts)
   D.sort(out.log, opts.sortLog or "near")
   D.sort(out.pickup, opts.sortPickup or "xp")
   out.area = D.areas(out)
+  -- XP colours: each group's best third green, worst third grey.
+  D.tier(out.turnin, "xp")
+  D.tier(out.pickup, "rate")
+  D.tier(out.party, "rate")
+  D.tier(out.area, "rate")
   -- Chains: the reward index is read once (spread over frames), then each
   -- quest gets what its chain leads to.
   if out.questie and D.buildRewards and D.buildRewards(opts.yield and tick) then
@@ -722,6 +727,28 @@ function D.yards(d)
   if not d then return "" end
   if d >= 1000 then return string.format("%.1fk yd", d / 1000) end
   return string.format("%d yd", math.floor(d / 10 + 0.5) * 10)
+end
+
+-- Marks each entry's value (field) against the others in its group:
+-- e.tier "good" (top third), "low" (bottom third) or nil. Needs 3 values.
+function D.tier(list, field)
+  local vals = {}
+  for _, e in ipairs(list or {}) do e.tier = nil if e[field] then table.insert(vals, e[field]) end end
+  if #vals < 3 then return end
+  table.sort(vals)
+  local lowCut = vals[math.max(1, math.floor(#vals / 3))]
+  local highCut = vals[#vals - math.max(1, math.floor(#vals / 3)) + 1]
+  for _, e in ipairs(list) do
+    local v = e[field]
+    if v and v >= highCut and v > lowCut then e.tier = "good"
+    elseif v and v <= lowCut and v < highCut then e.tier = "low" end
+  end
+end
+
+D.TIER_HEX = { good = "60d060", low = "909090" }
+function D.tierText(e, text)
+  local hex = e.tier and D.TIER_HEX[e.tier]
+  return hex and ("|cff" .. hex .. text .. "|r") or text
 end
 
 -- Travel time in a few characters: "<1 min", "4 min".

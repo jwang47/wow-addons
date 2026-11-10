@@ -5,6 +5,11 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## QuestBoard 0.1.1
+
+- XP colours: in each group, the best third of the XP (Turn in) or XP per
+  minute (Pick up, Party has, Areas) is green and the worst third grey.
+
 ## QuestBoard 0.1.0
 
 - New addon (`/qb`): a small board of the quests that matter now.

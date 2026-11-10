@@ -603,6 +603,17 @@ check("pace: a long break does not count", D.pace[900] == 20)
 check("pace: Active row shows time left", strip(ns.meta({ kind = "log", id = 900, left = pq.left, dist = 70 }, "active")):find("^~<1 min") ~= nil)
 D.pace, D.anyPace, D.lastGain, D.seen = {}, nil, {}, {}
 
+-- XP colours: best third green, worst third grey.
+local tl = { { v = 10 }, { v = 50 }, { v = 30 }, { v = 90 }, { v = 70 }, { v = 20 } }
+D.tier(tl, "v")
+local tiers = {}
+for _, e in ipairs(tl) do tiers[e.v] = e.tier or "mid" end
+check("xp colours: thirds", tiers[90] == "good" and tiers[70] == "good" and tiers[10] == "low" and tiers[20] == "low" and tiers[30] == "mid" and tiers[50] == "mid")
+check("xp colours: green text", D.tierText({ tier = "good" }, "1k xp") == "|cff60d0601k xp|r" and D.tierText({}, "x") == "x")
+local two = { { v = 1 }, { v = 2 } }
+D.tier(two, "v")
+check("xp colours: too few to rank", not two[1].tier and not two[2].tier)
+
 -- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
 local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },
   { name = "c", xp = 2000 }, { name = "d", dist = 5000, xp = 1500 }, { name = "e", dist = 800, xp = 50 } }, "near")

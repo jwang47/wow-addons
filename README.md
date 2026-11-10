@@ -311,6 +311,9 @@ A small floating list, under the minimap, of the quests that matter now.
   orange, red). Each row shows the distance and an arrow that turns with
   you. The distance is green within 300 yards, yellow up to 1000 yards and
   grey beyond (`D.NEAR_YARDS`, `D.MID_YARDS`).
+- XP colours: in each group, the best third of the XP (Turn in) or XP per
+  minute (Pick up, Party has, Areas) is green and the worst third grey
+  (`D.tier`), so the better quests stand out.
 - A Turn in row shows the XP, the run time to the finisher (distance at
   your current speed, at least run speed, `D.RUN_SPEED`) and the best item that the quest gives
   ("[Murloc Charm] +1" when you choose one of two), or "no item". When the
