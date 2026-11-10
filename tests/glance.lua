@@ -456,6 +456,30 @@ SlashCmdList.GLANCE("xpremind off")
 A.remindXP(true)
 check("reminder can be turned off", warned == nil)
 SlashCmdList.GLANCE("xpremind on")
+-- An item buff that says XP only in its tooltip.
+buffs = { { name = "Arcane Intellect", spellId = 1459, auraInstanceID = 1 }, { name = "Cheese Snack", spellId = 9002, auraInstanceID = 2, expirationTime = now + 900 } }
+C_TooltipInfo = { GetUnitBuffByAuraInstanceID = function(_, inst)
+  return { lines = { { leftText = inst == 2 and "Cheese Snack" or "Arcane Intellect" }, { leftText = inst == 2 and "Kills give 10% more XP." or "Intellect up." } } }
+end }
+A.refresh()
+check("xp buff found in its tooltip", A.chips.xp.text.text == "XP 15m", A.chips.xp.text.text)
+-- A buff no text match finds can be marked by hand.
+C_TooltipInfo = nil
+buffs = { { name = "Arcane Intellect", spellId = 1459 }, { name = "Big Cheese", spellId = 9003, expirationTime = now + 900 } }
+A.refresh()
+check("unmarked buff is not xp", A.chips.xp.text.text == "No XP buff", A.chips.xp.text.text)
+SlashCmdList.GLANCE("xpbuff big cheese")
+check("marked buff counts as xp", A.chips.xp.text.text == "XP 15m", A.chips.xp.text.text)
+local menuItems = {}
+MenuUtil = { CreateContextMenu = function(owner, gen)
+  gen(owner, { CreateTitle = function() end, CreateCheckbox = function(_, text, isOn, toggle) menuItems[text] = { isOn = isOn, toggle = toggle } end })
+end }
+A.chips.xp.scripts.OnClick()
+check("chip menu lists buffs", menuItems["Big Cheese"] and menuItems["Big Cheese"].isOn() == true and menuItems["Arcane Intellect"].isOn() == false)
+menuItems["Big Cheese"].toggle()
+check("menu unmarks a buff", A.chips.xp.text.text == "No XP buff", A.chips.xp.text.text)
+MenuUtil = nil
+_G.GlanceDB.xpBuffs = nil
 
 -- Watch row: key spells by name from the spellbook.
 local NAMES = { [1953] = "Blink", [2139] = "Counterspell", [116] = "Frostbolt" }

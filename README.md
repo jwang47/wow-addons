@@ -321,7 +321,10 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   for every XP buff and your rested XP); it turns amber, "No XP buff", when
   none is on. Then a message in the middle of the screen reminds you, at
   login, when a buff runs out and every 10 minutes (not in combat or
-  instances). `/glance xpremind off` stops the reminder. Click one to open that window; it hides when done.
+  instances). `/glance xpremind off` stops the reminder. Glance finds an XP
+  buff by "experience" or "XP" in its name, spell text or tooltip. If it
+  misses one, click the XP chip and tick the buff (or `/glance xpbuff NAME`);
+  the mark is kept for all your characters. Click one to open that window; it hides when done.
 - **Enemy cast bar**: when your target casts, a large bar with the spell
   name shows just above your unit frames. Orange when it can be
   interrupted, grey when not; "COUNTERSPELL" and a gold edge while your

@@ -64,20 +64,63 @@ local function freeBagSlots()
   return free
 end
 
--- XP buffs: any buff whose name or description speaks of experience.
--- A buff seen once is remembered, so its chip turns amber ("XP buff off")
--- when it runs out. Rested XP is listed in the tooltip.
-local function isXPBuff(aura)
-  local name = ns.plain(aura.name)
-  if type(name) ~= "string" then return false end
-  local text = name:lower()
+-- XP buffs: any buff whose name, spell description or tooltip speaks of
+-- experience. Item and server buffs often say it only in the tooltip.
+-- A buff the auto-match misses can be marked by hand: click the chip, or
+-- /glance xpbuff <name>. Marks are by buff name and kept for every character
+-- (ns.db.xpBuffs: true = XP buff, false = never). Rested XP is in the tooltip.
+local XP_WORDS = { "experience", "%f[%a]xp%f[%A]", "%f[%a]exp%f[%A]" }
+local function speaksOfXP(text)
+  for _, w in ipairs(XP_WORDS) do if text:find(w) then return true end end
+  return false
+end
+
+local function auraText(aura)
+  local parts = {}
   local id = ns.plain(aura.spellId)
   if type(id) == "number" and C_Spell and C_Spell.GetSpellDescription then
     local ok, d = pcall(C_Spell.GetSpellDescription, id)
     d = ok and ns.plain(d)
-    if type(d) == "string" then text = text .. " " .. d:lower() end
+    if type(d) == "string" then table.insert(parts, d) end
   end
-  return text:find("experience") ~= nil or text:find("%f[%a]xp%f[%A]") ~= nil
+  local inst = ns.plain(aura.auraInstanceID)
+  if inst and C_TooltipInfo and C_TooltipInfo.GetUnitBuffByAuraInstanceID then
+    local ok, data = pcall(C_TooltipInfo.GetUnitBuffByAuraInstanceID, "player", inst)
+    if ok and type(data) == "table" and type(data.lines) == "table" then
+      for _, line in ipairs(data.lines) do
+        local t = ns.plain(line.leftText)
+        if type(t) == "string" then table.insert(parts, t) end
+      end
+    end
+  end
+  return table.concat(parts, " ")
+end
+
+local function isXPBuff(aura)
+  local name = ns.plain(aura.name)
+  if type(name) ~= "string" then return false end
+  local mark = ns.db.xpBuffs and ns.db.xpBuffs[name]
+  if mark ~= nil then return mark end
+  return speaksOfXP((name .. " " .. auraText(aura)):lower())
+end
+
+local function playerBuffs()
+  local list = {}
+  local get = C_UnitAuras and C_UnitAuras.GetBuffDataByIndex
+  if not get then return list end
+  for i = 1, 40 do
+    local ok, aura = pcall(get, "player", i)
+    if not ok or not aura then break end
+    table.insert(list, aura)
+  end
+  return list
+end
+alerts.playerBuffs = playerBuffs
+
+function alerts.markXP(name, on)
+  ns.db.xpBuffs = ns.db.xpBuffs or {}
+  ns.db.xpBuffs[name] = on
+  alerts.refresh()
 end
 
 local function timeLeft(aura)
@@ -94,11 +137,7 @@ end
 
 function alerts.xpBuffs()
   local found = {}
-  local get = C_UnitAuras and C_UnitAuras.GetBuffDataByIndex
-  if not get then return found end
-  for i = 1, 40 do
-    local ok, aura = pcall(get, "player", i)
-    if not ok or not aura then break end
+  for _, aura in ipairs(playerBuffs()) do
     if isXPBuff(aura) then table.insert(found, { name = ns.plain(aura.name), left = timeLeft(aura) }) end
   end
   return found
@@ -120,6 +159,7 @@ local function xpChip()
     return "XP " .. (first.left or "on") .. (#buffs > 1 and (" +" .. (#buffs - 1)) or ""), true, tip
   end
   table.insert(tip, 1, "No XP buff active.")
+  table.insert(tip, "Click to mark one of your buffs as an XP buff.")
   return "No XP buff", false, tip
 end
 
@@ -147,6 +187,54 @@ function alerts.remindXP(force)
   if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
 end
 
+-- Click on the XP chip: a checkbox menu of your buffs. Without the menu
+-- API, the buffs are listed in chat for /glance xpbuff <name>.
+local function xpMenu(owner)
+  local names = {}
+  for _, aura in ipairs(playerBuffs()) do
+    local n = ns.plain(aura.name)
+    if type(n) == "string" then table.insert(names, { name = n, on = isXPBuff(aura) }) end
+  end
+  if MenuUtil and MenuUtil.CreateContextMenu then
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+      root:CreateTitle("Which buffs give XP?")
+      if #names == 0 then root:CreateTitle("(no buffs)") end
+      for _, b in ipairs(names) do
+        root:CreateCheckbox(b.name, function() return b.on end, function()
+          b.on = not b.on
+          alerts.markXP(b.name, b.on)
+        end)
+      end
+    end)
+    return
+  end
+  ns.commands.xpbuff("")
+end
+alerts.xpMenu = xpMenu
+
+ns.commands.xpbuff = function(rest)
+  rest = rest or ""
+  if rest == "" then
+    ns.print("Your buffs (/glance xpbuff <name> marks or unmarks one as an XP buff):")
+    for _, aura in ipairs(playerBuffs()) do
+      local n = ns.plain(aura.name)
+      if type(n) == "string" then ns.print("  " .. n .. (isXPBuff(aura) and "  [XP]" or "")) end
+    end
+    return
+  end
+  local want = rest:lower()
+  for _, aura in ipairs(playerBuffs()) do
+    local n = ns.plain(aura.name)
+    if type(n) == "string" and n:lower() == want then
+      local on = not isXPBuff(aura)
+      alerts.markXP(n, on)
+      ns.print(n .. (on and " is now an XP buff." or " is no longer an XP buff."))
+      return
+    end
+  end
+  ns.print("No buff named \"" .. rest .. "\" on you now.")
+end
+
 ns.commands.xpremind = function(rest)
   rest = (rest or ""):lower()
   if rest == "off" then ns.db.xpRemind = false elseif rest == "on" then ns.db.xpRemind = true end
@@ -164,7 +252,7 @@ alerts.list = {
   { key = "legacy", label = "Legacy", count = legacyPoints, click = function() open(ToggleLegacySystemUI) end },
   { key = "ranks", label = "Ranks", count = oldRanks, tip = "Keys with an old spell rank. Click: /glance ranks.",
     click = function() open(ns.commands.ranks) end },
-  { key = "xp", label = "XP", title = "XP buffs", text = xpChip, click = function() end },
+  { key = "xp", label = "XP", title = "XP buffs", text = xpChip, click = function(chip) xpMenu(chip) end },
   { key = "bags", label = "Bags", title = "Bags", text = function()
       local free = freeBagSlots()
       if not free then return nil end
@@ -225,7 +313,7 @@ ns.module("alerts", function()
     c.text:SetTextColor(1, 0.8, 0.35)
     c:SetScript("OnClick", function()
       if InCombatLockdown() then return end
-      a.click()
+      a.click(c)
       alerts.refresh()
     end)
     if a.text then

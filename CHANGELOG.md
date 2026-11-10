@@ -23,6 +23,8 @@ the same, and a test checks that every `.toc` version has a section here.
 - A Reload button under the minimap.
 - An XP buff chip: time left, rested XP on hover, and a reminder in the
   middle of the screen when no XP buff is on (`/glance xpremind off`).
+  It reads the buff tooltip too, and a click on the chip lets you mark a
+  buff it missed (`/glance xpbuff NAME`).
 - Alerts under the minimap: unspent talents, Legacy points, old ranks and
   free bag slots, each a chip that opens the window.
 - Old spell ranks: an amber corner on the key, and `/glance ranks` swaps

@@ -150,6 +150,7 @@ local help = {
   "/glance map SIZE - minimap size in pixels (120-400); or drag its gold corner",
   "/glance watch add|remove NAME - key spells in the row under your character",
   "/glance party on|off - large class-coloured names over party members",
+  "/glance xpbuff [NAME] - list your buffs, or mark NAME as an XP buff (or click the XP chip)",
   "/glance ranks - put your best known rank on every action slot (amber corner = old rank)",
   "/glance import - read your key bindings again and rebuild the keyboard bar",
   "/glance take KEY - put KEY on the keyboard bar even if it has another binding",
