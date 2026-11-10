@@ -224,6 +224,7 @@ local function tooltip(r)
     end
     tip:AddLine(" ")
     tip:AddLine(e.near and "Click: pin the nearest stop on the map" or "Far away: no pin from here", 0.5, 0.5, 0.5)
+    tip:AddLine(ns.listPinned({ e }) and "Alt-click: unpin these quests" or "Alt-click: pin all of them (keep them in Doing)", 0.5, 0.5, 0.5)
     tip:Show()
     return
   end
@@ -524,6 +525,8 @@ end
 function ns.click(e, button)
   if not e then return end
   if e.kind == "more" and e.tab then return ns.pickTab(e.tab) end
+  -- Alt-click a zone: pin every quest there (your log, hand-ins, pick-ups).
+  if e.kind == "zone" and rawget(_G, "IsAltKeyDown") and IsAltKeyDown() then return ns.pinList({ e }) end
   if e.kind == "zone" then
     if e.near then return ns.pin(e.near) end
     ns.sayOnce("zone:" .. e.name, e.name .. ": far away (another continent); open the map to plan the trip")
@@ -922,6 +925,7 @@ function ns.render()
           else r.name:SetTextColor(0.92, 0.92, 0.92) end
           -- Your Alt-click mark: a gold star before the name.
           if e.kind == "area" then e.pinned = ns.areaPinned(e) or nil end
+          if e.kind == "zone" then e.pinned = ns.listPinned({ e }) or nil end
           r.name:ClearAllPoints()
           r.name:SetPoint("LEFT", r.lvl, "RIGHT", e.pinned and 18 or 6, 0)
           r.name:SetPoint("RIGHT", r.meta, "LEFT", -6, 0)

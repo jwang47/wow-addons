@@ -1021,7 +1021,11 @@ function D.collect(opts)
     for _, id in ipairs(D.availableIDs()) do
       if not inLog[id] then
         local e = D.pickup(id, level, opts.maxAbove)
-        if e and e.far then table.insert(out.farPickup, D.finish(e, level)) end
+        if e and e.far then
+          -- Far away: for Areas, or Doing when you pinned it (a zone you swap to).
+          e.pinned = opts.doing and opts.doing[id] and true or nil
+          table.insert(e.pinned and out.active or out.farPickup, D.finish(e, level))
+        end
         if e and not e.far then
           -- A pick-up you pinned waits in Active until you take it.
           e.pinned = opts.doing and opts.doing[id] and true or nil

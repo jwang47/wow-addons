@@ -49,7 +49,8 @@ the same, and a test checks that every `.toc` version has a section here.
 - A log quest with no known place says "no place".
 - Alt-click a list's heading (Chain next, On the way, a Log zone) to pin
   every quest you see in it, the stops of its areas too; they all go to
-  Doing. Alt-click again to unpin them.
+  Doing. Alt-click again to unpin them. Alt-click a zone in Areas pins
+  every quest there, far pick-ups too.
 
 - Alt-click pins any quest, not only the ones you are working on: a
   hand-in or a pick-up goes to Active with a gold star too. A pinned

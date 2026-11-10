@@ -343,6 +343,14 @@ ns.pinList(setList)
 check("pin all: every one pinned", QuestBoardDB.doing[501] and QuestBoardDB.doing[502] and ns.listPinned(setList))
 ns.pinList(setList)
 check("pin all: again unpins them", next(QuestBoardDB.doing) == nil)
+local zoneRow = { kind = "zone", name = "Wetlands", stops = { { id = 601, kind = "log", name = "a" }, { id = 602, kind = "pickup", name = "b" } }, left = {} }
+local realAltZ = IsAltKeyDown
+IsAltKeyDown = function() return true end
+ns.click(zoneRow)
+check("pin all: Alt-click a zone pins its quests", QuestBoardDB.doing[601] and QuestBoardDB.doing[602])
+ns.click(zoneRow)
+IsAltKeyDown = realAltZ
+check("pin all: again unpins the zone", next(QuestBoardDB.doing) == nil)
 ns.refresh()
 for _ = 1, 50 do ns.step() end
 local nextHead

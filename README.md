@@ -399,7 +399,8 @@ A small floating board, under the minimap, of the quests that matter now.
 
 Alt-click a list's heading (Chain next, On the way, a Log zone) to pin
 every quest you see in it, the stops of its areas too; they go to Doing
-together. Alt-click it again to unpin them.
+together. Alt-click it again to unpin them. Alt-click a zone in Areas to
+pin every quest there (far pick-ups too), for a zone you swap to.
 
 A tab you click holds until the board's own pick changes (you start or
 finish a quest). Active means: the kill or loot count went up in the last
