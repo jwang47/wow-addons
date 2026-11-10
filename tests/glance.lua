@@ -339,6 +339,8 @@ check("bartender bar hidden by driver", drivers[BT4Bar1] == "hide")
 check("gryphon art hidden", not BT4BarBlizzardArt.shown)
 check("right-edge bar kept", BT4Bar3.shown and drivers[BT4Bar3] == nil)
 check("xp bar shown", _G.GlanceXP.shown)
+check("xp numbers in the bar", _G.GlanceXP.text.text == "300 / 1000 (30.0%)  Rested 20%", _G.GlanceXP.text.text)
+check("no xp text when secret", ns.bars.xpText(nil, 1000, 0) == "")
 
 -- Chat.
 check("chat fades", fadeSet == true)

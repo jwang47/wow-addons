@@ -5,6 +5,30 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## UpgradeFinder 0.2.0
+
+- New: crafting lines on recipes. Hover a pattern or other recipe item, or
+  a recipe in your profession window, to see the cost to craft, what the
+  made item sells for (AH, vendor or disenchant), the profit or loss, and
+  the score of the made item against what you wear. `/uf craft` turns them
+  off.
+- Hovering a row in the profession window's recipe list now shows the made
+  item's tooltip.
+- Transformations: the tooltip of a material you can make into another
+  item (Silk Cloth into Bolt of Silk Cloth, ore into bars) says what one
+  craft gains or loses ("Make into Bolt of Silk Cloth (4 each)").
+- Reagents the client has not seen yet get their AH price too: UpgradeFinder
+  learns the item names in the Auctionator scan once and saves them.
+
+## LootValue 0.2.1
+
+- The AH scan time on the tooltip says "AH full scan 3h ago".
+- An item that today's full scan did not see says "not in today's full
+  scan" instead of yesterday's listings and price trend.
+- On a pattern or other recipe, the line prices the recipe itself. Before,
+  it priced the item the recipe makes (the game reports that item on a
+  recipe tooltip), so a pattern showed a disenchant value.
+
 ## Omni 0.1.3
 
 - Where to get an item (`from:`) also lists the quests that give it as a
@@ -13,6 +37,19 @@ the same, and a test checks that every `.toc` version has a section here.
   after the quest ("Sold by (may need the quest first)").
 - Enter on a quest that starts at an object (a note, a bag) opens the map
   at the object and pins it.
+- The item tooltip says "AH full scan 3h ago" like LootValue, and "not in
+  today's full scan" next to an old price.
+
+## QuestBoard 0.1.2
+
+- Alt-click pins any quest, not only the ones you are working on: a
+  hand-in or a pick-up goes to Active with a gold star too. A pinned
+  pick-up stays pinned when you take it; a pin goes when you hand the
+  quest in. Alt-click on an area pins its hand-ins and pick-ups as well.
+- The tooltip of each quest shows its whole chain (with Questie): "Chain:
+  quest 3 of 5", then each step with its level, marked done, ">>" (this
+  quest), log (in your log) or "..." (later). A long chain shows the 8
+  steps around this quest.
 
 ## GroupUp 0.1.0
 
@@ -71,7 +108,8 @@ the same, and a test checks that every `.toc` version has a section here.
   Drag the gold corner, use Shift+mouse wheel or type `/glance map SIZE` to resize it.
 - `/glance bars hide`: hides the Bartender4 bottom bars (the right-edge
   bars 3 and 4 stay) and Blizzard's bottom bars, the
-  gryphon art and the old XP bar (a thin XP line replaces it).
+  gryphon art and the old XP bar (a thin XP bar with the numbers and
+  the percentage in it replaces it).
 - Chat in the same look: faint panel, tabs only under the mouse, no side
   buttons, text fades after 30 quiet seconds.
 - Shift layer and cooldown sweeps work in the game (first test round).

@@ -235,6 +235,17 @@ OBJ[122][1].numFulfilled = 3
 -- Alt-click marks a quest as one you are doing.
 local doing = D.collect({ time = 4000, doing = { [122] = true } })
 check("a quest you mark is Active", #doing.active == 1 and doing.active[1].id == 122 and doing.active[1].pinned)
+-- Every quest can be pinned: a hand-in and a pick-up too.
+local pickID = doing.pickup[1].id
+local pins = { [127] = true, [pickID] = true, [9999] = true }
+local all = D.collect({ time = 4001, doing = pins })
+local inActive = {}
+for _, e in ipairs(all.active) do inActive[e.id] = e end
+check("a pinned hand-in is Active", inActive[127] and inActive[127].kind == "turnin" and inActive[127].pinned and #all.turnin == 0)
+check("a pinned pick-up is Active", inActive[pickID] and inActive[pickID].kind == "pickup" and inActive[pickID].pinned)
+check("a pinned pick-up leaves Pick up", (function() for _, e in ipairs(all.pickup) do if e.id == pickID then return false end end return true end)())
+check("a pin of a quest gone from the log and the givers goes", pins[9999] == nil and pins[127] and pins[pickID])
+check("hand-ins and pick-ups are pinnable", ns.pinnable(inActive[127]) and ns.pinnable(inActive[pickID]) and not ns.pinnable({ kind = "area" }))
 D.HERE_YARDS = 0
 D.seen, D.activeAt, D.heldAt = {}, {}, {}
 
@@ -516,8 +527,8 @@ for _, q in ipairs(ns.areaQuests(area)) do if QuestBoardDB.doing[q.id] then mark
 check("areas: Alt-click marks every quest there", marked > 0 and marked == #ns.areaQuests(area) and ns.areaPinned(area))
 ns.toggleArea(area)
 check("areas: again unmarks them", next(QuestBoardDB.doing) == nil and not ns.areaPinned(area))
-check("areas: a hand-in is not marked", (function()
-  for _, q in ipairs(ns.areaQuests(area)) do if q.kind == "turnin" then return false end end return true end)())
+check("areas: hand-ins are marked too", (function()
+  for _, q in ipairs(ns.areaQuests(area)) do if q.kind == "turnin" then return true end end return false end)())
 D.heldAt = {}
 local here = ns.nextStep(withAreas)
 check("next step: not 'go to' an area you are in", not here:find("^Go "))
@@ -584,6 +595,34 @@ turnRow.scripts.OnEnter(turnRow)
 local rewardLine = false
 for _, l in ipairs(GameTooltip.lines) do if strip(l) == "Reward: [Murloc Charm]  (one of 2)" then rewardLine = true end end
 check("turn-in: tooltip names the reward", rewardLine)
+
+-- The whole chain in the tooltip: 124 comes before 125 (done), 125 is in
+-- your log, then 126 and 128.
+local PRE = { [125] = { 124 }, [126] = 125 }
+local QNAMES = { [124] = "Before", [125] = "Start", [126] = "Middle", [128] = "End" }
+mods.QuestieDB.QueryQuestSingle = function(id, key)
+  if key == "nextQuestInChain" then return NEXT[id] or 0 end
+  if key == "preQuestSingle" then return PRE[id] end
+  if key == "name" then return QNAMES[id] end
+  if key == "questLevel" then return 10 end
+end
+D.resetModules()
+local full, at = D.fullChain(126)
+check("chain: walks back and on", table.concat(full, ",") == "124,125,126,128" and at == 3)
+local steps = D.chainSteps(126, { [125] = true })
+check("chain: steps marked done, log, here, later", steps and steps[1].state == "done" and steps[2].state == "log"
+  and steps[3].state == "here" and steps[4].state == "later" and steps[4].name == "End")
+local lines = D.chainLines(D.chainSteps(126, {}))
+check("chain: tooltip lines", strip(lines[1]) == "Chain: quest 3 of 4" and strip(lines[4]) == "  >>  [10] Middle" and #lines == 5)
+check("chain: no chain, no lines", D.chainSteps(122, {}) == nil and #D.chainLines(nil) == 0)
+D.CHAIN_SHOW = 2
+local cut = D.chainLines(D.chainSteps(126, {}))
+check("chain: a long chain is cut around this quest", strip(cut[2]) == "  (1 earlier)" and strip(cut[#cut]) == "  (1 more)")
+D.CHAIN_SHOW = 8
+GameTooltip.lines = {}
+turnRow.scripts.OnEnter(turnRow)
+mods.QuestieDB.QueryQuestSingle = function(id, key) if key == "nextQuestInChain" then return NEXT[id] or 0 end end
+D.resetModules()
 
 -- Distances take a colour: green near, yellow a walk, grey far.
 check("distance colours", D.yardsText(120):find("^|cff") and D.yardsText(120) ~= D.yardsText(700)

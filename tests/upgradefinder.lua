@@ -156,7 +156,7 @@ ns.DUNGEONS = {
   { "Shadowfang Keep", "SFK", 11, 30, { "Arugal", 111 } },
 }
 
-for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Stats.lua", "Calib.lua", "Spells.lua", "Build.lua", "UI.lua", "Weights.lua", "BuildUI.lua" }) do
+for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Craft.lua", "Stats.lua", "Calib.lua", "Spells.lua", "Build.lua", "UI.lua", "Weights.lua", "BuildUI.lua" }) do
   assert(loadfile(root .. "UpgradeFinder/" .. file))("UpgradeFinder", ns)
 end
 local S = ns.score
@@ -841,6 +841,156 @@ check("tooltip: no run-on Changes line", not hasSingle("Changes:"))
 local cl, bl = hasDouble("^Craft$"), hasDouble("^Buy it made$")
 check("tooltip: craft cost and buy line", cl and cl[2] == "4g 04s +?" and bl and bl[2] == "binds on pickup"
   and hasDouble("^  Fine Thread x4$")[2] == "4s 00c (vendor)")
+
+
+-- Crafting lines on recipes ------------------------------------------------
+local Cr = ns.craft
+-- A tooltip that keeps its lines, with TextLeft globals like the game's.
+local function fakeTooltip(name, link)
+  local t = { lines = {} }
+  function t:GetName() return name end
+  function t:GetItem() return "x", link end
+  function t:NumLines() return #self.lines end
+  function t:AddLine(l) table.insert(self.lines, { l }) rawset(_G, name .. "TextLeft" .. #self.lines, { GetText = function() return l end }) end
+  function t:AddDoubleLine(l, r) self:AddLine(l) self.lines[#self.lines][2] = r end
+  function t:Show() end
+  function t:find(label) for _, l in ipairs(self.lines) do if l[1] == label then return l[2] or true end end end
+  return t
+end
+-- name, link, quality, ilvl, _, _, _, _, loc, _, sell, classID, _, bind
+local INFO = { ["Silk Robe"] = { 117, 2, 25, "INVTYPE_CHEST", 900, 4, 2 }, ["Frost Circlet"] = { 119, 2, 25, "INVTYPE_HEAD", 600, 4, 1 },
+  ["Bolt of Silk Cloth"] = { 900, 1, 1, "", 0, 7 }, ["Fine Thread"] = { 901, 1, 1, "", 0, 7 } }
+local byId = {}
+for n, v in pairs(INFO) do byId[v[1]] = n end
+local oldInfo = C_Item.GetItemInfo
+C_Item.GetItemInfo = function(x)
+  local name = INFO[x] and x or byId[tonumber(tostring(x):match("item:(%d+)"))]
+  local v = INFO[name]
+  if not v then return nil end
+  return name, "item:" .. v[1], v[2], v[3], 1, "", "", 1, v[4], 0, v[5], v[6], 0, v[7]
+end
+local tt = fakeTooltip("FakeTipA", "item:118")
+Cr.onTooltip(tt)
+-- Silk Robe: 2 x Fine Thread at 1s (vendor) = 2s; sells on the AH for 2g less 5%.
+check("craft: cost to craft line", tt:find("Cost to craft") == "2s 00c")
+check("craft: sells for the best of AH and vendor", tt:find("Sells for") == "~1g 90s AH")
+check("craft: profit", tt:find("Profit") == "+1g 88s")
+check("craft: score of the made item vs what you wear", tostring(tt:find("Score of the made item")):match("^%d+%.%d %([%+%-]%d+%.%d vs your chest%)$") ~= nil)
+local n = #tt.lines
+Cr.onTooltip(tt)
+check("craft: a second item hook adds nothing", #tt.lines == n)
+-- Frost Circlet: Bleach has no price; the circlet binds on pickup, so only the vendor buys it.
+tt = fakeTooltip("FakeTipB", "item:114")
+Cr.onTooltip(tt)
+check("craft: a reagent without a price", tt:find("Cost to craft") == "4g 04s +?" and tt:find("  No price: Bleach"))
+check("craft: bind on pickup sells to the vendor only", tt:find("Sells for") == "6s 00c vendor" and tt:find("Loss") == "-3g 98s ?")
+tt = fakeTooltip("FakeTipC", "item:106")
+Cr.onTooltip(tt)
+check("craft: not a recipe, no lines", #tt.lines == 0)
+-- The profession window: 2 x Fine Thread makes one Silk Robe.
+GetTradeSkillItemLink = function(i) return i == 1 and "|Hitem:117::|h[Silk Robe]|h" or nil end
+GetTradeSkillNumReagents = function(i) return i == 1 and 1 or 0 end
+GetTradeSkillReagentInfo = function() return "Fine Thread", "icon", 2, 5 end
+GetTradeSkillReagentItemLink = function() return "|Hitem:901::|h[Fine Thread]|h" end
+GetTradeSkillNumMade = function() return 2, 2 end
+local ts = Cr.forTradeSkill(1)
+local function lineOf(lines, label) for _, l in ipairs(lines) do if l[1] == label then return l[2] end end end
+check("trade skill: cost, two made and the profit", lineOf(ts, "Cost to craft") == "2s 00c"
+  and lineOf(ts, "Sells for (x2)") == "~3g 80s AH" and lineOf(ts, "Profit") == "+3g 78s"
+  and lineOf(ts, "Score of the made item") ~= nil)
+check("trade skill: no reagents, no lines", Cr.forTradeSkill(2) == nil)
+-- The game's recipe tooltip: GetItem gives the made item, the first line names the pattern.
+INFO["Pattern: Silk Robe"] = { 118, 2, 25, "", 400, 9 }
+byId[118] = "Pattern: Silk Robe"
+tt = fakeTooltip("FakeTipE", "|Hitem:117::|h[Silk Robe]|h")
+tt:AddLine("Pattern: Silk Robe")
+Cr.onTooltip(tt)
+check("craft: GetItem gives the made item, the first line finds the pattern", tt:find("Profit") == "+1g 88s")
+tt = fakeTooltip("FakeTipF", "item:117")
+Cr.onTooltip(tt, { id = 118 })
+check("craft: the tooltip data id finds the pattern", tt:find("Cost to craft") == "2s 00c")
+tt = fakeTooltip("FakeTipG", "|Hitem:117::|h[Silk Robe]|h")
+tt:AddLine("Silk Robe")
+Cr.onTooltip(tt)
+check("craft: the made item itself gets no lines", #tt.lines == 1)
+-- The made item from the game's recipe tooltip, when its name is unknown to the client.
+ITEMS[120] = { loc = "", class = 9, lines = { "Pattern: Earthen Hood", "Earthen Hood", "Binds when equipped", "Head",
+  "+10 Spirit", "Use: Teaches you how to craft Earthen Hood.", "Fine Thread (2), Elemental Earth (2)",
+  "Requires Tailoring (150)" } }
+INFO["Pattern: Earthen Hood"] = { 120, 2, 30, "", 300, 9 }
+byId[120] = "Pattern: Earthen Hood"
+byId[121] = "Earthen Hood"
+INFO["Earthen Hood"] = { 121, 2, 30, "INVTYPE_HEAD", 500, 4, 2 }
+local hoodInfo = INFO["Earthen Hood"]
+INFO["Earthen Hood"] = nil -- not seen by name
+local ahById = Auctionator.API.v1.GetAuctionPriceByItemID
+Auctionator.API.v1.GetAuctionPriceByItemID = function(c, id)
+  return ({ [121] = 9000, [7067] = 2000 })[id] or ahById(c, id) end
+local function byIdInfo(id) local n = byId[id] return n and (INFO[n] or (id == 121 and hoodInfo)) and n end
+local infoNow = C_Item.GetItemInfo
+local earthSeen = false
+C_Item.GetItemInfo = function(x)
+  local id = tonumber(tostring(x):match("^item:(%d+)$"))
+  if id == 121 then local v = hoodInfo return "Earthen Hood", "item:121", v[2], v[3], 1, "", "", 1, v[4], 0, v[5], v[6], 0, v[7] end
+  if id == 7067 and earthSeen then return "Elemental Earth", "item:7067", 1, 25, 1, "", "", 10, "", 0, 100, 7 end
+  return infoNow(x)
+end
+C_Item.RequestLoadItemDataByID = function(id) if id == 7067 then earthSeen = true end end
+runTimers() -- the name pass started by earlier tests ends
+Cr.NAME_COOLDOWN = 0
+Auctionator.Database.db["7067"] = {}
+tt = fakeTooltip("FakeTipH", "|Hitem:121::|h[Earthen Hood]|h")
+tt:AddLine("Pattern: Earthen Hood")
+Cr.onTooltip(tt)
+check("craft: the made item from the recipe tooltip", tt:find("Sells for") == "~85s 50c AH")
+check("craft: an unseen reagent name has no price at first", tt:find("  No price: Elemental Earth"))
+runTimers()
+check("craft: reagent names are learned from the Auctionator scan", UpgradeFinderDB.names["Elemental Earth"] == 7067)
+tt = fakeTooltip("FakeTipI", "|Hitem:121::|h[Earthen Hood]|h")
+tt:AddLine("Pattern: Earthen Hood")
+Cr.onTooltip(tt)
+check("craft: the learned name gives the price", tt:find("Cost to craft") == "42s 00c" and tt:find("Profit") == "+43s 50c")
+SlashCmdList.UPGRADEFINDER("craft names")
+check("/uf craft names says how many names it knows", chat[#chat]:match("item names: %d+ learned") ~= nil)
+C_Item.GetItemInfo = infoNow
+-- Transformations: Silk Cloth -> Bolt of Silk Cloth (built in), Copper Ore -> Copper Bar (learned).
+local infoT = C_Item.GetItemInfo
+local TNAMES = { [4306] = "Silk Cloth", [4305] = "Bolt of Silk Cloth", [2770] = "Copper Ore", [2840] = "Copper Bar" }
+C_Item.GetItemInfo = function(x)
+  local id = tonumber(tostring(x):match("^item:(%d+)$"))
+  if id and TNAMES[id] then return TNAMES[id], "item:" .. id, 1, 10, 1, "", "", 20, "", 0, 50, 7 end
+  return infoT(x)
+end
+local ahT = Auctionator.API.v1.GetAuctionPriceByItemID
+Auctionator.API.v1.GetAuctionPriceByItemID = function(c, id)
+  return ({ [4306] = 1000, [4305] = 5000, [2770] = 100, [2840] = 50 })[id] or ahT(c, id) end
+tt = fakeTooltip("FakeTipJ", "item:4306")
+Cr.onTooltip(tt)
+-- 4 x 10s = 40s in; the bolt sells for 50s less 5% = 47s 50c.
+check("transform: built-in bolt on the cloth tooltip", tt:find("Make into Bolt of Silk Cloth (4 each)") == "+7s 50c (40s 00c -> ~47s 50c)")
+GetNumTradeSkills = function() return 2 end
+GetTradeSkillInfo = function(i) return i == 1 and "Smelting" or "Copper Bar", i == 1 and "header" or "optimal" end
+GetTradeSkillItemLink = function(i) return i == 2 and "|Hitem:2840::|h[Copper Bar]|h" or nil end
+GetTradeSkillNumReagents = function(i) return i == 2 and 1 or 0 end
+GetTradeSkillReagentInfo = function() return "Copper Ore", "icon", 1, 5 end
+GetTradeSkillReagentItemLink = function() return "|Hitem:2770::|h[Copper Ore]|h" end
+GetTradeSkillNumMade = function() return 1, 1 end
+Cr.readTradeSkills()
+check("transform: recipes learned from the profession window", UpgradeFinderDB.recipes[2840]
+  and UpgradeFinderDB.recipes[2840].reagents[1][1] == 2770)
+tt = fakeTooltip("FakeTipK", "item:2770")
+Cr.onTooltip(tt)
+check("transform: a loss shows red", tt:find("Make into Copper Bar (1 each)") == "-50c (1s 00c -> 50c)")
+local n2 = #tt.lines
+Cr.onTooltip(tt)
+check("transform: added once", #tt.lines == n2)
+C_Item.GetItemInfo, Auctionator.API.v1.GetAuctionPriceByItemID = infoT, ahT
+SlashCmdList.UPGRADEFINDER("craft")
+tt = fakeTooltip("FakeTipD", "item:118")
+Cr.onTooltip(tt)
+check("/uf craft turns the lines off", #tt.lines == 0 and UpgradeFinderDB.opts.craft == false)
+SlashCmdList.UPGRADEFINDER("craft")
+C_Item.GetItemInfo = oldInfo
 
 print(failures == 0 and "all UpgradeFinder tests passed" or (failures .. " UpgradeFinder test(s) failed"))
 os.exit(failures == 0 and 0 or 1)

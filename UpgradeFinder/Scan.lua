@@ -309,6 +309,29 @@ end
 Scan.slotOf = slotOf
 
 local PROFESSION = "^Requires (.+) %((%d+)%)$"
+Scan.PROFESSION = PROFESSION
+
+-- The parts of a recipe tooltip: the made item's name, the reagents
+-- ({ name, count }), whether the made item binds on pickup, and the
+-- profession line ("Requires Tailoring (125)").
+function Scan.recipeParts(lines)
+  local made = lines[1] and (lines[1]:match("^[^:]+: (.+)$") or lines[2])
+  -- Reagents: the line after "Use: Teaches ...", such as "Bolt of Silk
+  -- Cloth (8), Fine Thread (4)". A reagent without a count is one.
+  local reagents, bop, craft = {}, false, nil
+  for i, line in ipairs(lines) do
+    if line == rawget(_G, "ITEM_BIND_ON_PICKUP") or line == "Binds when picked up" then bop = true end
+    if line:match(PROFESSION) and not line:match("^Requires Level") then craft = line end
+    if line:match("^Use: Teaches") and lines[i + 1] and not lines[i + 1]:match(PROFESSION) then
+      for part in (lines[i + 1] .. ","):gmatch("%s*([^,]+),") do
+        local name, n = part:match("^(.-)%s*%((%d+)%)$")
+        table.insert(reagents, { name or part, tonumber(n) or 1 })
+      end
+    end
+  end
+  return made, reagents, bop, craft
+end
+
 local function recipe(id)
   local lines, unusable, req, red = Scan.read(function(tt) tt:SetHyperlink("item:" .. id) end)
   if not lines then return false end
@@ -320,27 +343,11 @@ local function recipe(id)
   end
   if not loc then cache[id] = false return true end
   -- A red profession line only means you cannot craft it yourself yet.
-  local craft
-  for _, line in ipairs(lines) do
-    if line:match(PROFESSION) and not line:match("^Requires Level") then craft = line end
-  end
   unusable = false
   for _, line in ipairs(red) do
     if not line:match(PROFESSION) then unusable = true end
   end
-  local made = lines[1]:match("^[^:]+: (.+)$") or lines[2]
-  -- Reagents: the line after "Use: Teaches ...", such as "Bolt of Silk
-  -- Cloth (8), Fine Thread (4)". A reagent without a count is one.
-  local reagents, bop = {}, false
-  for i, line in ipairs(lines) do
-    if line == rawget(_G, "ITEM_BIND_ON_PICKUP") or line == "Binds when picked up" then bop = true end
-    if line:match("^Use: Teaches") and lines[i + 1] and not lines[i + 1]:match(PROFESSION) then
-      for part in (lines[i + 1] .. ","):gmatch("%s*([^,]+),") do
-        local name, n = part:match("^(.-)%s*%((%d+)%)$")
-        table.insert(reagents, { name or part, tonumber(n) or 1 })
-      end
-    end
-  end
+  local made, reagents, bop, craft = Scan.recipeParts(lines)
   local body = {}
   for i = 2, #lines do table.insert(body, lines[i]) end
   cache[id] = { name = made, recipe = lines[1], loc = loc, value = ns.valueOf(body, Scan.w), unusable = unusable,

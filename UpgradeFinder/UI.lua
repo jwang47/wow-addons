@@ -419,6 +419,7 @@ local HELP = {
   "/uf save NAME - save your weights as a preset; /uf load NAME, /uf presets, /uf delete NAME",
   "/uf reset - forget the saved item scores (they are kept between sessions)",
   "/uf where - turn the \"Get it:\" lines on item tooltips on or off (needs Questie)",
+  "/uf craft - turn the crafting lines on recipes on or off (cost to craft, sale price, profit, score); /uf craft names shows how many item names it has learned",
   "/uf dungeons - turn the dungeon drops in the list on or off (the From button filters them)",
   "/uf build - the Build window: try items in each slot, save builds, compare them (Alt-click a row to add it)",
   "/uf calib - the Forever formulas measured from your client (crit per Int and Agi, your spells); /uf calib reset; /uf calib log turns on the combat log (Forever blocks it)",
@@ -528,6 +529,13 @@ function ns.slash(msg)
     local o = ns.db().opts
     o.where = o.where == false
     say("\"Get it:\" lines on item tooltips " .. (o.where and "on" or "off"))
+  elseif cmd == "craft" and a == "names" then
+    ns.craft.learnNames()
+    say(ns.craft.namesStatus())
+  elseif cmd == "craft" then
+    local o = ns.db().opts
+    o.craft = o.craft == false
+    say("crafting lines on recipe tooltips " .. (o.craft and "on" or "off"))
   elseif cmd == "build" then
     ns.toggleBuild(true)
   elseif cmd == "calib" and a == "log" then

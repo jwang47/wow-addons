@@ -394,25 +394,34 @@ do
   check("AH age: days old", A.ahAge(4338) == "3d old" and A.ahAge(4306) == nil)
   Auctionator.API.v1.GetAuctionAgeByItemID = function(_, id) return id == 4306 and 0 or nil end
   check("AH age in the row", strip(A.detail(g[1].entries[1])) == "bags 12  bank 20  AH 25s 0c  today")
-  check("last scan: the newer stamp", A.lastScan() == 92800 and A.ago(A.lastScan()) == "2h ago")
+  check("last scan: the newer stamp", A.lastScan() == 92800 and A.ago(A.lastScan()) == "2h ago"
+    and A.scanText() == "AH full scan 2h ago")
   Auctionator.SavedState.TimeOfLastGetAllScan = 100000 - 120
   check("last scan: a newer full scan wins", A.ago(A.lastScan()) == "2m ago")
   local lines = {}
   local tt = { SetHyperlink = function() end, AddLine = function(_, l) table.insert(lines, l) end, Show = function() end }
   A.tooltip(tt, g[1].entries[1])
-  check("tooltip: price age and last scan", lines[1] == "AH price seen today; AH scan 2m ago")
+  check("tooltip: price age and last scan", lines[1] == "AH price seen today; AH full scan 2m ago")
+  Auctionator.API.v1.GetAuctionAgeByItemID = function(_, id) return id == 4306 and 1 or nil end
+  lines = {}
+  A.tooltip(tt, g[1].entries[1])
+  local scannedToday = A.fullScanToday()
+  check("tooltip: an old price after today's full scan", scannedToday
+    and lines[1] == "AH price seen 1d old, not in today's full scan; AH full scan 2m ago"
+    or not scannedToday and lines[1] == "AH price seen 1d old; AH full scan 2m ago")
+  Auctionator.API.v1.GetAuctionAgeByItemID = function(_, id) return id == 4306 and 0 or nil end
   LootValue = { scanText = function() return "AH scan 5m ago" end }
   check("LootValue's wording wins when loaded", A.scanText() == "AH scan 5m ago")
   LootValue.scanText = function() return nil end
-  check("LootValue gives nil: our own text", A.scanText() == "AH scan 2m ago")
+  check("LootValue gives nil: our own text", A.scanText() == "AH full scan 2m ago")
   LootValue.scanText = function() error("boom") end
-  check("LootValue throws: our own text", A.scanText() == "AH scan 2m ago")
+  check("LootValue throws: our own text", A.scanText() == "AH full scan 2m ago")
   LootValue = nil
   local ageApi = Auctionator.API.v1.GetAuctionAgeByItemID
   Auctionator.API.v1.GetAuctionAgeByItemID = nil
   lines = {}
   A.tooltip(tt, g[1].entries[1])
-  check("no age API: no made-up age, scan time only", lines[1] == "AH scan 2m ago")
+  check("no age API: no made-up age, scan time only", lines[1] == "AH full scan 2m ago")
   Auctionator.API.v1.GetAuctionAgeByItemID = ageApi
   Auctionator.SavedState = nil
   check("no saved state: no scan time", A.lastScan() == nil and A.scanText() == nil)

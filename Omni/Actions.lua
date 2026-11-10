@@ -318,7 +318,9 @@ function A.ago(stamp)
   return math.floor(s / 86400) .. "d ago"
 end
 
--- The last Auctionator scan: a full scan or a browse scan, whichever is newer.
+-- The last Auctionator full scan: each TimeOfLast...Scan field is one kind
+-- (Browse: the Full Scan button's default scan; Replicate; GetAll on older
+-- AH code). A plain AH search sets none of them.
 function A.lastScan()
   local st = api("Auctionator.SavedState")
   if type(st) ~= "table" then return nil end
@@ -327,13 +329,22 @@ function A.lastScan()
   return t > 0 and t or nil
 end
 
--- "AH scan 3h ago": LootValue's own text when it is loaded, so the wording
--- matches its tooltip line; else the same from A.lastScan.
+-- "AH full scan 3h ago": LootValue's own text when it is loaded, so the
+-- wording matches its tooltip line; else the same from A.lastScan.
 function A.scanText()
   local lv = call(api("LootValue.scanText"))
   if type(lv) == "string" then return lv end
   local ago = A.ago(A.lastScan())
-  return ago and ("AH scan " .. ago) or nil
+  return ago and ("AH full scan " .. ago) or nil
+end
+
+-- True when a full scan ran since local midnight (Auctionator's price day).
+function A.fullScanToday()
+  local full, now = A.lastScan(), call(rawget(_G, "time"))
+  local date = rawget(_G, "date") or (os and os.date)
+  local t = type(now) == "number" and call(date, "*t", now)
+  if not full or type(t) ~= "table" then return false end
+  return full >= now - (t.hour or 0) * 3600 - (t.min or 0) * 60 - (t.sec or 0)
 end
 
 -- The right-hand text of a row, worked out only for rows on screen.
@@ -402,7 +413,11 @@ function A.tooltip(tt, e)
       -- nil age: unknown (no age API, or not seen in 21 days); say only what we know.
       local parts = {}
       local age = A.ahAge(e.id)
-      if age then table.insert(parts, "AH price seen " .. age) end
+      if age then
+        -- A full scan today that did not see it: no listings now.
+        local unlisted = age ~= "today" and A.fullScanToday()
+        table.insert(parts, "AH price seen " .. age .. (unlisted and ", not in today's full scan" or ""))
+      end
       local scan = A.scanText()
       if scan then table.insert(parts, scan) end
       if #parts > 0 then tt:AddLine(table.concat(parts, "; "), 0.6, 0.6, 0.6) end

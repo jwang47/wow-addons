@@ -61,8 +61,12 @@ the 5% cut, the disenchant value).
   estimates them from the Classic disenchant table and the AH prices of the
   materials ("disenchant: no price" when no value is known).
 - A soulbound copy gets no AH option.
-- With an AH price on the line, it says how old Auctionator's last scan is
-  ("AH scan 3h ago").
+- With an AH price on the line, it says how old Auctionator's last full
+  scan is ("AH full scan 3h ago"). An item that a full scan today did not
+  see says "not in today's full scan": nobody lists it now, and its price,
+  listings and trend are from an older day. Auctionator counts price days
+  from local midnight, so an item seen only last night is "1 day old" in
+  the morning.
 
 ### Auto-loot
 
@@ -175,6 +179,30 @@ price is the craft cost: the pattern plus the reagents (from the line after
 lower; a "+" marks a reagent with no price. The tooltip lists the parts and
 the price to buy the made item on the AH instead.
 
+- Crafting lines (`UpgradeFinder/Craft.lua`): hover a recipe item (in your
+  bags, at a vendor, on the AH) or a recipe in your profession window (the
+  recipe list rows and the made item's icon) and the tooltip adds:
+  **Cost to craft** (the reagents at the AH price, or the vendor price when
+  lower; "+?" and a "No price:" line for a reagent with no price),
+  **Sells for** (the best of the AH after the 5% cut, the vendor and, with
+  Enchanting and LootValue, the disenchant estimate; times the number
+  made), **Profit** or **Loss**, and for gear the **Score of the made item**
+  against what you wear (MageMentor's score for a mage with MageMentor).
+  A bind on pickup item sells only to the vendor. An enchanting formula
+  makes no item, so it gets the cost only. On a recipe tooltip the game
+  reports the made item, so that gives its price. A recipe names its
+  reagents only by name, and the game finds an item by name only once the
+  client has seen it; so UpgradeFinder learns the names of the items in the
+  Auctionator scan in the background, starting 5 s after login (names the
+  client knows at once, others asked from the server 150 per 1.5 s), and saves them in
+  `UpgradeFinderDB.names`. A reagent that shows "No price" at first gets
+  its price on the next hover. A material you can turn into another item
+  with one reagent (Silk Cloth into Bolt of Silk Cloth, ore into bars)
+  gets a "Make into" line: what one craft gains or loses, with the cost
+  and the sale ("+7s 50c (40s -> ~47s 50c)"). The cloth bolts are built
+  in; other such recipes are read each time you open a profession window
+  and saved in `UpgradeFinderDB.recipes`. `/uf craft` turns the lines off
+  and on.
 - Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
   **Any price / Can afford**, and **All sources / AH only / Dungeons / Bags
@@ -364,7 +392,7 @@ A small floating list, under the minimap, of the quests that matter now.
 
 | Group | What | Sorted by |
 | --- | --- | --- |
-| Active | quests you are doing: the kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or you Alt-clicked it. It stays while you are within 600 yards (`STAY_YARDS`) or make progress, and 10 minutes after the last of either (`GRACE_SECS`) | most recent first, then nearest |
+| Active | quests you are doing: the kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or you Alt-clicked it (any quest, also a hand-in or a pick-up). It stays while you are within 600 yards (`STAY_YARDS`) or make progress, and 10 minutes after the last of either (`GRACE_SECS`) | most recent first, then nearest |
 | Nearby | other quests in your log whose open objective is within 300 yards (`HERE_YARDS`) | nearest |
 | Areas | places where 2 or more stops (objectives, hand-ins, givers) are within 250 yards of each other (`AREA_YARDS`), so one trip does several quests; the row says what is there ("2 hand in, 1 objective") | best XP per minute: the XP you earn there (hand-ins and objectives, not pick-ups) over the run there and the work |
 | Turn in | quests in your log that are complete | nearest quest giver |
@@ -435,7 +463,7 @@ A small floating list, under the minimap, of the quests that matter now.
   bottom of its row (each objective weighs the same): gold in Active,
   blue elsewhere.
 - A quest you Alt-clicked (pinned) has a gold star before its name.
-  Alt-click an area to pin every quest in your log there at once (again
+  Alt-click an area to pin every quest there at once (again
   to unpin them); the area gets the star when all of them are pinned.
 - "Nearest" sorting goes by distance only up to 1000 yards
   (`D.MID_YARDS`). Quests further away, in another zone or on another
@@ -469,8 +497,11 @@ A small floating list, under the minimap, of the quests that matter now.
   they are placed by screen position (not anchored to the board, which
   would lock the board too), and a change made in combat waits for the
   fight to end.
-- Alt-click a quest in your log: "I'm doing this" (it stays in Active until
-  you Alt-click it again or hand it in).
+- Point at a quest to see its whole chain in the tooltip: each step with
+  its level, marked done, `>>` (this one), log or `...` (later).
+- Alt-click any quest row: "I'm doing this" (it stays in Active until
+  you Alt-click it again or hand it in). This works for hand-ins and
+  pick-ups too: a pinned pick-up waits in Active until you take it.
 - Click a group name to fold it. Drag the board (anywhere on it) to move it;
   `/qb lock` stops that and `/qb reset`
   puts it back. In combat it fades to 35%.
@@ -627,7 +658,8 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
 - **Old bars**: `/glance bars hide` hides Bartender4's bottom action bars
   (1, 2 and 5-10; the right-edge bars 3 and 4 stay),
   Blizzard's bottom bars, the gryphon art and the old XP bar, and draws a
-  thin XP line along the bottom edge. The bag bar, micro menu, pet and
+  thin XP bar along the bottom edge, with your XP, the percentage and rested XP in it
+  ("12,345 / 20,000 (61.7%)  Rested 15%"). The bag bar, micro menu, pet and
   stance bars stay. Move click-only items (food, potions) onto Glance keys
   first. `/glance bars show` brings everything back.
 - **Chat**: Blizzard's chat in the same look: a faint panel, tabs that show
