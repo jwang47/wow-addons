@@ -395,9 +395,10 @@ C.onTooltip = function(tt, data) C.guard(onTooltip, tt, data) end
 ---------------------------------------------------------------------------
 -- The profession window (Blizzard_TradeSkillUI)
 ---------------------------------------------------------------------------
-function C.forTradeSkill(index)
+-- The reagents of the profession window's recipe at index: { { id or name,
+-- count, name } }.
+local function tradeSkillReagents(index)
   local g = function(n) return rawget(_G, n) end
-  local link = call(g("GetTradeSkillItemLink"), index)
   local reagents = {}
   for i = 1, call(g("GetTradeSkillNumReagents"), index) or 0 do
     local name, _, count = call(g("GetTradeSkillReagentInfo"), index, i)
@@ -405,6 +406,13 @@ function C.forTradeSkill(index)
     if id and name then C.learn(name, id) end
     if id or name then table.insert(reagents, { id or name, count or 1, name }) end
   end
+  return reagents
+end
+
+function C.forTradeSkill(index)
+  local g = function(n) return rawget(_G, n) end
+  local link = call(g("GetTradeSkillItemLink"), index)
+  local reagents = tradeSkillReagents(index)
   if #reagents == 0 then return nil end
   local lo, hi = call(g("GetTradeSkillNumMade"), index)
   local made = ((lo or 1) + (hi or lo or 1)) / 2
@@ -452,6 +460,176 @@ function C.hookRows()
   end
 end
 
+---------------------------------------------------------------------------
+-- Shopping for several crafts: the reagents for N crafts of the selected
+-- recipe, less what is in your bags and bank, as an Auctionator shopping
+-- list with the amounts, and a summary in chat with the estimated cost.
+---------------------------------------------------------------------------
+C.SHOP_LIST = "UpgradeFinder crafts"
+local bankSeen = false -- the game counts the bank only after a visit this session
+function C.bankSeen(v) if v ~= nil then bankSeen = v end return bankSeen end
+
+-- How many of an item you have in your bags and (once seen) your bank.
+function C.have(id)
+  if type(id) ~= "number" then return 0 end
+  local count = api("C_Item.GetItemCount") or rawget(_G, "GetItemCount")
+  return call(count, id, true) or 0
+end
+
+-- The shopping rows for want = { [id or name] = { id, name, count } }:
+-- { name, id, want, have, buy, each, from }, sorted by name, then the AH
+-- total of what to buy, the vendor total, and the names with no price.
+function C.shopRows(want)
+  local rows, ah, vendor, missing = {}, 0, 0, {}
+  for _, w in pairs(want or {}) do
+    local id = w.id or C.idByName(w.name)
+    local got = C.have(id)
+    local buy = math.max(0, w.count - got)
+    local each, from = Scan.priceOf(id or w.name)
+    local it = (not w.name and id) and info(id) or nil
+    local name = w.name or (it and it.name) or ("item " .. tostring(id))
+    table.insert(rows, { name = name, id = id, want = w.count, have = got, buy = buy, each = each, from = from })
+    if buy > 0 then
+      if not each then table.insert(missing, name)
+      elseif from == "vendor" then vendor = vendor + each * buy
+      else ah = ah + each * buy end
+    end
+  end
+  table.sort(rows, function(a, b) return a.name < b.name end)
+  return rows, ah, vendor, missing
+end
+
+-- Auctionator search strings for the rows to buy at the AH (not the ones a
+-- vendor sells for less): the exact name and the amount to buy.
+function C.searchTerms(rows)
+  local convert = api("Auctionator.API.v1.ConvertToSearchString")
+  local terms = {}
+  for _, r in ipairs(rows) do
+    if r.buy > 0 and r.from ~= "vendor" then
+      local s = call(convert, "UpgradeFinder", { searchString = r.name, isExact = true, quantity = r.buy })
+        or call(convert, "UpgradeFinder", { searchString = r.name, isExact = true })
+      table.insert(terms, s or ('"' .. r.name .. '"'))
+    end
+  end
+  return terms
+end
+
+-- Makes (or replaces) the Auctionator shopping list. true when it worked.
+function C.toAuctionator(rows)
+  local create = api("Auctionator.API.v1.CreateShoppingList")
+  local terms = C.searchTerms(rows)
+  if not create or #terms == 0 then return false end
+  return (pcall(create, "UpgradeFinder", C.SHOP_LIST, terms))
+end
+
+-- The chat lines for a shopping list.
+function C.shopLines(crafts, rows, ah, vendor, missing)
+  local money, out = ns.money, {}
+  table.insert(out, "Shopping for " .. table.concat(crafts, ", ") .. " (less your bags"
+    .. (bankSeen and " and bank)" or "; open your bank once to count it too)"))
+  local enough = {}
+  for _, r in ipairs(rows) do
+    if r.buy == 0 then table.insert(enough, r.name)
+    else
+      local price = r.each and (money(r.each) .. " each" .. (r.from == "vendor" and " at a vendor" or "")) or "no price"
+      table.insert(out, string.format("  %s: buy %d (need %d, have %d), %s", r.name, r.buy, r.want, r.have, price))
+    end
+  end
+  if #enough > 0 then table.insert(out, "  You have enough " .. table.concat(enough, ", ")) end
+  if ah + vendor == 0 and #missing == 0 then
+    table.insert(out, "You have every reagent.")
+  else
+    local parts = {}
+    if ah > 0 then table.insert(parts, "about " .. money(ah) .. " at the AH") end
+    if vendor > 0 then table.insert(parts, money(vendor) .. " at vendors") end
+    if #missing > 0 then table.insert(parts, #missing .. " with no price") end
+    table.insert(out, "Cost: " .. table.concat(parts, ", ") .. ".")
+  end
+  return out
+end
+
+-- The count in the profession window's Create box (at least 1).
+local function createCount()
+  local box = rawget(_G, "TradeSkillInputBox")
+  local n = box and box.GetNumber and call(box.GetNumber, box)
+  return (type(n) == "number" and n >= 1) and math.floor(n) or 1
+end
+C.createCount = createCount
+
+-- Shop for times crafts of the selected recipe (index), or add them to the
+-- list you have (add). Says the list in chat and makes the Auctionator list.
+function C.shop(times, add, index)
+  local g = function(n) return rawget(_G, n) end
+  index = index or call(g("GetTradeSkillSelectionIndex"))
+  local name, kind = call(g("GetTradeSkillInfo"), index or 0)
+  local reagents = (index and index > 0 and name and kind ~= "header") and tradeSkillReagents(index) or {}
+  if #reagents == 0 then
+    if ns.say then ns.say("open your profession window and pick a recipe to shop for") end
+    return nil
+  end
+  times = math.max(1, math.floor(tonumber(times) or createCount()))
+  local db = ns.db()
+  if not add or type(db.shop) ~= "table" then db.shop = { want = {}, crafts = {} } end
+  local want = db.shop.want
+  for _, r in ipairs(reagents) do
+    local id = type(r[1]) == "number" and r[1] or nil
+    local key = id or r[3] or r[1]
+    local w = want[key] or { id = id, name = r[3] or (type(r[1]) == "string" and r[1]) or nil, count = 0 }
+    w.count = w.count + r[2] * times
+    want[key] = w
+  end
+  table.insert(db.shop.crafts, times .. "x " .. name)
+  local rows, ah, vendor, missing = C.shopRows(want)
+  local lines = C.shopLines(db.shop.crafts, rows, ah, vendor, missing)
+  local made = C.toAuctionator(rows)
+  if made then
+    local frame = ns.ahFrame and ns.ahFrame()
+    local open = frame and frame.IsShown and frame:IsShown()
+    table.insert(lines, "Auctionator shopping list \"" .. C.SHOP_LIST .. "\" is ready"
+      .. (open and ": open it on the Shopping tab." or ": open it on the Shopping tab at the Auction House."))
+  elseif #C.searchTerms(rows) > 0 then
+    table.insert(lines, "Auctionator is not loaded (or too old for shopping lists), so there is no list to open.")
+  end
+  if ns.say then for _, l in ipairs(lines) do ns.say(l) end end
+  return rows, lines
+end
+
+-- The Shop button beside "Reagents:" in the profession window.
+local shopButton
+local function shopText()
+  if shopButton then shopButton:SetText("Shop x" .. createCount()) end
+end
+C.shopText = shopText
+function C.shopButton()
+  if shopButton or not rawget(_G, "TradeSkillFrame") then return shopButton end
+  local label = rawget(_G, "TradeSkillReagentLabel")
+  local parent = rawget(_G, "TradeSkillDetailScrollChildFrame") or rawget(_G, "TradeSkillFrame")
+  shopButton = CreateFrame("Button", "UpgradeFinderShopButton", parent, "UIPanelButtonTemplate")
+  shopButton:SetSize(64, 18)
+  if label then shopButton:SetPoint("LEFT", label, "RIGHT", 8, 0)
+  else shopButton:SetPoint("TOPRIGHT", rawget(_G, "TradeSkillFrame"), "TOPRIGHT", -40, -50) end
+  if shopButton.SetNormalFontObject and rawget(_G, "GameFontNormalSmall") then
+    shopButton:SetNormalFontObject(rawget(_G, "GameFontNormalSmall"))
+  end
+  shopButton:SetScript("OnClick", function()
+    C.guard(C.shop, nil, call(rawget(_G, "IsShiftKeyDown")) and true or false)
+  end)
+  shopButton:SetScript("OnEnter", function(self)
+    local tt = rawget(_G, "GameTooltip")
+    tt:SetOwner(self, "ANCHOR_RIGHT")
+    tt:AddLine("Shop for these crafts")
+    tt:AddLine("The reagents for the number in the Create box, less what is in your bags and bank, as an Auctionator shopping list.", 1, 1, 1, true)
+    tt:AddLine("Shift-click adds this recipe to the list you have.", 0.6, 0.6, 0.6, true)
+    tt:Show()
+  end)
+  shopButton:SetScript("OnLeave", function() local tt = rawget(_G, "GameTooltip") if tt then tt:Hide() end end)
+  shopButton:SetScript("OnShow", shopText)
+  local box = rawget(_G, "TradeSkillInputBox")
+  if box and box.HookScript then box:HookScript("OnTextChanged", function() pcall(shopText) end) end
+  shopText()
+  return shopButton
+end
+
 local hooked = false
 function C.hook()
   if hooked then return end
@@ -477,13 +655,18 @@ function C.hook()
       -- Learn the names soon after login, before the first recipe hover.
       local after = api("C_Timer.After")
       if after then after(5, function() C.guard(C.learnNames) end) end
-    elseif ev == "TRADE_SKILL_SHOW" or ev == "TRADE_SKILL_UPDATE" then C.guard(C.readTradeSkills)
-    elseif name == "Blizzard_TradeSkillUI" then C.hookRows() end
+    elseif ev == "TRADE_SKILL_SHOW" or ev == "TRADE_SKILL_UPDATE" then
+      C.guard(C.readTradeSkills)
+      C.guard(C.shopButton)
+      pcall(shopText)
+    elseif ev == "BANKFRAME_OPENED" then C.bankSeen(true)
+    elseif name == "Blizzard_TradeSkillUI" then C.hookRows() C.guard(C.shopButton) end
   end)
   pcall(f.RegisterEvent, f, "ADDON_LOADED")
   pcall(f.RegisterEvent, f, "PLAYER_EQUIPMENT_CHANGED")
   pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
   pcall(f.RegisterEvent, f, "TRADE_SKILL_SHOW")
   pcall(f.RegisterEvent, f, "TRADE_SKILL_UPDATE")
+  pcall(f.RegisterEvent, f, "BANKFRAME_OPENED")
 end
 C.hook()

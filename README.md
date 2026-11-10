@@ -203,6 +203,20 @@ the price to buy the made item on the AH instead.
   in; other such recipes are read each time you open a profession window
   and saved in `UpgradeFinderDB.recipes`. `/uf craft` turns the lines off
   and on.
+- Shopping for several crafts: the profession window has a **Shop xN**
+  button beside "Reagents:". It takes N from the Create box, works out the
+  reagents for N crafts of the selected recipe less what is in your bags
+  and bank (`GetItemCount(id, true)`; the game counts the bank only after
+  you open it, and chat says so until then), and says in chat what to buy,
+  what you have enough of and the estimated cost (AH and vendor prices as
+  for the crafting lines). It also makes the Auctionator shopping list
+  "UpgradeFinder crafts" with each reagent's exact name and the amount to
+  buy (`Auctionator.API.v1.CreateShoppingList`); open it on Auctionator's
+  Shopping tab. A reagent a vendor sells for less stays off the list.
+  Shift-click adds the recipe to the list you have, so two recipes that
+  share a reagent count it once. `/uf shop [N]`, `/uf shop add [N]` and
+  `/uf shop clear` do the same from chat. The Enchanting window (a
+  different frame) has no button yet.
 - Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
   **Any price / Can afford**, and **All sources / AH only / Dungeons / Bags

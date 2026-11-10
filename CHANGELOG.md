@@ -19,6 +19,11 @@ the same, and a test checks that every `.toc` version has a section here.
   craft gains or loses ("Make into Bolt of Silk Cloth (4 each)").
 - Reagents the client has not seen yet get their AH price too: UpgradeFinder
   learns the item names in the Auctionator scan once and saves them.
+- New: shop for several crafts. The **Shop xN** button in the profession
+  window (N is the Create box) lists the reagents for N crafts less what is
+  in your bags and bank, with the estimated cost, and makes the Auctionator
+  shopping list "UpgradeFinder crafts" with the amounts to buy.
+  Shift-click adds another recipe to the list. `/uf shop [N]` does the same.
 
 ## LootValue 0.2.1
 
