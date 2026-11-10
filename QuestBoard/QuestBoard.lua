@@ -189,7 +189,8 @@ function ns.meta(e, kind)
   if e.kind == "turnin" and e.xp then table.insert(parts, D.tierText(e, D.short(e.xp) .. " xp")) end
   -- A hand-in: the run there, so you can weigh the trip against the XP.
   if e.kind == "turnin" and e.dist then table.insert(parts, D.mins(D.travelSecs(e.dist))) end
-  if (e.kind == "pickup" or e.kind == "area" or e.kind == "zone") and e.rate then table.insert(parts, D.tierText(e, "~" .. D.short(e.rate) .. " xp/m")) end
+  if e.toFinisher then table.insert(parts, "|cff909090drop unknown|r")
+  elseif (e.kind == "pickup" or e.kind == "area" or e.kind == "zone") and e.rate then table.insert(parts, D.tierText(e, "~" .. D.short(e.rate) .. " xp/m")) end
   if e.dist then table.insert(parts, D.yardsText(e.dist))
   elseif e.far then table.insert(parts, "|cff909090far|r")
   elseif e.kind == "log" and not e.done then table.insert(parts, "|cff909090no place|r")
@@ -314,7 +315,7 @@ local function tooltip(r)
     tip:AddLine(string.format("~%s XP per minute (about %d min%s)", D.short(e.rate), math.max(1, math.floor(e.secs / 60 + 0.5)),
       guess and ", a guess until you make progress" or ""), 0.6, 0.8, 1)
   end
-  local verb = e.kind == "turnin" and "Turn in at " or (e.kind == "pickup" or e.kind == "party") and "Get it from " or "Nearest: "
+  local verb = e.kind == "turnin" and "Turn in at " or e.toFinisher and "Hand in to " or (e.kind == "pickup" or e.kind == "party") and "Get it from " or "Nearest: "
   if e.target then
     tip:AddLine(verb .. e.target .. (e.dist and ("  " .. D.yards(e.dist) .. " " .. D.compass(e.angle)) or ""), 1, 1, 1)
   end
@@ -322,7 +323,7 @@ local function tooltip(r)
     local how = e.dropHow == "vendor" and ", sold by " or e.dropHow == "object" and ", found in " or ", drops from "
     tip:AddLine("Starts from an item" .. (e.startItem and (": " .. e.startItem) or "") .. (e.dropFrom and (how .. e.dropFrom) or ""), 0.8, 0.8, 0.8)
     if e.toFinisher then tip:AddLine("Questie does not know where it drops; the distance is to " .. e.finisher, 0.8, 0.5, 0.5) end
-    if e.finisher then tip:AddLine("Hand in to " .. e.finisher, 0.8, 0.8, 0.8) end
+    if e.finisher and not e.toFinisher then tip:AddLine("Hand in to " .. e.finisher, 0.8, 0.8, 0.8) end
   end
   if not e.spawn and not e.spot then tip:AddLine("Questie has no place for this quest", 0.8, 0.5, 0.5) end
   for _, o in ipairs(e.left or {}) do

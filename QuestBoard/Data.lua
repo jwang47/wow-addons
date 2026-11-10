@@ -1070,6 +1070,9 @@ function D.collect(opts)
       if not inLog[id] then
         local e = D.pickup(id, level, opts.maxAbove)
         if e and opts.dungeons == false and D.isDungeon(e) then e = nil end
+        -- Started by an item that Questie cannot place (a world drop): you
+        -- cannot go and get it, so it is not offered. A pin keeps it.
+        if e and e.toFinisher and not (opts.doing and opts.doing[id]) then e = nil end
         if e and e.far then
           -- Far away: for Areas, or Doing when you pinned it (a zone you swap to).
           e.pinned = opts.doing and opts.doing[id] and true or nil

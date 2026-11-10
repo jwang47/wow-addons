@@ -46,6 +46,10 @@ the same, and a test checks that every `.toc` version has a section here.
   still says it); a chain shows only when it ends in gear.
 - Fix: pins stay after a /reload or a login. A pin goes only when you
   hand the quest in.
+- A quest that starts from a world drop (Questie does not know where the
+  item drops) is no longer offered as a pick-up: you cannot go and get it.
+  A pin keeps it, marked "drop unknown", and its tooltip says "Hand in to"
+  in place of "Get it from".
 - New layout: four tabs for what you are doing, in place of nine groups.
   Doing (picked by itself while a quest is Active): the quests you are on,
   the stops on the way, your party, and one line that counts the rest of

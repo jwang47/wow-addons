@@ -604,6 +604,17 @@ mods.QuestieDB.GetItem = function(_, id) if id == 10441 then return { name = "Gl
 local loose = D.pickup(207, 27, 3)
 check("item quest: unknown drop has the finisher's distance", loose.dist == 2000 and loose.toFinisher and loose.target == "Sputtervalve")
 check("item quest: unknown drop says so", ns.todo(loose) == "Loot Glowing Shard (drop unknown), hand in to Sputtervalve")
+do
+  local avail = mods.AvailableQuests.__availableQuests
+  avail[207] = true
+  local function has(list) for _, e in ipairs(list) do if e.id == 207 then return e end end end
+  local st = D.collect({ time = 9000 })
+  check("a world-drop quest is not offered as a pick-up", not has(st.pickup) and not has(st.farPickup) and not has(st.active))
+  local pinnedSt = D.collect({ time = 9001, doing = { [207] = true } })
+  local p = has(pinnedSt.active)
+  check("a pinned world-drop quest stays, marked drop unknown", p and p.toFinisher and ns.meta(p, "active"):find("drop unknown", 1, true))
+  avail[207] = nil
+end
 mods.QuestieDB.GetObject = nil
 mods.QuestieDB.GetQuest = realGetQuest
 mods.DistanceUtils.GetNearestFinisherOrStarter = realFinisher
