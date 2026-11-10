@@ -57,6 +57,11 @@ the same, and a test checks that every `.toc` version has a section here.
   at the object and pins it.
 - The item tooltip says "AH full scan 3h ago" like LootValue, and "not in
   today's full scan" next to an old price.
+- `ah:` searches your last full AH scan from anywhere ("ah: silk"): the
+  items LootValue's full scan saw, with the cheapest buyout, the fair
+  price, the items listed and the sales in 2 days, most sold first.
+  Without a LootValue scan it uses Auctionator's prices. With Bazaar
+  loaded, the last row opens the same search in the Bazaar AH browser.
 
 ## QuestBoard 0.1.2
 
