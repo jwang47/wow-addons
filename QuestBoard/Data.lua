@@ -271,13 +271,18 @@ function D.availableIDs()
 end
 
 -- An entry for one available quest, or nil when it does not fit.
-function D.pickup(id, level, maxAbove)
+-- kind "party": a quest a party member has; any level you can take.
+function D.pickup(id, level, maxAbove, kind)
   local qdb, du = D.module("QuestieDB"), D.module("DistanceUtils")
   local quest = qdb and call(qdb.GetQuest, id)
   if type(quest) ~= "table" or quest.isHidden then return nil end
-  if not D.fits(quest.level, quest.requiredLevel, level, maxAbove) then return nil end
+  if kind == "party" then
+    if quest.requiredLevel and quest.requiredLevel > (level or D.playerLevel()) then return nil end
+  elseif not D.fits(quest.level, quest.requiredLevel, level, maxAbove) then
+    return nil
+  end
   local e = { id = id, name = quest.name or ("Quest " .. id), level = quest.level, req = quest.requiredLevel,
-    kind = "pickup", objectives = 0, left = {} }
+    kind = kind or "pickup", objectives = 0, left = {} }
   -- Raw objectives: [1] creatures, [2] objects, [3] items (lists of entries).
   local raw = type(quest.objectives) == "table" and quest.objectives or {}
   for k = 1, 3 do
@@ -291,6 +296,82 @@ function D.pickup(id, level, maxAbove)
   -- Started by an item that drops: no giver to walk to.
   if not e.spawn and quest.Starts and quest.Starts.Item then e.fromItem = true end
   return e
+end
+
+---------------------------------------------------------------------------
+-- Party
+---------------------------------------------------------------------------
+-- { { name, unit } } for each party member.
+function D.partyMembers()
+  local list = {}
+  for i = 1, 4 do
+    local unit = "party" .. i
+    local name = call(rawget(_G, "UnitName"), unit)
+    if type(name) == "string" and name ~= "" then table.insert(list, { name = name, unit = unit }) end
+  end
+  return list
+end
+
+-- Questie's copy of the party's quest logs: questID -> { player -> objectives }.
+function D.remoteLogs()
+  local comms = D.module("QuestieComms")
+  local logs = comms and rawget(comms, "remoteQuestLogs")
+  return type(logs) == "table" and logs or {}
+end
+
+local function shortName(n) return type(n) == "string" and (n:match("^([^%-]+)") or n) or nil end
+
+-- "3/8" from Questie's objectives for one player, or "done" or "".
+function D.partyProgress(objectives)
+  if type(objectives) ~= "table" then return "" end
+  local any, all = false, true
+  for _, o in pairs(objectives) do
+    if type(o) == "table" then
+      any = true
+      if not o.finished then
+        all = false
+        if o.fulfilled and o.required and o.required > 1 then return o.fulfilled .. "/" .. o.required end
+      end
+    end
+  end
+  return (any and all) and "done" or ""
+end
+
+-- Party members with a quest from Questie's data: { { name, progress } }.
+function D.partyHas(players, members)
+  local who = {}
+  for _, m in ipairs(members) do
+    for pname, obj in pairs(type(players) == "table" and players or {}) do
+      if shortName(pname) == m.name then
+        table.insert(who, { name = m.name, progress = D.partyProgress(obj) })
+        break
+      end
+    end
+  end
+  return who
+end
+
+-- Party members on a quest in your log: the game knows (IsUnitOnQuest),
+-- and Questie adds their progress when it has it.
+function D.partyOn(id, members)
+  local on = api("C_QuestLog.IsUnitOnQuest") or rawget(_G, "IsUnitOnQuest")
+  local remote = D.remoteLogs()[id]
+  local who = {}
+  for _, m in ipairs(members) do
+    local has = call(on, m.unit, id)
+    local mine = D.partyHas(remote, { m })[1]
+    if has or mine then table.insert(who, { name = m.name, progress = mine and mine.progress or "" }) end
+  end
+  return who
+end
+
+-- "Ann 3/8, Bo" for a row.
+function D.partyText(who)
+  local parts = {}
+  for _, w in ipairs(who or {}) do
+    table.insert(parts, w.progress ~= "" and (w.name .. " " .. w.progress) or w.name)
+  end
+  return table.concat(parts, ", ")
 end
 
 function D.pickupSecs(e)
@@ -370,7 +451,7 @@ function D.collect(opts)
       start = now()
     end
   end
-  local out = { active = {}, turnin = {}, log = {}, pickup = {}, questie = D.hasQuestie(), level = level }
+  local out = { active = {}, turnin = {}, log = {}, party = {}, pickup = {}, questie = D.hasQuestie(), level = level }
   local inLog = {}
   local clock = opts.time or call(rawget(_G, "GetTime")) or 0
   for _, e in ipairs(D.logQuests()) do
@@ -382,6 +463,29 @@ function D.collect(opts)
       table.insert(e.done and out.turnin or out.log, e)
     end
     tick()
+  end
+  -- Your party: who shares each quest in your log, and the quests they have
+  -- that you do not (Questie's party data), nearest giver first.
+  local members = D.partyMembers()
+  if #members > 0 then
+    for _, list in ipairs({ out.active, out.turnin, out.log }) do
+      for _, e in ipairs(list) do e.party = D.partyOn(e.id, members) end
+    end
+    if out.questie then
+      for id, players in pairs(D.remoteLogs()) do
+        if not inLog[id] then
+          local who = D.partyHas(players, members)
+          if #who > 0 then
+            local e = D.pickup(id, level, nil, "party")
+            if e and not e.far then
+              e.party = who
+              table.insert(out.party, D.finish(e, level))
+            end
+          end
+        end
+        tick()
+      end
+    end
   end
   if out.questie then
     for _, id in ipairs(D.availableIDs()) do
@@ -398,6 +502,7 @@ function D.collect(opts)
     return (a.dist or math.huge) < (b.dist or math.huge)
   end)
   D.sort(out.turnin, "near")
+  D.sort(out.party, "near")
   D.sort(out.log, opts.sortLog or "near")
   D.sort(out.pickup, opts.sortPickup or "xp")
   return out

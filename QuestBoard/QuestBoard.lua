@@ -14,7 +14,7 @@ local defaults = {
   sortLog = "near",      -- near | xp
   sortPickup = "xp",     -- near | xp
   maxAbove = 3,          -- pick-ups at most this many levels over you
-  rows = { active = 4, turnin = 6, log = 8, pickup = 8 },
+  rows = { active = 4, turnin = 6, log = 8, party = 5, pickup = 8 },
   collapsed = {},
   combatAlpha = 0.35,
   hideTrackers = false,
@@ -36,8 +36,8 @@ ns.say = say
 ---------------------------------------------------------------------------
 local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6
 local FONT, FONT_DIM = "GameFontHighlightSmall", "GameFontDisableSmall"
-local HEADS = { active = "Active", turnin = "Turn in", log = "In your log", pickup = "Pick up" }
-local ORDER = { "active", "turnin", "log", "pickup" }
+local HEADS = { active = "Active", turnin = "Turn in", log = "In your log", party = "Party has", pickup = "Pick up" }
+local ORDER = { "active", "turnin", "log", "party", "pickup" }
 
 local panel, rows, heads = nil, {}, {}
 local state = nil        -- last collect() result
@@ -47,8 +47,18 @@ local function rgb(name) local c = D.COLORS[name] or D.COLORS.yellow return c[1]
 -- What to do for a quest, in a few words: the open objective and where
 -- (Questie's nearest mob, object or NPC for it), or who takes it in.
 function ns.todo(e)
+  local text = ns.todoBase(e)
+  local with = e.party and #e.party > 0 and D.partyText(e.party)
+  if with and with ~= "" then
+    if e.kind == "party" then return with .. (text and ("  -  " .. text) or "") end
+    return (text and (text .. "  -  ") or "") .. "with " .. with
+  end
+  return text
+end
+
+function ns.todoBase(e)
   if e.kind == "turnin" then return e.target and ("Hand in to " .. e.target) or "Hand it in" end
-  if e.kind == "pickup" then return e.target and ("Get it from " .. e.target) or nil end
+  if e.kind == "pickup" or e.kind == "party" then return e.target and ("Get it from " .. e.target) or nil end
   local o = e.left and e.left[1]
   local text = o and o.text
   if text and text ~= "" then
@@ -107,7 +117,7 @@ local function tooltip(r)
   if e.rate and e.secs then
     tip:AddLine(string.format("~%s XP per minute (about %d min)", D.short(e.rate), math.max(1, math.floor(e.secs / 60 + 0.5))), 0.6, 0.8, 1)
   end
-  local verb = e.kind == "turnin" and "Turn in at " or e.kind == "pickup" and "Get it from " or "Nearest: "
+  local verb = e.kind == "turnin" and "Turn in at " or (e.kind == "pickup" or e.kind == "party") and "Get it from " or "Nearest: "
   if e.target then
     tip:AddLine(verb .. e.target .. (e.dist and ("  " .. D.yards(e.dist) .. " " .. D.compass(e.angle)) or ""), 1, 1, 1)
   elseif e.fromItem then
@@ -118,7 +128,10 @@ local function tooltip(r)
   end
   tip:AddLine(" ")
   tip:AddLine("Click: show it on the map   Shift-click: link", 0.5, 0.5, 0.5)
-  if e.kind ~= "pickup" then tip:AddLine("Right-click: open the quest log", 0.5, 0.5, 0.5)
+  if e.party and #e.party > 0 then
+    tip:AddLine((e.kind == "party" and "Your party has it: " or "With ") .. D.partyText(e.party), 0.6, 0.8, 1)
+  end
+  if e.kind ~= "pickup" and e.kind ~= "party" then tip:AddLine("Right-click: open the quest log", 0.5, 0.5, 0.5)
   else tip:AddLine("Right-click: show the giver on the map", 0.5, 0.5, 0.5) end
   tip:Show()
 end
@@ -220,7 +233,7 @@ function ns.click(e, button)
   if not e then return end
   if rawget(_G, "IsShiftKeyDown") and IsShiftKeyDown() then return ns.link(e) end
   if button == "RightButton" then
-    if e.kind == "pickup" then return ns.showGiver(e) end
+    if e.kind == "pickup" or e.kind == "party" then return ns.showGiver(e) end
     return ns.openLog(e)
   end
   if e.npc then ns.markNPC(e.npc) end

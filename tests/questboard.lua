@@ -381,6 +381,31 @@ SlashCmdList.QUESTBOARD("far on")
 SlashCmdList.QUESTBOARD("far off")
 check("/qb far off puts the old values back", cvars.nameplateMaxDistance == "20" and cvars.nameplateShowEnemies == "0")
 
+-- Party: who shares your quests, and the quests they have that you do not.
+local party = { party1 = "Ann" }
+local realUnitName = UnitName
+function UnitName(u) return party[u] end
+C_QuestLog.IsUnitOnQuest = function(u, id) return u == "party1" and id == 122 end
+mods.QuestieComms = { remoteQuestLogs = {
+  [122] = { ["Ann-Forever"] = { { fulfilled = 5, required = 6, finished = false } } },
+  [201] = { ["Ann"] = { { fulfilled = 2, required = 8, finished = false } } },
+  [204] = { ["Bo"] = { { fulfilled = 1, required = 8, finished = false } } },
+} }
+D.resetModules()
+local withParty = D.collect({})
+local shared
+for _, e in ipairs(withParty.log) do if e.id == 122 then shared = e end end
+check("a shared quest names the party member and progress", shared and D.partyText(shared.party) == "Ann 5/6")
+check("party group: quests a member has that you do not", #withParty.party == 1 and withParty.party[1].id == 201
+  and D.partyText(withParty.party[1].party) == "Ann 2/8")
+check("party row says who and where", ns.todo(withParty.party[1]) == "Ann 2/8  -  Get it from Marshal")
+check("shared row adds who", ns.todo(shared):find("with Ann 5/6", 1, true) ~= nil)
+UnitName = realUnitName
+mods.QuestieComms = nil
+C_QuestLog.IsUnitOnQuest = nil
+D.resetModules()
+check("no party: no party group", #D.collect({}).party == 0)
+
 ---------------------------------------------------------------------------
 -- Without Questie: the log only, no errors.
 questieOn = false

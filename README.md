@@ -271,8 +271,13 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
 | Active | quests in your log whose kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or whose nearest open objective is within 200 yards (`HERE_YARDS`). It stays while you are within 600 yards (`STAY_YARDS`) or make progress, and 10 minutes after the last of either (`GRACE_SECS`) | most recent first, then nearest |
 | Turn in | quests in your log that are complete | nearest quest giver |
 | In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
+| Party has | quests your party members have that you do not (Questie's party data, `QuestieComms.remoteQuestLogs`), with who and their progress ("Ann 2/8") | nearest giver |
 | Pick up | quests Questie shows as available ("!") that give XP and are at most 3 levels over you (`/qb range N`) | best estimated XP per minute (right-click the group: nearest) |
 
+- A quest in your log that a party member also has says so under it ("with
+  Ann 5/6"): the game's `IsUnitOnQuest`, plus Questie's party data for the
+  progress. Party members need Questie too for their progress and for the
+  Party has group.
 - Focus (on by default): the board shows only the Next line and the Active
   group. Move the mouse over it and the whole board opens; it closes again
   a moment after the mouse leaves. `/qb focus` shows the whole board all the
