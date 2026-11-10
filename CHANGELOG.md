@@ -47,6 +47,10 @@ the same, and a test checks that every `.toc` version has a section here.
   A click on a tab keeps it until you start or finish a quest. The "Next:"
   line is gone: the first row of Nearby is the suggestion.
 - A log quest with no known place says "no place".
+- A quest you finish stays in Doing as a hand-in (pinned until you hand it
+  in; else for 10 minutes after your last progress), so the next step,
+  taking it back, is on top. Your pins also sit in a "Pinned" list at the
+  top of the Nearby, Areas and Log tabs.
 - Alt-click a list's heading (Chain next, On the way, a Log zone) to pin
   every quest you see in it, the stops of its areas too; they all go to
   Doing. Alt-click again to unpin them. Alt-click a zone in Areas pins

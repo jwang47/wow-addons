@@ -1020,8 +1020,11 @@ function D.collect(opts)
     local pinned = opts.doing and opts.doing[e.id]
     e.pinned = pinned and true or nil
     local recent = D.noteProgress(e, clock)
-    if e.done and pinned then
-      table.insert(out.active, e)   -- a hand-in you pinned stays in Active
+    -- A hand-in you pinned, or one you were just working on, stays in Active
+    -- (Doing) until you hand it in: the next step is to take it back.
+    local held = D.heldAt[e.id]
+    if e.done and (pinned or (held and clock - held <= D.GRACE_SECS)) then
+      table.insert(out.active, e)
     elseif not e.done and D.isActive(e, recent, clock, pinned) then
       table.insert(out.active, e)
     elseif not e.done and e.dist and e.dist <= D.HERE_YARDS then

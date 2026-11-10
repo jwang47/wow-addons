@@ -834,6 +834,12 @@ function ns.sections(st, tab)
     add({ key = "active", head = "Doing", right = "hover: all", list = st.active, cap = ALL })
     return out
   end
+  -- Your pins sit at the top of every other tab.
+  if tab ~= "doing" then
+    local pins = {}
+    for _, e in ipairs(st.active) do if e.pinned then table.insert(pins, e) end end
+    add({ key = "pinned", head = "Pinned", right = "Alt-click: unpin", list = pins, cap = ALL })
+  end
   if tab == "doing" then
     add({ key = "active", head = "Doing", right = "your quests now", list = st.active, cap = ALL })
     local cand, isActive = {}, {}

@@ -402,6 +402,10 @@ every quest you see in it, the stops of its areas too; they go to Doing
 together. Alt-click it again to unpin them. Alt-click a zone in Areas to
 pin every quest there (far pick-ups too), for a zone you swap to.
 
+A quest you finish stays in Doing as a hand-in: a pinned one until you
+hand it in, else for 10 minutes after your last progress. Pinned quests
+also sit in a "Pinned" list at the top of the other tabs.
+
 A tab you click holds until the board's own pick changes (you start or
 finish a quest). Active means: the kill or loot count went up in the last
 5 minutes (`ACTIVE_SECS`), or you Alt-clicked the quest (any quest, also a

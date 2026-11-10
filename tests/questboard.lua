@@ -241,6 +241,13 @@ local pins = { [127] = true, [pickID] = true, [9999] = true }
 local all = D.collect({ time = 4001, doing = pins })
 local inActive = {}
 for _, e in ipairs(all.active) do inActive[e.id] = e end
+-- A quest you were working on that is now done stays in Active.
+D.heldAt[127] = 3990
+local justDone = D.collect({ time = 4000 })
+local stays = false
+for _, e in ipairs(justDone.active) do if e.id == 127 then stays = true end end
+check("just done: the hand-in stays in Doing", stays)
+D.heldAt[127] = nil
 check("a pinned hand-in is Active", inActive[127] and inActive[127].kind == "turnin" and inActive[127].pinned and #all.turnin == 0)
 check("a pinned pick-up is Active", inActive[pickID] and inActive[pickID].kind == "pickup" and inActive[pickID].pinned)
 check("a pinned pick-up leaves Pick up", (function() for _, e in ipairs(all.pickup) do if e.id == pickID then return false end end return true end)())
@@ -351,6 +358,11 @@ check("pin all: Alt-click a zone pins its quests", QuestBoardDB.doing[601] and Q
 ns.click(zoneRow)
 IsAltKeyDown = realAltZ
 check("pin all: again unpins the zone", next(QuestBoardDB.doing) == nil)
+local pinState = { active = { { id = 1, pinned = true, name = "p", kind = "log", left = {} }, { id = 2, name = "q", kind = "log", left = {} } },
+  nearby = {}, turnin = {}, log = {}, party = {}, pickup = {}, area = {}, zones = {}, town = {}, members = {} }
+local ps = ns.sections(pinState, "areas")
+check("pins: a Pinned list on top of the other tabs", ps[1] and ps[1].key == "pinned" and #ps[1].list == 1 and ps[1].list[1].id == 1)
+check("pins: not twice in Doing", ns.sections(pinState, "doing")[1].key == "active")
 ns.refresh()
 for _ = 1, 50 do ns.step() end
 local nextHead
@@ -943,7 +955,7 @@ local restRow
 for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and f.entry.tab == "log" then restRow = f end end
 check("on a job: one line counts the rest of the log", restRow and restRow.entry.name == "1 more in your log: Log tab")
 ns.click(restRow.entry)
-check("tabs: that line opens the Log tab with every quest", ns.tab() == "log" and countRows() == 3)
+check("tabs: that line opens the Log tab with every quest (and your pin on top)", ns.tab() == "log" and countRows() == 4)
 ns.pickTab("areas")
 check("tabs: a click holds a tab", ns.tab() == "areas")
 QuestBoardDB.doing = {}
