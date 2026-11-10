@@ -33,6 +33,12 @@ the same, and a test checks that every `.toc` version has a section here.
 - Nearby is always the first group in the results.
 - With an empty search, Omni shows the 5 nearest NPCs above Recent.
 
+## UpgradeFinder 0.1.9
+
+- Spell damage against one creature type ("damage done to Undead by
+  magical spells") is its own stat, not spell damage. The built-in weights
+  give it 0; with MageMentor, a mage uses MageMentor's weight (0.1).
+
 ## UpgradeFinder 0.1.8
 
 - Fix a Lua error when the Upgrades window opens for the first time
