@@ -76,6 +76,16 @@ the 5% cut, the disenchant value).
   cut. Under half of 4+ finished auctions sold makes the AH advice count
   the market as slow. `/lv sales` lists your best sellers; `/lv sales
   reset` clears the counts.
+- The whole market: "AH market: ~34 sold in 2d, 120 listed, ~9s each".
+  LootValue reads each full scan (its Scan button under the AH window,
+  or Auctionator's Full Scan) and keeps every auction: item, seller,
+  stack, buyout, time left. An auction gone in the next scan with more
+  time left than passed counts as sold; the same seller posting the same
+  stack at another price is a repost. Two or three scans a day are enough.
+  It reads a few milliseconds a frame, so the game does not freeze; stay
+  at the AH until the status under the window says "read", then walk
+  away. `/lv scan` prints the status, `/lv scan now` starts a scan (one
+  per 15 minutes).
 
 ### Auto-loot
 

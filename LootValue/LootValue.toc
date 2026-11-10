@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: LootValue: Sell, Vendor or Disenchant
-## Notes: Requires Auctionator. Tooltip advice from its prices: sell on the AH, disenchant or vendor, and how hard the AH sale looks; how well your own auctions of it sold. Auto-loot that leaves cheap junk (/lv).
+## Notes: Requires Auctionator. Tooltip advice from its prices: sell on the AH, disenchant or vendor, and how hard the AH sale looks; how well your own auctions of it sold and what sells, from full scans. Auto-loot that leaves cheap junk (/lv).
 ## Author: jwang47
 ## Version: 0.3.0
 ## Dependencies: Auctionator
@@ -8,4 +8,5 @@
 
 LootValue.lua
 Sales.lua
+Scan.lua
 AutoLoot.lua

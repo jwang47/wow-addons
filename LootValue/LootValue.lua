@@ -206,7 +206,8 @@ end
 -- listings, price trend) and price age: { listed, age, slow, note }.
 -- "slow" when many are listed (50+ items, or 50+ full stacks), the low fell 10% or more since the last
 -- scan day, the price is 3+ days old, today's full scan did not see the item,
--- or under half of your own last 4+ finished auctions of it sold.
+-- under half of your own last 4+ finished auctions of it sold, or the
+-- LootValue full scans saw 10+ listed and none sold.
 function LV.marketInfo(link)
   local info = {}
   local db = Auctionator and Auctionator.Database
@@ -250,6 +251,9 @@ function LV.marketInfo(link)
   -- Your own auctions of it mostly expire (Sales.lua).
   local own = LV.sales and LV.sales.slowNote(LV.sales.itemName(link))
   if own then table.insert(notes, own) end
+  -- Your full scans saw it listed and none sold (Scan.lua).
+  local market = LV.scan and LV.scan.slowNote(link)
+  if market then table.insert(notes, market) end
   info.slow = #notes > 0
   info.note = #notes > 0 and table.concat(notes, ", ") or nil
   return info
@@ -379,7 +383,7 @@ function LV.tooltipLink(tooltip, data)
 end
 
 -- MageMentor sets LootValue.deferTo = "MageMentor" and draws the advice
--- line itself; the sales line (Sales.lua) shows either way.
+-- line itself; the sales and market lines (Sales.lua, Scan.lua) show either way.
 function LV.onTooltipItem(tooltip, data)
   if not tooltip.GetItem then return end
   local name = tooltip.GetName and tooltip:GetName()
@@ -392,10 +396,12 @@ function LV.onTooltipItem(tooltip, data)
     tooltip:AddLine(line)
     added = true
   end
-  local sales = LV.salesLine and LV.salesLine(link)
-  if sales then
-    tooltip:AddLine(sales)
-    added = true
+  for _, fn in ipairs({ LV.salesLine or false, LV.marketLine or false }) do
+    local extra = fn and fn(link)
+    if extra then
+      tooltip:AddLine(extra)
+      added = true
+    end
   end
   if added then tooltip:Show() end
 end

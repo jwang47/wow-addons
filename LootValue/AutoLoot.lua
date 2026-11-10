@@ -254,7 +254,7 @@ end
 function AL.status()
   local a = db()
   local lvl = UnitLevel and UnitLevel("player") or 1
-  return string.format("auto-loot %s, mode %s, leaves items under %s%s. /lv autoloot on|off|review|quiet|min 3s|min auto, /lv skipped, /lv sales",
+  return string.format("auto-loot %s, mode %s, leaves items under %s%s. /lv autoloot on|off|review|quiet|min 3s|min auto, /lv skipped, /lv sales, /lv scan",
     a.enabled and "on" or "off", a.mode, LV.money(AL.threshold(lvl, 99)), a.min and " (set)" or " (10c a level)")
 end
 
@@ -274,6 +274,7 @@ function AL.slash(msg)
   local a = db()
   local cmd, rest = (msg or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
   if cmd == "sales" and LV.sales then LV.sales.slash(rest) return end
+  if cmd == "scan" and LV.scan then LV.scan.slash(rest) return end
   if cmd == "skipped" then
     if #a.skipped == 0 then say("nothing skipped yet.") return end
     local recent = {}

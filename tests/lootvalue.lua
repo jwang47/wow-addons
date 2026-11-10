@@ -134,7 +134,7 @@ local handlers, cvars, chat = {}, { autoLootDefault = "1" }, {}
 CreateFrame = function()
   local fr = {}
   function fr:RegisterEvent(e) handlers[e] = true end
-  function fr:SetScript(_, fn) fr.onEvent = fn end
+  function fr:SetScript(what, fn) if what == "OnEvent" then fr.onEvent = fn end end
   _G.LAST_FRAME = fr
   return fr
 end
@@ -333,6 +333,113 @@ AL.slash("sales")
 check("/lv sales lists items", has(chat[#chat], "Linen Cloth 2/6"))
 AL.slash("sales reset")
 check("/lv sales reset clears", next(LootValueDB.sales) == nil)
+
+-- Scan: two full scans, what sold between them -------------------------------
+local T = 1000000
+_G.time = function() return T end
+local timers = {}
+C_Timer = { After = function(_, fn) table.insert(timers, fn) end }
+local function runTimers()
+  local frames = 0
+  while #timers > 0 and frames < 1000 do
+    local q = timers
+    timers = {}
+    for _, fn in ipairs(q) do fn() end
+    frames = frames + 1
+  end
+  return frames
+end
+local ms = 0
+debugprofilestop = function() ms = ms + 20 return ms end
+local LIST = {} -- { itemID, owner, count, buyout, band }
+local listGone = false
+GetNumAuctionItems = function() local n = listGone and 0 or #LIST return n, n end
+GetAuctionItemInfo = function(_, i)
+  local a = LIST[i]
+  if not a or listGone then return nil end
+  return "x", nil, a[3], 1, true, 1, "", 0, 0, a[4], 0, nil, nil, a[2], nil, 0, a[1]
+end
+GetAuctionItemTimeLeft = function(_, i) return LIST[i] and LIST[i][5] end
+local canAll = true
+CanSendAuctionQuery = function() return true, canAll end
+local queried = 0
+QueryAuctionItems = function() queried = queried + 1 end
+-- Widgets for the AH panel: every method is a no-op that remembers text.
+local function widget()
+  local w = {}
+  return setmetatable(w, { __index = function(_, k)
+    if k == "CreateFontString" then return function() return widget() end end
+    if k == "SetText" then return function(self, t) self.text = t end end
+    if k == "SetScript" then return function(self, what, fn) self[what] = fn end end
+    if k == "RegisterEvent" then return function(self, e) self.events = self.events or {} self.events[e] = true end end
+    return function() end
+  end })
+end
+CreateFrame = function() local w = widget() LAST_FRAME = w return w end
+AuctionFrame = widget()
+assert(loadfile(root .. "LootValue/Scan.lua"))("LootValue", {})
+local SC = LV.scan
+local scanFrame = LAST_FRAME
+local function ev(e, ...) scanFrame.OnEvent(scanFrame, e, ...) end
+ev("PLAYER_LOGIN")
+check("scan: hooks the full scan request", hooks.QueryAuctionItems ~= nil)
+ev("AUCTION_HOUSE_SHOW")
+check("scan: status shows on the AH window", SC.statusText():find("no full scan yet", 1, true) ~= nil)
+
+LIST = {
+  { 2589, "Bob", 20, 2000, 4 }, { 2589, "Bob", 20, 2000, 4 }, -- one sells
+  { 2589, "Ann", 20, 2200, 2 },  -- gone, but could have expired
+  { 2589, "Cid", 20, 1800, 3 },  -- gone, could have expired
+  { 2589, "Eve", 20, 2100, 4 },  -- reposted cheaper: not a sale
+  { 2592, "Dan", 1, 500, 4 },    -- sells
+}
+check("scan: Scan button starts a full scan", SC.start() == true and queried == 1)
+hooks.QueryAuctionItems("", nil, nil, 0, false, -1, true)
+check("scan: waits for the server", SC.job.state == "waiting")
+SC.SLICE = 2
+ev("AUCTION_ITEM_LIST_UPDATE")
+local frames = runTimers()
+check("scan: reads in slices over frames", frames >= 3)
+check("scan: first snapshot saved", LootValueDB.snap and LootValueDB.snap.n == 6 and SC.job.state == "idle")
+check("scan: says when sales will show", has(chat[#chat], "Sales show after the next full scan"))
+canAll = false
+check("scan: throttled for 15 minutes", select(2, SC.start()) == "next full scan in 15m")
+canAll = true
+
+T = T + 6 * 3600
+LIST = {
+  { 2589, "Bob", 20, 2000, 4 },
+  { 2589, "Eve", 20, 1900, 4 },
+  { 2589, "Cid", 20, 1700, 4 },
+}
+SC.onRequest()
+ev("AUCTION_ITEM_LIST_UPDATE")
+runTimers()
+local sold, gone, listed, posted = SC.compare({}, {}, 0)
+check("scan: compare of nothing is zero", sold == 0 and gone == 0 and listed == 0 and posted == 0)
+local st = SC.stats(2589)
+check("scan: one sale, the rest expired or reposted", st and st.sold == 20 and st.gone == 80 and st.listed == 60)
+check("scan: tooltip market line", has(SC.line("|Hitem:2589:0|h[Linen Cloth]|h"), "AH market: ~20 sold in 6h, 60 listed, ~1s each"))
+check("scan: an item that left the AH counts too", SC.stats(2592) and SC.stats(2592).sold == 1)
+check("scan: chat summary", has(chat[#chat], "about 2 auctions sold"))
+
+-- The AH closes before the rows are read: the scan is dropped.
+T = T + 3600
+local before = LootValueDB.snap
+LIST = { { 2589, "Bob", 20, 2000, 4 }, { 2589, "Bob", 20, 2000, 4 }, { 2589, "Bob", 20, 2000, 4 },
+  { 2589, "Bob", 20, 2000, 4 }, { 2589, "Bob", 20, 2000, 4 } }
+SC.onRequest()
+ev("AUCTION_ITEM_LIST_UPDATE")
+listGone = true
+runTimers()
+listGone = false
+check("scan: AH closed while reading drops the scan", LootValueDB.snap == before and SC.job.state == "failed"
+  and has(SC.statusText(), "the AH closed at"))
+-- A market with 10+ listed and no sales is slow.
+LootValueDB.market[9003] = { string.format("%d,%d,0,0,40,0,0,0", T, 8 * 3600) }
+check("scan: none sold makes the market slow", has(LV.marketInfo("|Hitem:9003:0|h[Thing]|h").note, "none sold in 8h"))
+AL.slash("scan")
+check("/lv scan prints the status", has(chat[#chat], "last full scan"))
 
 if failures > 0 then error(failures .. " LootValue test(s) failed") end
 print("all LootValue tests passed")
