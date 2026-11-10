@@ -492,6 +492,7 @@ ns.keybar.bookSpells = { 1953, 2139, 116 }
 local W = ns.units.watch
 W.build()
 check("watch shows known key spells", #W.ids == 2 and W.icons[1].id == 1953 and W.icons[2].id == 2139)
+check("watch icons cast on click", W.icons[2].attrs.type == "spell" and W.icons[2].attrs.spell == 2139)
 check("cooling spell is dark", W.icons[1].cooling == true and W.icons[2].cooling == false)
 W.icons[1].cd.scripts.OnCooldownDone()
 check("ready flash", W.icons[1].flash.shown)
@@ -509,6 +510,9 @@ local TC = ns.units.tcast
 ns.units.castUpdate(TC)
 check("target cast shows", TC.shown and TC.text.text == "Fireball")
 check("counterspell call-out", TC.kick.text == "COUNTERSPELL" and TC.glow.shown)
+local KB = _G.GlanceKickButton
+check("click on the call-out casts counterspell", KB and KB.attrs.type == "spell" and KB.attrs.spell == "Counterspell" and KB.attrs.unit == "target")
+check("kick button shown by the game in combat", drivers[KB] == "[combat,harm,nodead]show;hide")
 UnitCastingInfo = function(u) if u == "target" then return "Shield Wall", "", 1, 1000, 3000, false, 7, true, 134 end end
 ns.units.castUpdate(TC)
 check("no call-out when it cannot be interrupted", TC.kick.text == "" and not TC.glow.shown)

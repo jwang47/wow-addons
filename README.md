@@ -328,12 +328,16 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
 - **Enemy cast bar**: when your target casts, a large bar with the spell
   name shows just above your unit frames. Orange when it can be
   interrupted, grey when not; "COUNTERSPELL" and a gold edge while your
-  Counterspell is ready (from the watch row).
+  Counterspell is ready (from the watch row). In combat, click the bar or
+  the call-out to cast your interrupt (Counterspell, Kick, Pummel or Earth
+  Shock) on your target. The click area stays there in combat while you
+  target a living enemy, even between casts, because the game does not let
+  addons show or hide a spell button in combat.
 - **Watch row**: your key spells (for a mage: Blink, Counterspell, Frost
   Nova, Ice Block, Cold Snap, Ice Barrier, Evocation) as large icons below
   the cast bar. Bright when ready, dark with a sweep on cooldown, a short
   flash when one comes back. `/glance watch add NAME`, `remove NAME`,
-  `reset`. Only spells you know show.
+  `reset`. Only spells you know show. Click an icon to cast it.
 - **Range**: the target frame gets a green edge while your longest-range
   spell reaches the target, red when it does not. Under it is the
   distance: exact yards for a party or raid member ("23 yd"), and for

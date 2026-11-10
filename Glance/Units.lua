@@ -337,6 +337,39 @@ local function makeCast(unit, frameName, y, w, h, fontSize)
   return c
 end
 
+-- Click the enemy cast bar to interrupt. Secure buttons cannot be shown or
+-- hidden by addon code in combat, so the click button is its own frame
+-- (not a child of the bar, which shows and hides freely) over the bar and
+-- its call-out, and the game shows it by a macro condition: in combat with
+-- a living enemy targeted. In that state it takes clicks on that strip even
+-- when the enemy is not casting.
+local makeKickButton
+local INTERRUPTS = { MAGE = "Counterspell", ROGUE = "Kick", WARRIOR = "Pummel", SHAMAN = "Earth Shock" }
+makeKickButton = function(c)
+  local class = UnitClass and select(2, UnitClass("player"))
+  local spell = INTERRUPTS[class or ""]
+  if not spell then return nil end
+  local b = CreateFrame("Button", "GlanceKickButton", UIParent, "SecureActionButtonTemplate")
+  b:SetSize(300, 44)
+  -- Anchored to UIParent, not the bar: a secure frame anchored to the bar
+  -- would lock the bar's Show and Hide in combat too.
+  local _, _, _, _, y = c:GetPoint(1)
+  b:SetPoint("BOTTOM", UIParent, "CENTER", 0, (y or -84) - (c:GetHeight() or 22))
+  b:RegisterForClicks("AnyUp", "AnyDown")
+  b:SetAttribute("type", "spell")
+  b:SetAttribute("spell", spell)
+  b:SetAttribute("unit", "target")
+  b:SetScript("OnEnter", function(self)
+    if not c:IsShown() then return end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("Click: " .. spell, 1, 1, 1)
+    GameTooltip:Show()
+  end)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  RegisterStateDriver(b, "visibility", "[combat,harm,nodead]show;hide")
+  return b
+end
+
 local function makeTargetCast()
   -- Enemy cast bar: big, just above your unit frames, close to your
   -- character, so a Counterspell window is hard to miss.
@@ -361,6 +394,7 @@ local function makeTargetCast()
     self.glow:SetShown(ready and true or false)
   end)
   ns.units.tcast = c
+  ns.units.kick = makeKickButton(c)
   return c
 end
 
@@ -455,8 +489,18 @@ end
 local function watchIcon(i)
   local b = watch.icons[i]
   if b then return b end
-  b = CreateFrame("Frame", nil, watch.frame)
+  -- A secure button: a click casts the spell.
+  b = CreateFrame("Button", "GlanceWatch" .. i, watch.frame, "SecureActionButtonTemplate")
   b:SetSize(WATCH_SIZE, WATCH_SIZE)
+  b:RegisterForClicks("AnyUp", "AnyDown")
+  b:SetAttribute("type", "spell")
+  b:SetScript("OnEnter", function(self)
+    if not self.id then return end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    if GameTooltip.SetSpellByID then GameTooltip:SetSpellByID(self.id) end
+    GameTooltip:Show()
+  end)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
   b.icon = b:CreateTexture(nil, "ARTWORK")
   b.icon:SetAllPoints()
   b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -498,6 +542,7 @@ end
 
 function watch.build()
   if not watch.frame then return end
+  if InCombatLockdown() then return ns.outOfCombat("watch build", watch.build) end
   watch.ids = {}
   for _, name in ipairs(watchList()) do
     local id = knownSpell(name)
@@ -508,6 +553,7 @@ function watch.build()
   for i, id in ipairs(watch.ids) do
     local b = watchIcon(i)
     b.id = id
+    b:SetAttribute("spell", id)
     b:ClearAllPoints()
     b:SetPoint("TOPLEFT", watch.frame, "TOPLEFT", (i - 1) * (WATCH_SIZE + 4), 0)
     local tex = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(id)
