@@ -114,7 +114,12 @@ ns.module("minimap", function()
   local holder = CreateFrame("Frame", "GlanceMinimap", UIParent)
   mm.holder = holder
   holder:SetSize(ns.db.mapSize or SIZE, ns.db.mapSize or SIZE)
-  holder:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -16)
+  local pos = ns.db.mapPos
+  if pos then holder:SetPoint(pos[1], UIParent, pos[1], pos[2], pos[3])
+  else holder:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -16) end
+  -- In edit mode (Glance's or the game's), drag the map to move it.
+  holder:SetMovable(true)
+  holder:SetClampedToScreen(true)
 
   Minimap:SetParent(holder)
   Minimap:ClearAllPoints()
@@ -157,6 +162,23 @@ ns.module("minimap", function()
     mm.setSize(self.from.size + grow)
   end)
   table.insert(ns.editHooks, function(on) lit(on) end)
+  Minimap:RegisterForDrag("LeftButton")
+  Minimap:HookScript("OnDragStart", function()
+    if ns.unlocked and not InCombatLockdown() then holder:StartMoving() end
+  end)
+  Minimap:HookScript("OnDragStop", function()
+    holder:StopMovingOrSizing()
+    -- Keep it hanging from its top-right corner so resizing grows it
+    -- down and left.
+    local right, top = holder:GetRight(), holder:GetTop()
+    local w, h = UIParent:GetWidth(), UIParent:GetHeight()
+    if right and top and w and h then
+      local x, y = right - w, top - h
+      holder:ClearAllPoints()
+      holder:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, y)
+      ns.db.mapPos = { "TOPRIGHT", x, y }
+    end
+  end)
   Minimap:SetMaskTexture("Interface\\Buttons\\WHITE8X8")
   Minimap:EnableMouseWheel(true)
   Minimap:SetScript("OnMouseWheel", function(self, d)

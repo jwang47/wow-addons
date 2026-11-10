@@ -301,6 +301,10 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
 - **Unit frames**: small player and target bars under your character and a
   cast bar below them. They replace Blizzard's player, target and cast
   frames (`/glance blizzard on` keeps those).
+- **Edit mode**: the game's Edit Mode (Esc, Edit Mode) also unlocks Glance,
+  the same as `/glance edit`: drag the keyboard bar or the minimap to move
+  them, and the minimap's gold corner to size it. `/glance reset` puts both
+  back.
 - **Minimap**: square, top-right, mouse-wheel zoom, right-click for
   tracking. Drag the gold corner at its bottom left (it shows when the
   mouse is over the map) to resize it, hold Shift and turn the mouse wheel

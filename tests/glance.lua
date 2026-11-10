@@ -143,6 +143,10 @@ UnitCastingInfo = function() end
 UnitChannelInfo = function() end
 RegisterUnitWatch = function(f) f.watched = true end
 
+-- The game's Edit Mode callbacks.
+local editCallbacks = {}
+EventRegistry = { RegisterCallback = function(_, ev, fn) editCallbacks[ev] = fn end }
+
 -- Load the addon in .toc order.
 local ns = {}
 local toc = assert(io.open(root .. "Glance/Glance.toc")):read("*a")
@@ -459,6 +463,12 @@ Minimap.scripts.hookOnEnter()
 check("grip shows on map hover", _G.GlanceMinimapGrip.alpha == 0.9)
 Minimap.scripts.hookOnLeave()
 check("grip fades off the map", _G.GlanceMinimapGrip.alpha == 0.25)
+local wasUnlocked = ns.unlocked
+editCallbacks["EditMode.Enter"]()
+check("game Edit Mode unlocks Glance", ns.unlocked and _G.GlanceMinimapGrip.alpha == 0.9)
+editCallbacks["EditMode.Exit"]()
+check("leaving Edit Mode locks it", not ns.unlocked and _G.GlanceMinimapGrip.alpha == 0.25)
+if wasUnlocked then ns.setEdit(true) end
 local size0 = ns.db.mapSize or 190
 P.shift = true
 Minimap.scripts.OnMouseWheel(Minimap, -1)

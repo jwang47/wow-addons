@@ -106,7 +106,17 @@ events:SetScript("OnEvent", function(_, event, ...)
 end)
 events:RegisterEvent("PLAYER_REGEN_ENABLED")
 
-ns.editHooks = {}  -- fn(unlocked), run on /glance edit
+ns.editHooks = {}  -- fn(unlocked), run on /glance edit and the game's Edit Mode
+function ns.setEdit(on)
+  ns.unlocked = on and true or false
+  for _, fn in ipairs(ns.editHooks) do ns.safe("edit", fn, ns.unlocked) end
+end
+-- The game's Edit Mode (Esc > Edit Mode) unlocks Glance too: move the bar
+-- and the minimap, size the minimap, all in one place.
+if EventRegistry and EventRegistry.RegisterCallback then
+  EventRegistry:RegisterCallback("EditMode.Enter", function() ns.setEdit(true) end, ns)
+  EventRegistry:RegisterCallback("EditMode.Exit", function() ns.setEdit(false) end, ns)
+end
 ns.modules = {}  -- name -> setup function, run at PLAYER_LOGIN in order
 ns.order = {}
 function ns.module(name, setup)

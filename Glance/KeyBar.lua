@@ -364,6 +364,12 @@ ns.module("keybar", function()
     local point, _, _, x, y = self:GetPoint(1)
     ns.db.barPos = { point, x, y }
   end)
+  table.insert(ns.editHooks, function(on)
+    if InCombatLockdown() then return end
+    if bar.editTag then bar.editTag:SetShown(on) end
+    bar.edge:SetShown(on)
+    bar:EnableMouse(on)
+  end)
   bar.edge = bar:CreateTexture(nil, "BACKGROUND")
   bar.edge:SetPoint("TOPLEFT", -6, 6)
   bar.edge:SetPoint("BOTTOMRIGHT", 6, -6)
@@ -412,14 +418,8 @@ end)
 -- Commands
 ---------------------------------------------------------------------------
 ns.commands.edit = function()
-  ns.unlocked = not ns.unlocked
-  for _, fn in ipairs(ns.editHooks) do ns.safe("edit", fn, ns.unlocked) end
-  if bar then
-    bar.editTag:SetShown(ns.unlocked)
-    bar.edge:SetShown(ns.unlocked)
-    bar:EnableMouse(ns.unlocked)
-  end
-  ns.print(ns.unlocked and "Edit mode: drag the gold area to move the bar, the gold corner to size the map."
+  ns.setEdit(not ns.unlocked)
+  ns.print(ns.unlocked and "Edit mode: drag the gold area to move the bar, drag the minimap to move it, its gold corner to size it."
     or "Edit mode off.")
 end
 
@@ -434,7 +434,12 @@ ns.commands.reset = function()
   ns.db.barPos = nil
   bar:ClearAllPoints()
   bar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 14)
-  ns.print("Keyboard bar back at the bottom centre.")
+  ns.db.mapPos = nil
+  if ns.minimap and ns.minimap.holder then
+    ns.minimap.holder:ClearAllPoints()
+    ns.minimap.holder:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -16)
+  end
+  ns.print("Keyboard bar and minimap back in their places.")
 end
 
 ns.commands.import = function()
