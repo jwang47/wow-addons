@@ -224,6 +224,27 @@ for _ = 1, 50 do ns.step() end
 check("board built and shown", QuestBoardFrame and QuestBoardFrame.shown)
 local st = ns.state()
 check("state after login", st and #st.turnin == 1 and #st.pickup == 2)
+-- Focus (the default): only Next and Active until the mouse is over the board.
+local function countRows()
+  local n = 0
+  for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown then n = n + 1 end end
+  return n
+end
+ns.render()
+check("focus: no rows when nothing is active", countRows() == 0 and QuestBoardFrame.next.shown)
+local over = false
+QuestBoardFrame.IsMouseOver = function() return over end
+over = true
+QuestBoardFrame.scripts.OnUpdate(QuestBoardFrame, 0.05)
+check("focus: mouse-over shows the whole board", countRows() == 5)
+over = false
+QuestBoardFrame.scripts.OnUpdate(QuestBoardFrame, 0.1)
+check("focus: it stays open for a moment", countRows() == 5)
+QuestBoardFrame.scripts.OnUpdate(QuestBoardFrame, 0.5)
+check("focus: then only Next and Active again", countRows() == 0)
+SlashCmdList.QUESTBOARD("focus")
+check("/qb focus off shows the whole board", countRows() == 5 and QuestBoardDB.focus == false)
+
 local shownRows = 0
 local firstRow
 for _, f in ipairs(frames) do

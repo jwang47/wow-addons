@@ -273,6 +273,10 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
 | In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
 | Pick up | quests Questie shows as available ("!") that give XP and are at most 3 levels over you (`/qb range N`) | best estimated XP per minute (right-click the group: nearest) |
 
+- Focus (on by default): the board shows only the Next line and the Active
+  group. Move the mouse over it and the whole board opens; it closes again
+  a moment after the mouse leaves. `/qb focus` shows the whole board all the
+  time (again to undo).
 - The top line says what to do next: the open objective of a quest you
   are on now (Active), else the nearest hand-in, else the nearest quest.
   Under each quest a dim line says what to do: the open objective and

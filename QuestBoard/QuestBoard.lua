@@ -19,7 +19,8 @@ local defaults = {
   combatAlpha = 0.35,
   hideTrackers = false,
   locked = false,        -- /qb lock: no dragging
-  compact = false,       -- /qb compact: one line per quest, no "what to do" line  -- hide the game's quest tracker (and Questie's)
+  compact = false,       -- /qb compact: one line per quest, no "what to do" line
+  focus = true,          -- show only Next and Active until the mouse is over the board  -- hide the game's quest tracker (and Questie's)
   point = nil,           -- saved position { point, x, y }
 }
 
@@ -231,10 +232,13 @@ end
 ---------------------------------------------------------------------------
 -- Dragging any part of the board (rows and group names too) moves it. A
 -- click without a drag still clicks.
-local function dragStart() if panel and not ns.db.locked then panel:StartMoving() end end
+local function dragStart()
+  if panel and not ns.db.locked then panel.isMoving = true panel:StartMoving() end
+end
 local function dragStop()
   if not panel then return end
   panel:StopMovingOrSizing()
+  panel.isMoving = false
   ns.dragEnded = rawget(_G, "GetTime") and GetTime() or nil
   local p, _, _, x, y = panel:GetPoint(1)
   ns.db.point = { p, x, y }
@@ -333,6 +337,8 @@ function ns.render()
     local list = state and state[kind] or {}
     local h = heads[kind] or makeHead(kind)
     local show = #list > 0 or kind == "pickup" and state and state.questie
+    -- Focus: only the quests you are on now, the rest on mouse-over.
+    if ns.db.focus and not ns.expanded and kind ~= "active" then show = false end
     if show then
       h:ClearAllPoints()
       h:SetPoint("TOPLEFT", PAD, y)
@@ -410,7 +416,23 @@ function ns.state() return state end
 -- Arrows turn with you; distances update every few seconds.
 local sinceArrow, sinceFull = 0, 0
 ns.FULL_SECS = 3
-local function tickFn(_, dt)
+-- Focus mode: the full board while the mouse is over it (or a drag runs),
+-- back to Next and Active a moment after the mouse leaves.
+ns.LEAVE_SECS = 0.4
+local awaySecs = 0
+function ns.hover(over, dt)
+  if not ns.db.focus then return end
+  if over then
+    awaySecs = 0
+    if not ns.expanded then ns.expanded = true ns.render() end
+  elseif ns.expanded then
+    awaySecs = awaySecs + (dt or 0)
+    if awaySecs >= ns.LEAVE_SECS then ns.expanded = false awaySecs = 0 ns.render() end
+  end
+end
+
+local function tickFn(self, dt)
+  ns.hover(self:IsMouseOver() or (self.isMoving == true), dt)
   sinceArrow, sinceFull = sinceArrow + dt, sinceFull + dt
   if sinceArrow > 0.1 then
     sinceArrow = 0
@@ -564,6 +586,7 @@ end)
 local help = {
   "/qb - show or hide the board. Drag it anywhere to move it.",
   "/qb lock - stop dragging (again to undo)",
+  "/qb focus - show the whole board all the time, not only on mouse-over (again to undo)",
   "/qb compact - one line per quest, without the what-to-do line (again to undo)",
   "Click a group name to fold it; right-click it to sort by nearest or best XP.",
   "/qb range N - pick-ups at most N levels over you (now %d)",
@@ -602,6 +625,11 @@ SlashCmdList.QUESTBOARD = function(text)
   elseif cmd == "far" and (rest == "on" or rest == "off") then
     ns.far(rest == "on")
     return
+  elseif cmd == "focus" then
+    ns.db.focus = not ns.db.focus
+    ns.expanded = false
+    say(ns.db.focus and "showing Next and Active; mouse over the board for the rest" or "showing the whole board")
+    return ns.render()
   elseif cmd == "compact" then
     ns.db.compact = not ns.db.compact
     return ns.render()
