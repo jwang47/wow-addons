@@ -277,7 +277,7 @@ ns.updateItems(ns.state())
 check("the item button sits left of its quest's row", placed and placed[1] == "TOPRIGHT" and placed[4] == 897 and placed[5] == 400)
 itemBtn.SetPoint, rowOf122.GetTop, QuestBoardFrame.GetLeft = nil, nil, nil
 local savedCollapsed = QuestBoardDB.collapsed
-QuestBoardDB.collapsed = { active = true, nearby = true, log = true, turnin = true }
+QuestBoardDB.collapsed = { next = true, active = true }
 ns.render()
 check("no button when the quest's row is hidden", not itemBtn.shown)
 QuestBoardDB.collapsed = savedCollapsed
@@ -301,27 +301,27 @@ local function countRows()
   return n
 end
 ns.render()
-check("out in the world the whole board shows", countRows() == 5)
+check("out in the world the whole board shows", countRows() == 4)
 local inside = true
 function IsInInstance() return inside end
 ns.render()
-check("focus: in an instance, no rows when nothing is active", countRows() == 0 and QuestBoardFrame.next.shown)
+check("focus: in an instance, no rows when nothing is active", countRows() == 0 and QuestBoardFrame.tabs[1].shown)
 local over = false
 QuestBoardFrame.IsMouseOver = function() return over end
 over = true
 QuestBoardFrame.scripts.OnUpdate(QuestBoardFrame, 0.05)
-check("focus: mouse-over shows the whole board", countRows() == 5)
+check("focus: mouse-over shows the whole board", countRows() == 4)
 over = false
 QuestBoardFrame.scripts.OnUpdate(QuestBoardFrame, 0.1)
-check("focus: it stays open for a moment", countRows() == 5)
+check("focus: it stays open for a moment", countRows() == 4)
 QuestBoardFrame.scripts.OnUpdate(QuestBoardFrame, 0.5)
 check("focus: then only Next and Active again", countRows() == 0)
 SlashCmdList.QUESTBOARD("focus")
-check("/qb focus off shows the whole board", countRows() == 5 and QuestBoardDB.focus == false)
+check("/qb focus off shows the whole board", countRows() == 4 and QuestBoardDB.focus == false)
 SlashCmdList.QUESTBOARD("focus")
 inside = false
 ns.render()
-check("leaving the instance shows the whole board again", countRows() == 5)
+check("leaving the instance shows the whole board again", countRows() == 4)
 
 local shownRows = 0
 local firstRow
@@ -331,10 +331,11 @@ for _, f in ipairs(frames) do
     firstRow = firstRow or f
   end
 end
-check("rows drawn for every quest", shownRows == 5)
+check("Nearby: every stop within 1000 yd", shownRows == 4 and ns.tab() == "nearby")
 check("first row is the turn-in", firstRow.entry.id == 127 and firstRow.name.text == "Murloc Poachers")
 check("row shows what to do", firstRow.sub.text == "Hand in to Wiley")
-check("board shows the next step", QuestBoardFrame.next.text == "Next: Hand in Murloc Poachers to Wiley  300 yd")
+check("tabs: Nearby is picked and gold", QuestBoardFrame.tabs[2].text.text == "Nearby" and QuestBoardFrame.tabs[2].line.shown
+  and QuestBoardFrame.tabs[4].text.text == "Log 3" and not QuestBoardFrame.next.shown)
 SlashCmdList.QUESTBOARD("compact")
 check("/qb compact drops the what-to-do line", firstRow.sub.text == "")
 SlashCmdList.QUESTBOARD("compact")
@@ -683,11 +684,9 @@ check("rows: a short group has no more line", #ns.shownRows("log", { { name = "A
 QuestBoardDB.rows.log = saveRows
 -- /qb why: where a quest is, or why not.
 local whyState = { active = {}, nearby = {}, turnin = {}, log = { { name = "A" }, { name = "Stopping the Cycle" } }, party = {}, pickup = {} }
-check("why: past the row limit", D.whyQuest("stopping", whyState, { log = 1 }, { log = "In your log" }, 3)
-  == "Stopping the Cycle is in In your log at row 2, but the group shows 1 rows (/qb rows 2 shows it)")
-check("why: on the board", D.whyQuest("Stopping the Cycle", whyState, { log = 8 }, { log = "In your log" }, 3) == "Stopping the Cycle is in In your log, row 2")
+check("why: in the log", D.whyQuest("stopping", whyState, ns.WHERE, 3) == "Stopping the Cycle, no known place: in the Log tab, and in Nearby within 1000 yd")
 check("why: a level too high", D.unfitReason({ level = 20 }, 10, 3):find("level 20, more than 3 over you", 1, true) ~= nil)
-check("why: unknown name", D.whyQuest("no such quest", whyState, {}, {}, 3):find("no quest named", 1, true) ~= nil)
+check("why: unknown name", D.whyQuest("no such quest", whyState, ns.WHERE, 3):find("no quest named", 1, true) ~= nil)
 
 -- Distances take a colour: green near, yellow a walk, grey far.
 check("distance colours", D.yardsText(120):find("^|cff") and D.yardsText(120) ~= D.yardsText(700)
@@ -842,13 +841,6 @@ local names = {}
 for _, e in ipairs(sorted) do table.insert(names, e.name) end
 check("sort: near by distance, then far by XP", table.concat(names) == "becda")
 
--- Group order: hand-ins first when nothing is active and one is near;
--- Active first while you are on a quest.
-local function order(st) return table.concat(ns.order(st), ",") end
-check("order: a near hand-in leads when nothing is active", order({ active = {}, turnin = { { dist = 300 } } }):find("^turnin,nearby") ~= nil)
-check("order: a far hand-in does not", order({ active = {}, turnin = { { dist = 3000 } } }):find("^active") ~= nil)
-check("order: Active leads while you do a quest", order({ active = { {} }, turnin = { { dist = 100 } } }):find("^active,nearby") ~= nil)
-
 -- Pinned quests get a gold star.
 QuestBoardDB.doing = { [122] = true }
 ns.refresh()
@@ -878,11 +870,34 @@ check("on a job: Active shows, the rest of the log does not", idSet[122] and idS
 local way = ns.onWay({ { id = 1, dist = 250 }, { id = 2, dist = 900, wx = 100, wy = 0, inst = 0 }, { id = 3, dist = 900, wx = 900, wy = 0, inst = 0 } },
   { { wx = 0, wy = 0, inst = 0 } })
 check("on a way: near you or near an Active quest", #way == 2 and way[1].id == 1 and way[2].id == 2)
-check("on a job: the title says hover shows all", (QuestBoardFrame.sub.text or ""):find("hover: all", 1, true) ~= nil)
-ns.hover(true, 0)
-check("on a job: mouse-over shows the whole board", countRows() > #shownIDs)
-ns.hover(false, 1)
-check("on a job: and trims again after", countRows() == #shownIDs)
+check("on a job: the board picks Doing", ns.tab() == "doing")
+local restRow
+for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and f.entry.tab == "log" then restRow = f end end
+check("on a job: one line counts the rest of the log", restRow and restRow.entry.name == "1 more in your log: Log tab")
+ns.click(restRow.entry)
+check("tabs: that line opens the Log tab with every quest", ns.tab() == "log" and countRows() == 3)
+ns.pickTab("areas")
+check("tabs: a click holds a tab", ns.tab() == "areas")
+QuestBoardDB.doing = {}
+D.heldAt = {}
+ns.refresh()
+for _ = 1, 50 do ns.step() end
+check("tabs: when you stop the quest the board picks again", ns.tab() == "nearby")
+local stNow = ns.state()
+local areaSecs = ns.sections(stNow, "areas")
+check("areas tab: zones ranked, then travel", areaSecs[1] and areaSecs[1].key == "zones" and #areaSecs[1].list >= 1 and areaSecs[1].list[1].kind == "zone")
+local z1 = areaSecs[1].list[1]
+check("areas tab: a zone row says what is there", D.zoneText(z1) ~= "" and #z1.stops >= 1 and ns.todo(z1) == D.zoneText(z1))
+local logSecs = ns.sections(stNow, "log")
+local logRows = 0
+for _, sec in ipairs(logSecs) do check("log tab: one section per log zone, never cut", sec.key:find("^log:") and sec.cap == math.huge and sec.compact) logRows = logRows + #sec.list end
+check("log tab: every quest in the log", logRows == #ns.logAll(stNow) and logRows == 3)
+check("no place: a log quest with no distance says so", strip(ns.meta({ kind = "log", left = {} })) == "no place")
+check("zones: far ones after the ones you can reach", (function()
+  local zs = D.zones({ log = { { kind = "log", name = "a", header = "Near Zone", xp = 900, dist = 400, left = {} },
+    { kind = "log", name = "b", header = "Far Zone", xp = 5000, left = {} } } })
+  return #zs == 2 and not zs[1].far and zs[2].far
+end)())
 QuestBoardDB.doing = {}
 D.heldAt = {}
 

@@ -416,22 +416,17 @@ function D.unfitReason(quest, level, maxAbove)
 end
 
 -- Finds a quest by name (part of it, any case) and says where it is on the
--- board or why it is not there. st: the last pass; rows: rows per group;
--- heads: group names; maxAbove: the /qb range.
-function D.whyQuest(query, st, rows, heads, maxAbove)
+-- board or why it is not there. st: the last pass; where: kind -> where
+-- the board shows it; maxAbove: the /qb range.
+function D.whyQuest(query, st, where, maxAbove)
   local q = (query or ""):lower()
   if q == "" then return "name a quest: /qb why Stopping the Cycle" end
   local function hit(name) return type(name) == "string" and name:lower():find(q, 1, true) ~= nil end
-  for _, kind in ipairs({ "active", "nearby", "turnin", "log", "party", "pickup" }) do
-    for i, e in ipairs(st and st[kind] or {}) do
+  for _, kind in ipairs({ "active", "nearby", "turnin", "log", "party", "pickup", "farPickup" }) do
+    for _, e in ipairs(st and st[kind] or {}) do
       if hit(e.name) then
-        local group = heads and heads[kind] or kind
-        local cap = rows and rows[kind] or 6
-        if i > cap then
-          return string.format("%s is in %s at row %d, but the group shows %d rows (/qb rows %d shows it)", e.name, group, i, cap, i)
-        end
-        return string.format("%s is in %s, row %d%s", e.name, group, i,
-          (kind ~= "active" and st.active and #st.active > 0) and " (while you are on a job, point at the board to see every group)" or "")
+        local place = e.dist and (", " .. D.yards(e.dist)) or (kind ~= "farPickup" and kind ~= "pickup" and ", no known place" or "")
+        return e.name .. place .. ": " .. ((where and where[kind]) or kind)
       end
     end
   end
@@ -836,6 +831,66 @@ function D.areas(out)
   return list
 end
 
+---------------------------------------------------------------------------
+-- Zones: where to go next or swap to. Every stop you know of (your log,
+-- hand-ins, pick-ups near and far) by zone, scored by the XP there per
+-- minute of the trip and the work.
+---------------------------------------------------------------------------
+local function zoneWork(e)
+  if e.kind == "pickup" or e.kind == "party" then
+    return D.PICKUP_SECS + math.max(1, e.objectives or 0) * D.OBJECTIVE_SECS + D.RETURN_SECS
+  end
+  return stopSecs(e)
+end
+
+function D.zones(out)
+  local by, list = {}, {}
+  for _, kind in ipairs({ "active", "nearby", "turnin", "log", "pickup", "farPickup" }) do
+    for _, e in ipairs(out[kind] or {}) do
+      local name = D.zoneName(e.zone) or (e.kind ~= "pickup" and e.header) or nil
+      if name then
+        local z = by[name]
+        if not z then
+          z = { kind = "zone", name = name, color = "white", stops = {}, counts = {}, xp = 0, work = 0, left = {}, id = "zone:" .. name }
+          by[name] = z
+          table.insert(list, z)
+        end
+        table.insert(z.stops, e)
+        local k = kind == "farPickup" and "pickup" or e.kind
+        z.counts[k] = (z.counts[k] or 0) + 1
+        z.xp = z.xp + (e.xp or 0)
+        z.work = z.work + zoneWork(e)
+        if e.dist and (not z.dist or e.dist < z.dist) then
+          z.dist, z.angle, z.spawn, z.zone, z.target, z.near = e.dist, e.angle, e.spawn, e.zone, e.target, e
+        end
+        z.zone = z.zone or e.zone
+      end
+    end
+  end
+  for _, z in ipairs(list) do
+    z.secs = (z.dist and D.travelSecs(z.dist) or 0) + z.work
+    z.rate = z.xp > 0 and D.rate(z.xp, z.secs) or nil
+    z.far = not z.dist
+  end
+  -- Zones you can reach first, best XP per minute; far ones after, most XP.
+  table.sort(list, function(a, b)
+    if a.far ~= b.far then return not a.far end
+    if a.far then return a.xp > b.xp end
+    return (a.rate or 0) > (b.rate or 0)
+  end)
+  return list
+end
+
+-- "3 in your log, 1 hand in, 4 pick up" for a zone.
+function D.zoneText(z)
+  local c, parts = z.counts, {}
+  local logN = (c.active or 0) + (c.nearby or 0) + (c.log or 0)
+  if logN > 0 then table.insert(parts, logN .. " in your log") end
+  if (c.turnin or 0) > 0 then table.insert(parts, c.turnin .. " hand in") end
+  if (c.pickup or 0) > 0 then table.insert(parts, c.pickup .. " pick up") end
+  return table.concat(parts, ", ")
+end
+
 -- "2 hand in, 1 objective, 1 pick up" for an area.
 function D.areaText(a)
   local c, parts = a.counts, {}
@@ -910,7 +965,7 @@ function D.collect(opts)
       start = now()
     end
   end
-  local out = { active = {}, nearby = {}, turnin = {}, log = {}, party = {}, pickup = {}, questie = D.hasQuestie(), level = level }
+  local out = { active = {}, nearby = {}, turnin = {}, log = {}, party = {}, pickup = {}, farPickup = {}, questie = D.hasQuestie(), level = level }
   local inLog = {}
   local clock = opts.time or call(rawget(_G, "GetTime")) or 0
   for _, e in ipairs(D.logQuests()) do
@@ -966,6 +1021,7 @@ function D.collect(opts)
     for _, id in ipairs(D.availableIDs()) do
       if not inLog[id] then
         local e = D.pickup(id, level, opts.maxAbove)
+        if e and e.far then table.insert(out.farPickup, D.finish(e, level)) end
         if e and not e.far then
           -- A pick-up you pinned waits in Active until you take it.
           e.pinned = opts.doing and opts.doing[id] and true or nil
@@ -995,6 +1051,7 @@ function D.collect(opts)
   D.sort(out.log, opts.sortLog or "near")
   D.sort(out.pickup, opts.sortPickup or "xp")
   out.area = D.areas(out)
+  out.zones = D.zones(out)
   -- Your party: how each member is, where, and how far on your quests.
   out.members = D.memberList(out, members, level)
   -- XP colours: each group's best third green, worst third grey.

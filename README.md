@@ -387,37 +387,30 @@ the release that ships it.
 
 ## QuestBoard
 
-A small floating list, under the minimap, of the quests that matter now.
-`/qb` shows or hides it.
+A small floating board, under the minimap, of the quests that matter now.
+`/qb` shows or hides it. Four tabs follow what you are doing:
 
-| Group | What | Sorted by |
+| Tab | When | What |
 | --- | --- | --- |
-| Active | quests you are doing: the kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or you Alt-clicked it (any quest, also a hand-in or a pick-up). It stays while you are within 600 yards (`STAY_YARDS`) or make progress, and 10 minutes after the last of either (`GRACE_SECS`) | most recent first, then nearest |
-| Nearby | other quests in your log whose open objective is within 300 yards (`HERE_YARDS`) | nearest |
-| Areas | places where 2 or more stops (objectives, hand-ins, givers) are within 250 yards of each other (`AREA_YARDS`), so one trip does several quests; the row says what is there ("2 hand in, 1 objective") | best XP per minute: the XP you earn there (hand-ins and objectives, not pick-ups) over the run there and the work |
-| Turn in | quests in your log that are complete | nearest quest giver |
-| In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
-| Party has | quests your party members have that you do not (Questie's party data, `QuestieComms.remoteQuestLogs`), with who and their progress ("Ann 2/8") | nearest giver |
-| Town | the nearest innkeeper and flight master friendly to your side (Questie's NPC data, `npcFlags`); click or `/qb town` pins it on the map. Addons cannot walk you there | nearest |
-| Pick up | quests Questie shows as available ("!") that give XP and are at most 3 levels over you (`/qb range N`) | best estimated XP per minute (right-click the group: nearest) |
+| Doing | picked by itself while a quest is Active | the quests you are on (each open objective, party, chain), then "On the way": hand-ins, pick-ups and party quests within 300 yards of you or of an Active quest (`ns.ON_WAY_YARDS`), then "Your party", then one line that counts the rest of your log ("11 more in your log: Log tab") |
+| Nearby | picked by itself when no quest is Active | "Chain next": one list of what to do next within 1000 yards (`ns.NEXT_YARDS`): hand-ins, open objectives, pick-ups, party quests you can take, and areas with 3 or more stops in place of those stops. Best XP per minute first, the walk counted; a hand-in within 600 yards (`ns.TURNIN_TOP_YARDS`) first. Then "Your party" and the line for the rest of your log |
+| Areas | click it | "Where to go": every zone with stops you know (your log, hand-ins, pick-ups near and far), the ones you can reach first by XP per minute with the trip counted, far ones after by XP; each row says what is there ("3 in your log, 4 pick up"). Then "Travel": the nearest innkeeper and flight master |
+| Log | click it, or the "more in your log" line | every quest in your log under its log zone, one line each, never cut. A quest with no known place says "no place" |
+
+A tab you click holds until the board's own pick changes (you start or
+finish a quest). Active means: the kill or loot count went up in the last
+5 minutes (`ACTIVE_SECS`), or you Alt-clicked the quest (any quest, also a
+hand-in or a pick-up). It stays while you are within 600 yards
+(`STAY_YARDS`) or make progress, and 10 minutes after the last of either
+(`GRACE_SECS`).
 
 - A quest in your log that a party member also has says so under it ("with
   Ann 5/6"): the game's `IsUnitOnQuest`, plus Questie's party data for the
-  progress. Party members need Questie too for their progress and for the
-  Party has group.
+  progress. Party members need Questie too for their progress.
 - Focus (on by default): in combat and inside a dungeon or other instance,
-  the board shows only the Next line and the Active group. Move the mouse
-  over it and the whole board opens; it closes again a moment after the
-  mouse leaves. Out in the world the whole board shows. `/qb focus` shows
-  the whole board everywhere (again to undo).
-- On a job (a quest in Active, by progress or your pin), the board shows
-  only Active plus Turn in, Pick up and Party has rows within 300 yards
-  (`ns.ON_WAY_YARDS`) of you or of an Active quest. Mouse-over shows the
-  whole board, as in focus; `/qb focus` turns both off.
-- The top line says what to do next: the open objective of a quest you
-  are on now (Active), else the best area when it has 3 or more stops, else
-  the hand-in or quest with the best XP per minute from where you are
-  (travel included).
+  the board shows only the quests you are on. Move the mouse over it and
+  the whole tab opens; it closes again a moment after the mouse leaves.
+  `/qb focus` shows the whole tab everywhere (again to undo).
 - An item-started quest says where the item comes from (a mob that drops
   it, a chest or crate that holds it, or a vendor) and who takes it in.
   When Questie does not know (a world drop), the row says "drop unknown"
@@ -441,7 +434,7 @@ A small floating list, under the minimap, of the quests that matter now.
   Questie's `showPartyQuestObjectives` to off (its old value comes back
   with `/qb party on`).
 - Minimap pointers: when Glance is loaded, QuestBoard gives its minimap
-  edge arrows the Next quest's place, the nearest hand-in and the Town
+  edge arrows the best next stop's place, the nearest hand-in and the Town
   rows (`Glance.minimap.addPointerSource`, a list cached per refresh).
 - XP colours: in each group, the best third of the XP (Turn in) or XP per
   minute (Pick up, Party has, Areas) is green and the worst third grey
@@ -456,7 +449,7 @@ A small floating list, under the minimap, of the quests that matter now.
   another continent shows "far".
 - Time left: once you kill or loot for a quest, the board learns your pace
   (seconds per kill or loot, on that quest and over all quests; a break
-  over 5 minutes is not counted). An Active row and the Next line show
+  over 5 minutes is not counted). An Active row shows
   about how long the rest takes ("~4 min"): the run there plus the kills
   left at your pace. XP per minute uses the same estimate.
 - A quest in your log that is not done has a thin progress bar along the
@@ -469,11 +462,8 @@ A small floating list, under the minimap, of the quests that matter now.
   (`D.MID_YARDS`). Quests further away, in another zone or on another
   continent come after them, biggest XP first, because the travel guess
   counts for little there.
-- Group order follows what you do: when no quest is Active and a hand-in
-  is within 600 yards (`ns.TURNIN_TOP_YARDS`), Turn in comes first. Else
-  Active and Nearby come first.
 - Max height: drag the grip at the bottom right corner, or `/qb height N`.
-  The title and the Next line stay; the groups scroll with the mouse wheel,
+  The title and the tabs stay; the rows scroll with the mouse wheel,
   one line at a time, and a dim line says how many rows are above and
   below. Right-click the grip or `/qb height off` for no limit.
 - Click a row: open the world map (M) at the place, and set and track the
@@ -501,9 +491,9 @@ A small floating list, under the minimap, of the quests that matter now.
   offline / dead / AFK, yards and arrow (or zone), and your quests they
   share ("1 behind": you can hand it in, they cannot yet). Point at it for
   their progress on each one; click pins them on the map.
-- A group shows its first rows; the rest are on a "+N more" line (click
-  it for the whole group). `/qb why NAME` says where a quest is, or why
-  it is not on the board.
+- A list with more rows than it shows ends in a "+N more: ..." line that
+  names them (click it for the whole list). `/qb why NAME` says where a
+  quest is on the board, or why it is not there.
 - Point at a quest to see its whole chain in the tooltip: each step with
   its level, marked done, `>>` (this one), log or `...` (later).
 - Alt-click any quest row: "I'm doing this" (it stays in Active until

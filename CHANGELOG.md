@@ -34,7 +34,19 @@ the same, and a test checks that every `.toc` version has a section here.
 - The item tooltip says "AH full scan 3h ago" like LootValue, and "not in
   today's full scan" next to an old price.
 
-## QuestBoard 0.1.2
+## QuestBoard 0.2.0
+
+- New layout: four tabs for what you are doing, in place of nine groups.
+  Doing (picked by itself while a quest is Active): the quests you are on,
+  the stops on the way, your party, and one line that counts the rest of
+  your log. Nearby (picked by itself otherwise): one list of what to chain
+  next within 1000 yd, best XP per minute with the walk counted, hand-ins,
+  objectives, pick-ups and areas mixed. Areas: zones to go to or swap to,
+  by XP per minute with the trip counted, far ones after; and the nearest
+  inn and flight master. Log: every quest in your log by zone, never cut.
+  A click on a tab keeps it until you start or finish a quest. The "Next:"
+  line is gone: the first row of Nearby is the suggestion.
+- A log quest with no known place says "no place".
 
 - Alt-click pins any quest, not only the ones you are working on: a
   hand-in or a pick-up goes to Active with a gold star too. A pinned
