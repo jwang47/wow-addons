@@ -371,11 +371,13 @@ turned off. It is not in the release yet (not in `tools/release.py`
 `ADDONS`); try it with `dev.ps1 Niceties`.
 
 `/nice` lists the features and their state. `/nice KEY` toggles one,
-`/nice KEY on|off` sets it. The state is in `NicetiesDB` (SavedVariables).
+`/nice KEY on|off` sets it (a feature with a list, such as `blocked`,
+shows the list on `/nice KEY`). The state is in `NicetiesDB` (SavedVariables).
 
 | Key | What it does |
 | --- | --- |
 | `zoom` | Max camera distance (on by default). Sets the `cameraDistanceMaxZoomFactor` CVar to the highest value the client keeps, at each login and loading screen, so you can scroll the camera out much further. The Options slider stops at 2.0; the addon tries 4.0, 3.4, 2.6 and 2.0 and keeps the first one the client takes (or the value the client clamps it to). Off puts back the value you had before. Moving the Options slider changes it until the next login. |
+| `blocked` | Blocked-action report (on by default). The game prints only "Interface action failed because of an AddOn". Niceties listens for `ADDON_ACTION_BLOCKED` and `ADDON_ACTION_FORBIDDEN`, says once per session which addon it was and the call it refused (and if you were in combat), and keeps the last 20 in `NicetiesDB` (`/nice blocked` lists them). It also sets the `taintLog` CVar to 1, so the game writes `Logs\taint.log`; off puts the old value back. |
 
 To add a feature: put it in the next free `SpareN.lua` (the `.toc` already
 lists five empty ones, so the game loads it after `/reload`; a new file
