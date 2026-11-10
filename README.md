@@ -467,7 +467,9 @@ hand-in or a pick-up). It stays while you are within 600 yards
   (`D.MID_YARDS`). Quests further away, in another zone or on another
   continent come after them, biggest XP first, because the travel guess
   counts for little there.
-- Max height: drag the grip at the bottom right corner, or `/qb height N`.
+- Size: drag the grip at the bottom right corner: up and down sets the max
+  height, sideways the width (220 to 560, `/qb width N`). While you drag, a
+  gold outline shows the max size with its numbers. Or `/qb height N`.
   The title and the tabs stay; the rows scroll with the mouse wheel,
   one line at a time, and a dim line says how many rows are above and
   below. Right-click the grip or `/qb height off` for no limit.

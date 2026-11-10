@@ -27,6 +27,7 @@ local defaults = {
   focus = true,          -- in combat and instances: only the quests you are on until mouse-over
   point = nil,           -- saved position { point, x, y }
   maxHeight = nil,       -- drag the grip (or /qb height N): scroll past it
+  width = 270,           -- drag the grip sideways (or /qb width N)
 }
 
 local function say(msg)
@@ -39,7 +40,8 @@ ns.say = say
 -- Look: the Glance "floating minimal" style. A see-through dark panel, no
 -- frame art, small text, colour only for quest level.
 ---------------------------------------------------------------------------
-local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6
+local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6   -- W: the board width, from ns.db.width
+ns.MIN_W, ns.MAX_W = 220, 560
 -- Spacing that shows the grouping: a quest's two lines sit close, quests
 -- have a small gap between them, groups a bigger one.
 local SUB_UP, ROW_GAP, GROUP_GAP = 3, 4, 10
@@ -707,6 +709,8 @@ ns.MIN_HEIGHT = 80
 
 -- The bar: for log quests not done yet; gold in Active, blue elsewhere.
 ns.BAR_W = W - 2 * PAD - 26 - 16
+-- The board width: ns.db.width within MIN_W..MAX_W.
+function ns.width() return math.max(ns.MIN_W, math.min(ns.MAX_W, (ns.db and ns.db.width) or 270)) end
 function ns.setBar(r, e, kind)
   if e.kind ~= "log" or e.done or not e.frac then r.bar:Hide() r.fill:Hide() return end
   r.bar:Show()
@@ -869,6 +873,9 @@ end
 -- the max height you set (drag the grip at the bottom right).
 function ns.render()
   if not panel then return end
+  W = ns.width()
+  ns.BAR_W = W - 2 * PAD - 26 - 16
+  panel:SetWidth(W)
   local y = -PAD
   local level = state and state.level or D.playerLevel()
   panel.title:SetText("Quests")
@@ -1036,24 +1043,49 @@ end
 
 -- The grip at the bottom right sets the max height: drag it; right-click
 -- takes the limit off.
-local function cursorY()
-  local _, cy = call(rawget(_G, "GetCursorPosition"))
+local function cursorXY()
+  local cx, cy = call(rawget(_G, "GetCursorPosition"))
   local scale = UIParent.GetEffectiveScale and UIParent:GetEffectiveScale() or 1
-  return (cy or 0) / scale
+  return (cx or 0) / scale, (cy or 0) / scale
+end
+-- While you drag, a gold outline shows the max size (the board itself is
+-- only as tall as its rows), with the numbers in it.
+local function showOutline()
+  local o = panel.outline
+  if not o then return end
+  local h = ns.db.maxHeight or panel:GetHeight() or 200
+  o:ClearAllPoints()
+  o:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
+  o:SetWidth(W)
+  o:SetHeight(h)
+  o.text:SetText(W .. " x " .. h)
+  o:Show()
 end
 function ns.sizeStart()
-  ns.sizing = { y = cursorY(), h = panel:GetHeight() or 200 }
+  ns.pinTop()   -- grow right and down from the top-left corner
+  local x, y = cursorXY()
+  ns.sizing = { x = x, y = y, h = ns.db.maxHeight or panel:GetHeight() or 200, w = ns.width() }
+  showOutline()
 end
 function ns.sizeMove()
   if not ns.sizing then return end
-  local h = ns.sizing.h + (ns.sizing.y - cursorY())
+  local x, y = cursorXY()
+  local h = ns.sizing.h + (ns.sizing.y - y)
   ns.db.maxHeight = math.floor(math.max(ns.MIN_HEIGHT, h) + 0.5)
+  ns.db.width = math.floor(math.max(ns.MIN_W, math.min(ns.MAX_W, ns.sizing.w + (x - ns.sizing.x))) + 0.5)
   ns.render()
+  showOutline()
 end
 function ns.sizeStop()
   if not ns.sizing then return end
   ns.sizing = nil
-  say("max height " .. ns.db.maxHeight .. " (right-click the grip, or /qb height off, for no limit)")
+  if panel.outline then panel.outline:Hide() end
+  say("size " .. ns.width() .. " x " .. ns.db.maxHeight .. " max (right-click the grip, or /qb height off, for no height limit)")
+  if ns.updateItems then ns.updateItems(state) end
+end
+function ns.setWidth(w)
+  ns.db.width = w and math.max(ns.MIN_W, math.min(ns.MAX_W, w)) or 270
+  ns.render()
 end
 function ns.setMaxHeight(h)
   ns.db.maxHeight = h and math.max(ns.MIN_HEIGHT, h) or nil
@@ -1269,12 +1301,27 @@ local function build()
     local tip = rawget(_G, "GameTooltip")
     if not tip then return end
     tip:SetOwner(self, "ANCHOR_RIGHT")
-    tip:AddLine("Drag: set the board's max height", 1, 1, 1)
+    tip:AddLine("Drag: set the board's width and max height", 1, 1, 1)
     tip:AddLine("Mouse wheel scrolls past it. Right-click: no limit", 0.6, 0.6, 0.6)
     tip:Show()
   end)
   grip:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
   panel.grip = grip
+  -- The max-size outline, shown only while you drag the grip.
+  local o = CreateFrame("Frame", nil, panel)
+  o:SetFrameLevel((panel.GetFrameLevel and panel:GetFrameLevel() or 1) + 5)
+  for _, edge in ipairs({ { "TOPLEFT", "TOPRIGHT", true }, { "BOTTOMLEFT", "BOTTOMRIGHT", true }, { "TOPLEFT", "BOTTOMLEFT", false }, { "TOPRIGHT", "BOTTOMRIGHT", false } }) do
+    local t = o:CreateTexture(nil, "OVERLAY")
+    t:SetColorTexture(1, 0.82, 0.25, 0.9)
+    t:SetPoint(edge[1], 0, 0)
+    t:SetPoint(edge[2], 0, 0)
+    if edge[3] then t:SetHeight(1) else t:SetWidth(1) end
+  end
+  o.text = o:CreateFontString(nil, "OVERLAY", FONT)
+  o.text:SetPoint("BOTTOMRIGHT", -16, 4)
+  o.text:SetTextColor(1, 0.82, 0.25)
+  o:Hide()
+  panel.outline = o
   wheel(panel)
   local p = ns.db.point
   if p then
@@ -1422,6 +1469,7 @@ local help = {
   "/qb range N - pick-ups at most N levels over you (now %d)",
   "/qb rows N - rows per group (now %d)",
   "/qb height N - at most N pixels tall, scroll for the rest (off: no limit; or drag the grip)",
+  "/qb width N - the board's width, 220 to 560 (reset: 270; or drag the grip sideways)",
   "/qb doing | nearby | areas | log - open that tab (the board picks Doing or Nearby by itself)",
   "/qb why NAME - where a quest is on the board, or why it is not there",
   "/qb town - pin the nearest innkeeper or flight master on the map (/qb inn: innkeeper only)",
@@ -1479,6 +1527,10 @@ SlashCmdList.QUESTBOARD = function(text)
   elseif cmd == "height" and (n or rest == "off") then
     ns.setMaxHeight(n)
     say(n and ("max height " .. ns.db.maxHeight .. ", scroll for the rest") or "no max height")
+    return
+  elseif cmd == "width" and (n or rest == "reset") then
+    ns.setWidth(n)
+    say("width " .. ns.width())
     return
   elseif ns.TAB_NAMES[cmd] then
     ns.pickTab(cmd)

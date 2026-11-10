@@ -952,8 +952,26 @@ for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and 
 check("height: the wheel shows rows further down", moved and ns.scroll > 0 and (board.more.text or ""):find("above", 1, true) ~= nil)
 ns.scrollBy(100)
 check("height: scroll stops at the top", ns.scroll == 0)
-local cursor = 500
-function GetCursorPosition() return 0, cursor end
+local cursor, cursorX = 500, 100
+function GetCursorPosition() return cursorX, cursor end
+local widths = {}
+local realSetWidth = board.SetWidth
+function board:SetWidth(w) widths[#widths + 1] = w end
+ns.sizeStart()
+check("size: the outline shows while you drag", board.outline and board.outline.shown)
+cursor, cursorX = 400, 160
+ns.sizeMove()
+check("size: the outline names the size", board.outline.text.text == "330 x " .. QuestBoardDB.maxHeight)
+ns.sizeStop()
+check("size: dragging right widens the board", QuestBoardDB.width == 330 and widths[#widths] == 330 and not board.outline.shown)
+ns.sizeStart()
+cursorX = -1000
+ns.sizeMove() ns.sizeStop()
+check("size: not narrower than the minimum", QuestBoardDB.width == ns.MIN_W)
+SlashCmdList.QUESTBOARD("width reset")
+check("/qb width reset", QuestBoardDB.width == 270)
+board.SetWidth = realSetWidth
+cursor, cursorX = 500, 100
 ns.sizeStart()
 cursor = 400
 ns.sizeMove()

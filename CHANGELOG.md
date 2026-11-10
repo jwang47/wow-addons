@@ -51,6 +51,10 @@ the same, and a test checks that every `.toc` version has a section here.
   every quest you see in it, the stops of its areas too; they all go to
   Doing. Alt-click again to unpin them. Alt-click a zone in Areas pins
   every quest there, far pick-ups too.
+- The grip at the bottom right now sets the width too (drag it sideways,
+  220 to 560, or `/qb width N`). While you drag, a gold outline shows the
+  max size and its numbers, so you see the limit even when the board is
+  shorter.
 
 - Alt-click pins any quest, not only the ones you are working on: a
   hand-in or a pick-up goes to Active with a gold star too. A pinned
