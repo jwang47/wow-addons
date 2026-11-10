@@ -423,6 +423,10 @@ small grid (`/buffs`). It is not in the release yet.
   players outside your group: target them by name, cast, then
   `/targetlasttarget`. `UnitName` gives the surname as its second value:
   `/target First Surname` finds the player.
+- The `UNIT_AURA` payload can be secret: reading `info.addedAuras` or
+  `info.isFullUpdate` raises "table expected, got secret". Do not read
+  it; rescan the unit's auras with `C_UnitAuras.GetAuraDataByIndex`
+  and pass each value through `issecretvalue` first.
 - Addons may not use the combat log: registering for
   `COMBAT_LOG_EVENT_UNFILTERED` brings up "blocked from an action only
   available to the Blizzard UI" right after login. UpgradeFinder leaves it
