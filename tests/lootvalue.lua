@@ -460,6 +460,10 @@ check("ahWins: an unsold listing keeps the sure option", LV.ahWins(1000, 0, 200,
 LootValueDB.sales["Linen Cloth"] = { posted = 10, sold = 0, expired = 10, cancelled = 0, soldItems = 0, net = 0 }
 check("your own expired auctions pull the odds down", SC.odds(2589, 93, "Linen Cloth").chance < 0.25)
 LootValueDB.sales["Linen Cloth"] = nil
+local qt = LV.marketQuote(2589, "|Hitem:2589:0|h[Linen Cloth]|h", 13, 13)
+check("market quote: fair price, odds, expected", qt and qt.price == 93 and qt.fresh and qt.expected
+  and qt.expected < qt.net and qt.auctions == 3 and has(qt.note, "3 listed") and has(qt.note, "sells in 24h"))
+check("market quote: no scan is unsure", LV.marketQuote(9003).confidence == "no scan")
 local T2 = T
 T = T + 2 * 86400
 check("an old scan's fair price is not used", LV.fairPrice(2589) == nil)

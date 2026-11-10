@@ -681,6 +681,65 @@ function S.itemOdds(link)
 end
 LV.sellOdds = S.itemOdds
 
+-- Auctions and items listed in the last full scan, not yours.
+function S.listedNow(id)
+  local snap = db().snap
+  if not snap or not snap.items or not snap.items[id] then return 0, 0 end
+  local me = UnitName and UnitName("player")
+  local auctions, items = 0, 0
+  for _, e in ipairs(S.decode(snap.items[id], snap.owners or {})) do
+    if e[1] ~= me then auctions, items = auctions + 1, items + e[2] end
+  end
+  return auctions, items
+end
+
+-- What an AH sale of one item is worth, for other addons (UpgradeFinder's
+-- craft profit). sure: what you get without the AH (vendor, disenchant),
+-- in copper. Returns nil without any AH price, else
+-- { price, net (after the cut), expected (net weighed by the chance, an
+-- unsold listing coming back as sure less the deposit; nil without odds),
+-- chance, hours, auctions, perDay (items sold a day, nil unknown),
+-- fresh (from a LootValue scan under a day old), confidence ("ok",
+-- "thin", "no scan"), note (short text) }.
+function S.quote(id, link, sure, vendor)
+  if not id then return nil end
+  local fair = S.price(id)
+  local price = fair
+  if not price then
+    local a = Auctionator and Auctionator.API and Auctionator.API.v1
+    if a then
+      local ok, v = pcall(a.GetAuctionPriceByItemID, "LootValue", id)
+      price = ok and type(v) == "number" and v or nil
+    end
+  end
+  if not price or price <= 0 then return nil end
+  local q = { price = price, net = math.floor(price * 0.95), fresh = fair ~= nil }
+  local st = S.stats(id)
+  q.auctions = S.listedNow(id)
+  q.perDay = st and st.rate and st.rate * 86400 or nil
+  local o = fair and S.odds(id, fair, link and LV.sales and LV.sales.itemName(link))
+  if o then
+    q.chance, q.hours = o.chance, o.hours
+    local deposit = math.floor((vendor or 0) * 0.3)
+    q.expected = math.floor(o.chance * q.net + (1 - o.chance) * math.max(0, (sure or 0) - deposit) + 0.5)
+  end
+  local parts = {}
+  if not q.fresh then
+    q.confidence = "no scan"
+    table.insert(parts, "lowest listing, no LootValue scan today")
+  else
+    q.confidence = (q.auctions < 3 or not o) and "thin" or "ok"
+    table.insert(parts, q.auctions .. " listed")
+    if q.perDay then table.insert(parts, string.format("~%s sold/day", q.perDay >= 10 and math.floor(q.perDay + 0.5)
+      or string.format("%.1f", q.perDay))) end
+    if o then table.insert(parts, math.floor(o.chance * 100 + 0.5) .. "% sells in 24h") end
+    if not o then table.insert(parts, "no sales seen yet") end
+  end
+  q.note = table.concat(parts, ", ")
+  return q
+end
+LV.marketQuote = S.quote
+
 
 -- "none sold in 1d" when the scans saw 10+ listed and no sales, else nil.
 function S.slowNote(link)

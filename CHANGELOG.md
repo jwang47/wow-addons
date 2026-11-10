@@ -60,6 +60,12 @@ the same, and a test checks that every `.toc` version has a section here.
   craft gains or loses ("Make into Bolt of Silk Cloth (4 each)").
 - Reagents the client has not seen yet get their AH price too: UpgradeFinder
   learns the item names in the Auctionator scan once and saves them.
+- With LootValue 0.3.0, the AH sale of a made item counts at its expected
+  value: LootValue's fair price (outliers dropped) times the chance it
+  sells in 24 hours, from your full scans. A line under "Sells for" says
+  how many are listed, how many sell a day and the chance. A thin market
+  (under 3 listed, or no sales seen) or a price with no LootValue scan
+  today is marked in red, and the profit gets "?".
 
 ## LootValue 0.2.1
 
