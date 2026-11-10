@@ -71,6 +71,84 @@ function D.chain(id)
   return list
 end
 
+-- The quest before id: Questie's preQuestSingle (one of them is enough),
+-- else the first of preQuestGroup (all of them are needed).
+local function firstOf(v)
+  if type(v) == "number" and v > 0 then return v end
+  if type(v) == "table" then
+    for _, x in ipairs(v) do if type(x) == "number" and x > 0 then return x end end
+  end
+  return nil
+end
+function D.preQuest(id)
+  local qdb = D.module("QuestieDB")
+  if not qdb then return nil end
+  return firstOf(call(qdb.QueryQuestSingle, id, "preQuestSingle")) or firstOf(call(qdb.QueryQuestSingle, id, "preQuestGroup"))
+end
+
+-- The whole chain around id: the quests before it (walked back) and after
+-- it. Returns the list and the place of id in it.
+function D.fullChain(id)
+  local before, seen, q = {}, { [id] = true }, id
+  for _ = 1, D.CHAIN_MAX do
+    local pre = D.preQuest(q)
+    if not pre or seen[pre] then break end
+    seen[pre] = true
+    table.insert(before, 1, pre)
+    q = pre
+  end
+  local list = {}
+  for _, x in ipairs(before) do table.insert(list, x) end
+  for _, x in ipairs(D.chain(id)) do
+    if x == id or not seen[x] then seen[x] = true table.insert(list, x) end
+  end
+  return list, #before + 1
+end
+
+local function completed(id)
+  local f = api("C_QuestLog.IsQuestFlaggedCompleted") or rawget(_G, "IsQuestFlaggedCompleted")
+  return f and call(f, id) == true or false
+end
+
+-- Each step of the chain: { id, name, level, state } with state "done"
+-- (handed in), "here" (this quest), "log" (in your log), or "later".
+-- inLog: questID -> true. Nil when the quest has no chain.
+function D.chainSteps(id, inLog)
+  local qdb = D.module("QuestieDB")
+  if not qdb then return nil end
+  local list, at = D.fullChain(id)
+  if #list < 2 then return nil end
+  local steps = {}
+  for i, q in ipairs(list) do
+    local state = i == at and "here" or (inLog and inLog[q]) and "log" or completed(q) and "done" or (i < at and "done" or "later")
+    local name = call(qdb.QueryQuestSingle, q, "name")
+    table.insert(steps, { id = q, name = type(name) == "string" and name or ("quest " .. q),
+      level = plain(call(qdb.QueryQuestSingle, q, "questLevel")), state = state })
+  end
+  return steps, at
+end
+
+D.CHAIN_SHOW = 8   -- chain lines in a tooltip
+D.STEP_MARK = { done = "|cff60d060done|r", here = "|cffffd200>>|r", log = "|cffffd200log|r", later = "|cff909090...|r" }
+-- Tooltip lines for a chain: "Chain: 3 of 5", then one line per step
+-- ("done", ">>" for this quest, "log", "..." for later ones), at most
+-- CHAIN_SHOW around this quest.
+function D.chainLines(steps, at)
+  if not steps then return {} end
+  local lines = { string.format("Chain: quest %d of %d", at, #steps) }
+  local back = math.min(2, D.CHAIN_SHOW - 1)   -- steps shown before this one
+  local first = math.max(1, math.min(at - back, #steps - D.CHAIN_SHOW + 1))
+  local last = math.min(#steps, first + D.CHAIN_SHOW - 1)
+  if first > 1 then table.insert(lines, string.format("  (%d earlier)", first - 1)) end
+  for i = first, last do
+    local s = steps[i]
+    local lvl = s.level and ("[" .. s.level .. "] ") or ""
+    table.insert(lines, "  " .. D.STEP_MARK[s.state] .. "  " .. lvl .. s.name)
+  end
+  if last < #steps then table.insert(lines, string.format("  (%d more)", #steps - last)) end
+  return lines
+end
+
 local function itemFacts(item)
   local qdb = D.module("QuestieDB")
   local class = qdb and call(qdb.QueryItemSingle, item, "class")

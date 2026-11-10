@@ -34,6 +34,17 @@ the same, and a test checks that every `.toc` version has a section here.
 - The item tooltip says "AH full scan 3h ago" like LootValue, and "not in
   today's full scan" next to an old price.
 
+## QuestBoard 0.1.2
+
+- Alt-click pins any quest, not only the ones you are working on: a
+  hand-in or a pick-up goes to Active with a gold star too. A pinned
+  pick-up stays pinned when you take it; a pin goes when you hand the
+  quest in. Alt-click on an area pins its hand-ins and pick-ups as well.
+- The tooltip of each quest shows its whole chain (with Questie): "Chain:
+  quest 3 of 5", then each step with its level, marked done, ">>" (this
+  quest), log (in your log) or "..." (later). A long chain shows the 8
+  steps around this quest.
+
 ## GroupUp 0.1.0
 
 - New: a panel that helps you decide whether to group up (`/gu`). It
