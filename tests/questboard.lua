@@ -597,6 +597,21 @@ for _, f in ipairs(frames) do
   end
 end
 check("pinned: a star on the quest you marked", starred and not others)
+-- On a job: Active plus hand-ins and pick-ups on the way; the rest on hover.
+local shownIDs = {}
+for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown then table.insert(shownIDs, f.entry.id) end end
+table.sort(shownIDs)
+local idSet = {}
+for _, id in ipairs(shownIDs) do idSet[id] = true end
+check("on a job: Active shows, the rest of the log does not", idSet[122] and idSet[127] and idSet[201] and not idSet[125])
+local way = ns.onWay({ { id = 1, dist = 250 }, { id = 2, dist = 900, wx = 100, wy = 0, inst = 0 }, { id = 3, dist = 900, wx = 900, wy = 0, inst = 0 } },
+  { { wx = 0, wy = 0, inst = 0 } })
+check("on a way: near you or near an Active quest", #way == 2 and way[1].id == 1 and way[2].id == 2)
+check("on a job: the title says hover shows all", (QuestBoardFrame.sub.text or ""):find("hover: all", 1, true) ~= nil)
+ns.hover(true, 0)
+check("on a job: mouse-over shows the whole board", countRows() > #shownIDs)
+ns.hover(false, 1)
+check("on a job: and trims again after", countRows() == #shownIDs)
 QuestBoardDB.doing = {}
 D.heldAt = {}
 

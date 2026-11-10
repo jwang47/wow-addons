@@ -285,6 +285,10 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   over it and the whole board opens; it closes again a moment after the
   mouse leaves. Out in the world the whole board shows. `/qb focus` shows
   the whole board everywhere (again to undo).
+- On a job (a quest in Active, by progress or your pin), the board shows
+  only Active plus Turn in, Pick up and Party has rows within 300 yards
+  (`ns.ON_WAY_YARDS`) of you or of an Active quest. Mouse-over shows the
+  whole board, as in focus; `/qb focus` turns both off.
 - The top line says what to do next: the open objective of a quest you
   are on now (Active), else the best area when it has 3 or more stops, else
   the nearest hand-in, else the nearest quest.

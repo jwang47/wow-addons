@@ -507,6 +507,7 @@ function ns.render()
   local level = state and state.level or D.playerLevel()
   panel.title:SetText("Quests")
   panel.sub:SetText(state and (state.questie and ("level " .. level) or "level " .. level .. "  (no Questie: log only)") or "")
+  if ns.focused() or ns.trimmed() then panel.sub:SetText(panel.sub:GetText() .. "  -  hover: all") end
   y = y - HEAD_H
   local nextText = ns.nextStep(state)
   if nextText then
@@ -528,6 +529,11 @@ function ns.render()
     local show = #list > 0 or kind == "pickup" and state and state.questie
     -- Focus: only the quests you are on now, the rest on mouse-over.
     if ns.focused() and kind ~= "active" then show = false end
+    -- On a job: Active, plus hand-ins and pick-ups on the way.
+    if show and ns.trimmed() and kind ~= "active" then
+      list = ns.ON_WAY_KINDS[kind] and ns.onWay(list, state.active) or {}
+      show = #list > 0
+    end
     h:Hide()
     if show then
       local collapsed = ns.db.collapsed[kind]
@@ -704,8 +710,32 @@ function ns.busy()
 end
 function ns.focused() return ns.db.focus and ns.busy() and not ns.expanded end
 
+-- On a job (a quest in Active, by progress or your pin): only what helps
+-- it shows; the whole board on mouse-over, as in focus.
+ns.ON_WAY_YARDS = 300
+ns.ON_WAY_KINDS = { turnin = true, pickup = true, party = true }
+function ns.onJob() return state and state.active and #state.active > 0 or false end
+function ns.trimmed() return ns.db.focus and ns.onJob() and not ns.expanded end
+
+-- The entries within ON_WAY_YARDS of you or of an Active quest's place.
+function ns.onWay(list, active)
+  local out = {}
+  for _, e in ipairs(list) do
+    local near = e.dist and e.dist <= ns.ON_WAY_YARDS
+    for _, a in ipairs(active or {}) do
+      if near then break end
+      if e.wx and a.wx and e.inst == a.inst then
+        local dx, dy = e.wx - a.wx, e.wy - a.wy
+        near = dx * dx + dy * dy <= ns.ON_WAY_YARDS * ns.ON_WAY_YARDS
+      end
+    end
+    if near then table.insert(out, e) end
+  end
+  return out
+end
+
 function ns.hover(over, dt)
-  if not (ns.db.focus and ns.busy()) then ns.expanded = false return end
+  if not (ns.db.focus and (ns.busy() or ns.onJob())) then ns.expanded = false return end
   if over then
     awaySecs = 0
     if not ns.expanded then ns.expanded = true ns.render() end
