@@ -117,10 +117,24 @@ check("categories with counts and subclasses", #cats == 3 and cats[1].name == "A
 check("footer names the scan and its age", B.sourceText():find("Full scan 3h ago: 6 auctions of 4 items", 1, true) ~= nil,
   B.sourceText())
 
+-- Estimated profit: flip at the fair price, a vendor, or one craft for a recipe.
+ITEMS[5] = { "Pattern: Silk Pack", 1, 20, 0, 9, 2 }
+loaded[5] = true
+LootValueDB.snap.items[5] = "1,1,8000,4"
+LootValueDB.snap.t = LootValueDB.snap.t + 1
+UpgradeFinderAPI = { recipe = function(id) return id == 5 and { profit = 25000 } or nil end }
+B.buildAll()
+byID = B.current().byID
+check("flip profit: fair price after the cut less the cheapest", byID[1].how == "flip" and byID[1].profit == 4500 * 0.95 - 4000)
+check("recipe profit: one craft", byID[5].how == "craft" and byID[5].profit == 25000)
+check("no fair price, no vendor price: no profit", byID[2].profit == nil)
+check("sort by profit", names(B.query({}, "profit", true)):find("^Pattern: Silk Pack,Linen Bag") ~= nil, names(B.query({}, "profit", true)))
+UpgradeFinderAPI = nil
+
 -- The window.
 SlashCmdList.BAZAAR("silk")
 check("/bazaar silk opens the window with the search", BazaarFrame:IsShown() and BazaarFrame.search:GetText() == "silk")
-check("the status line counts what is shown", BazaarFrame.status:GetText():find("2 shown") ~= nil, BazaarFrame.status:GetText())
+check("the status line counts what is shown", BazaarFrame.status:GetText():find("3 shown") ~= nil, BazaarFrame.status:GetText())
 SlashCmdList.BAZAAR("")
 check("/bazaar again closes it", not BazaarFrame:IsShown())
 check("Esc closes it", UISpecialFrames[1] == "BazaarFrame")

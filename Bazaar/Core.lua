@@ -100,11 +100,33 @@ end
 -- from the server: a row with no name yet says "item 12345" and fills in
 -- when GET_ITEM_INFO_RECEIVED comes (B.fillName).
 ---------------------------------------------------------------------------
+-- Estimated profit of one item, r.profit and r.how:
+-- - "craft": a recipe, the profit of one craft (UpgradeFinderAPI.recipe:
+--   reagent prices against what the made item sells for).
+-- - "flip": buy the cheapest, sell again at the fair price after the AH
+--   cut of 5%, or to a vendor when that pays more ("vendor").
+B.CUT = 0.95
+B.RECIPE = 9
+function B.estimate(r)
+  r.profit, r.how = nil, nil
+  local uf = rawget(_G, "UpgradeFinderAPI")
+  if r.classID == B.RECIPE and type(uf) == "table" and type(uf.recipe) == "function" then
+    local sum = call(uf.recipe, r.id)
+    if type(sum) == "table" and sum.profit then r.profit, r.how = sum.profit, "craft" return end
+  end
+  if not r.min then return end
+  local ah = r.fair and r.fair * B.CUT
+  local vendor = r.sell and r.sell > 0 and r.sell or nil
+  if vendor and (not ah or vendor > ah) then r.profit, r.how = vendor - r.min, "vendor"
+  elseif ah then r.profit, r.how = ah - r.min, "flip" end
+end
+
 local function itemFields(r)
   local get = api("C_Item.GetItemInfo") or rawget(_G, "GetItemInfo")
-  local name, _, quality, ilvl, req, _, _, _, _, icon, _, classID, subclassID = call(get, r.id)
+  local name, _, quality, ilvl, req, _, _, _, _, icon, sell, classID, subclassID = call(get, r.id)
   if name then
     r.name, r.lname, r.quality, r.ilvl, r.req, r.icon = name, name:lower(), quality, ilvl, req, icon
+    r.sell = type(sell) == "number" and sell or nil
     r.classID, r.subclassID = classID or r.classID, subclassID or r.subclassID
     return true
   end
@@ -163,6 +185,7 @@ function B.step(budget)
       end
       if r.min or r.listed then
         if not itemFields(r) then b.missing = b.missing + 1 end
+        B.estimate(r)
         table.insert(b.rows, r)
         b.byID[id] = r
       end
@@ -191,6 +214,7 @@ function B.fillName(id)
   if not r or r.lname ~= "" then return false end
   if itemFields(r) then
     build.missing = math.max(0, build.missing - 1)
+    B.estimate(r)
     return true
   end
   return false
@@ -214,8 +238,8 @@ function B.matches(r, f)
   return true
 end
 
--- Sort keys: name, req, listed, min, fair, sold. Missing numbers go last.
-B.SORTS = { "name", "req", "listed", "min", "fair", "sold" }
+-- Sort keys: name, req, listed, min, fair, sold, profit. Missing numbers go last.
+B.SORTS = { "name", "req", "listed", "min", "fair", "sold", "profit" }
 function B.sorter(key, desc)
   return function(a, b)
     local x, y = a[key], b[key]
