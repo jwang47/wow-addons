@@ -46,6 +46,14 @@ the same, and a test checks that every `.toc` version has a section here.
 - With 10+ listed and none sold across your scans, the AH advice counts
   the market as slow ("none sold in 8h").
 
+## Bazaar 0.1.0
+
+- New addon (in testing): an AH browser for your last full AH scan, away
+  from the AH. Categories, search, level and price filters, and sortable
+  columns: cheapest buyout, items listed, fair price, sold in 2 days.
+  `/bazaar`, `/ahb`. It reads LootValue's full scan, or Auctionator's
+  prices without one.
+
 ## UpgradeFinder 0.2.0
 
 - `UpgradeFinderAPI.recipe(itemID)` gives other addons a recipe's skill,
