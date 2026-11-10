@@ -519,8 +519,20 @@ check("areas: again unmarks them", next(QuestBoardDB.doing) == nil and not ns.ar
 check("areas: a hand-in is not marked", (function()
   for _, q in ipairs(ns.areaQuests(area)) do if q.kind == "turnin" then return false end end return true end)())
 D.heldAt = {}
+local here = ns.nextStep(withAreas)
+check("next step: not 'go to' an area you are in", not here:find("^Go "))
+local savedDist = withAreas.area[1].dist
+withAreas.area[1].dist = 2000
 local nextArea = ns.nextStep(withAreas)
-check("next step: the best area when nothing is active", nextArea:find("^Go near ") ~= nil)
+check("next step: the best area when nothing is active", nextArea:find("^Go ") ~= nil)
+withAreas.area[1].dist = savedDist
+local fake = { log = { { kind = "log", id = 1, name = "L", target = "Stoutfist", wx = 0, wy = 0, dist = 10, xp = 100, left = {} } },
+  pickup = { { kind = "pickup", id = 2, fromItem = true, wx = 5, wy = 0, dist = 15, xp = 100 },
+    { kind = "pickup", id = 3, wx = 6, wy = 0, dist = 16, xp = 100 } },
+  party = { { kind = "party", id = 4, wx = 7, wy = 0, dist = 17, xp = 100 } } }
+local fa = D.areas(fake)[1]
+check("areas: no item-started pick-ups, no party quests you cannot take", fa and #fa.stops == 2 and D.areaText(fa) == "1 objective, 1 pick up")
+check("areas: inside one, the name says so", fa.name:find("^Around you") ~= nil)
 D.AREA_YARDS = 0
 HBD.GetWorldCoordinatesFromZone = function() return 100, 0, 0 end
 
@@ -592,16 +604,132 @@ C_Map.GetMapInfo = nil
 D.pace, D.anyPace, D.lastGain, D.seen = {}, nil, {}, {}
 local pq = { id = 900, count = 1, left = { { have = 1, need = 6 } } }
 D.noteProgress(pq, 100)
-check("pace: before any kill, the default", D.workSecs(pq) == D.OBJECTIVE_SECS)
+check("pace: before any kill, a guess per kill left", D.workSecs(pq) == 5 * D.UNIT_SECS and select(2, D.workSecs(pq)) == true)
+check("pace: 27 drops left is not 2 minutes", D.workSecs({ id = 999, left = { { have = 3, need = 30 } } }) == 27 * D.UNIT_SECS)
 pq.count = 2 D.noteProgress(pq, 110)
 pq.count = 4 pq.left[1].have = 4 D.noteProgress(pq, 150)
 check("pace: from your kills", D.pace[900] and D.pace[900] == 20)
 check("pace: time left is kills left times pace", math.abs(D.workSecs(pq) - 2 * D.pace[900]) < 1e-9)
-check("pace: other quests use your pace too", D.workSecs({ id = 901, left = { { have = 0, need = 3 } } }) == 3 * D.anyPace)
+check("pace: other quests use your pace too", D.workSecs({ id = 901, left = { { have = 0, need = 3 } } }) == 3 * math.max(D.anyPace, D.UNIT_SECS))
 pq.count = 5 D.noteProgress(pq, 150 + D.PACE_GAP_SECS + 1)
 check("pace: a long break does not count", D.pace[900] == 20)
 check("pace: Active row shows time left", strip(ns.meta({ kind = "log", id = 900, left = pq.left, dist = 70 }, "active")):find("^~<1 min") ~= nil)
 D.pace, D.anyPace, D.lastGain, D.seen = {}, nil, {}, {}
+
+-- XP colours: best third green, worst third grey.
+local tl = { { v = 10 }, { v = 50 }, { v = 30 }, { v = 90 }, { v = 70 }, { v = 20 } }
+D.tier(tl, "v")
+local tiers = {}
+for _, e in ipairs(tl) do tiers[e.v] = e.tier or "mid" end
+check("xp colours: thirds", tiers[90] == "good" and tiers[70] == "good" and tiers[10] == "low" and tiers[20] == "low" and tiers[30] == "mid" and tiers[50] == "mid")
+check("xp colours: green text", D.tierText({ tier = "good" }, "1k xp") == "|cff60d0601k xp|r" and D.tierText({}, "x") == "x")
+local two = { { v = 1 }, { v = 2 } }
+D.tier(two, "v")
+check("xp colours: too few to rank", not two[1].tier and not two[2].tier)
+
+-- Town: nearest innkeeper and flight master of your side.
+local NPCS = {
+  [1] = { name = "Innkeeper A", npcFlags = 65536 + 1, friendlyToFaction = "A", d = 800 },
+  [2] = { name = "Innkeeper H", npcFlags = 65536, friendlyToFaction = "H", d = 100 },
+  [3] = { name = "Gryphon Master", npcFlags = 8192, friendlyToFaction = "A", d = 1500 },
+  [4] = { name = "Innkeeper Far", npcFlags = 65536, friendlyToFaction = "AH", d = 3000 },
+  [5] = { name = "Vendor", npcFlags = 128, friendlyToFaction = "A", d = 10 },
+}
+UnitFactionGroup = function() return "Alliance" end
+local realQNS, realNearest = mods.QuestieDB.QueryNPCSingle, mods.DistanceUtils.GetNearestSpawn
+mods.QuestieDB.NPCPointers = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, [5] = 1 }
+mods.QuestieDB.QueryNPCSingle = function(id, key)
+  local n = NPCS[id]
+  if not n then return realQNS and realQNS(id, key) end
+  if key == "spawns" then return { d = n.d } end
+  return n[key]
+end
+mods.DistanceUtils.GetNearestSpawn = function(sp) return { 50, 50 }, 1519, sp.d end
+D.townBuild, D.townNPCs = { state = "idle", i = 1 }, nil
+D.resetModules()
+local town = D.townList()
+check("town: nearest inn of your side, then the flight master", #town == 2 and town[1].name == "Innkeeper A" and town[1].dist == 800
+  and town[2].name == "Gryphon Master" and town[2].role == "flight")
+check("town: what the row says", ns.todoBase({ kind = "town", role = "inn" }) == "Innkeeper")
+mods.QuestieDB.NPCPointers, mods.QuestieDB.QueryNPCSingle, mods.DistanceUtils.GetNearestSpawn = nil, realQNS, realNearest
+D.townBuild, D.townNPCs = { state = "idle", i = 1 }, nil
+UnitFactionGroup = nil
+D.resetModules()
+
+-- Glance pointers: Next, nearest hand-in, town; registered with Glance.
+local srcFn
+Glance = { minimap = { addPointerSource = function(fn) srcFn = fn end } }
+check("pointers: registered with Glance", ns.registerPointers() and srcFn ~= nil)
+mods.ZoneDB = mods.ZoneDB or {}
+local realUi2 = mods.ZoneDB.GetUiMapIdByAreaId
+mods.ZoneDB.GetUiMapIdByAreaId = function() return 1437 end
+ns.updatePointers({ active = { { kind = "log", name = "Q", target = "Kobold", spawn = { 41, 62 }, zone = 11, left = {} } },
+  turnin = { { kind = "turnin", name = "T", target = "Bob", spawn = { 10, 20 }, zone = 11 } }, nearby = {}, log = {},
+  town = { { kind = "town", role = "inn", name = "Inn Lady", spawn = { 50, 50 }, zone = 11 } } })
+local pts = srcFn()
+check("pointers: next, hand-in and inn", #pts == 3 and pts[1].label == "Kobold" and pts[1].mapID == 1437 and math.abs(pts[1].x - 0.41) < 1e-9
+  and pts[2].label == "Hand in: Bob" and pts[3].label == "Inn: Inn Lady")
+mods.ZoneDB.GetUiMapIdByAreaId = realUi2
+Glance = nil
+ns.pointers = {}
+
+-- Active detail: a line per objective, the party, the chain.
+local al = ns.activeLines({ target = "Kobold", left = { { text = "Candle: 2/8" }, { text = "Kobold Miner slain: 1/6" } },
+  party = { { name = "Ann", progress = "5/8" } } })
+check("active detail: one line each", #al == 3 and al[1] == "Candle: 2/8  (Kobold)" and al[2] == "Kobold Miner slain: 1/6"
+  and strip(al[3]) == "Party: Ann 5/8")
+
+-- /qb party off: no party data here, Questie's party objectives off, back on with on.
+local poCalls = 0
+Questie = { db = { profile = { showPartyQuestObjectives = true } } }
+mods.QuestiePartyObjectives = { Update = function() poCalls = poCalls + 1 end }
+D.resetModules()
+SlashCmdList.QUESTBOARD("party off")
+check("party off: Questie's party objectives off", Questie.db.profile.showPartyQuestObjectives == false and poCalls == 1 and QuestBoardDB.party == false)
+SlashCmdList.QUESTBOARD("party on")
+check("party on: Questie's setting comes back", Questie.db.profile.showPartyQuestObjectives == true and QuestBoardDB.party == true)
+check("party off: collect skips the party", #D.collect({ party = false }).party == 0)
+Questie, mods.QuestiePartyObjectives = nil, nil
+D.resetModules()
+
+-- Item objectives: where to get them, not the turn-in.
+check("objective name", D.objectiveName("Perfect Razormaw Egg: 8/12") == "Perfect Razormaw Egg"
+  and D.objectiveName("8/12 Perfect Razormaw Egg") == "Perfect Razormaw Egg")
+local realGetItem, realGetObject, realNearest2 = mods.QuestieDB.GetItem, mods.QuestieDB.GetObject, mods.DistanceUtils.GetNearestSpawn
+mods.QuestieDB.GetItem = function(_, id) if id == 777 then return { name = "Perfect Razormaw Egg", objectDrops = { 55 } } end end
+mods.QuestieDB.GetObject = function(_, id) if id == 55 then return { name = "Razormaw Nest", spawns = { x = 1 } } end end
+mods.DistanceUtils.GetNearestSpawn = function() return { 60, 40 }, 11, 420 end
+D.resetModules()
+D.itemsByName = { ["Perfect Razormaw Egg"] = 777 }
+local egg = { left = { { text = "8/12 Perfect Razormaw Egg", have = 8, need = 12 } } }
+D.placeObjectiveItem(egg, {})
+check("item objective: found by name, in a nest", egg.target == "Razormaw Nest" and egg.dist == 420 and egg.getHow == "object")
+mods.QuestieDB.GetItem, mods.QuestieDB.GetObject, mods.DistanceUtils.GetNearestSpawn = realGetItem, realGetObject, realNearest2
+D.itemsByName = nil
+D.resetModules()
+
+-- No known source: the place is where you last made progress.
+local realPos = HBD.GetPlayerWorldPosition
+HBD.GetPlayerWorldPosition = function() return 300, 400, 0 end
+C_Map.GetBestMapForUnit = function() return 1437 end
+C_Map.GetPlayerMapPosition = function() return { GetXY = function() return 0.3, 0.4 end } end
+D.noteSpot(950)
+HBD.GetPlayerWorldPosition = function() return 0, 0, 0 end
+local spotQ = { id = 950, left = {} }
+D.placeSpot(spotQ)
+check("spot: distance to where you last got one", spotQ.dist == 500 and spotQ.spot.mapID == 1437 and spotQ.spot.x == 0.3)
+D.finish(spotQ, 27)
+check("spot: arrow and world place", spotQ.angle == 0.5 and spotQ.wx == 300)
+HBD.GetPlayerWorldPosition = realPos
+C_Map.GetBestMapForUnit, C_Map.GetPlayerMapPosition = nil, nil
+D.lastSpot[950] = nil
+
+-- Next: the best XP per minute from here, not the biggest XP far away.
+local nx, ne = ns.nextStep({ active = {}, nearby = {}, area = {},
+  turnin = { { kind = "turnin", name = "Far", target = "A", xp = 2000, dist = 7000, rate = 120 },
+    { kind = "turnin", name = "Near", target = "B", xp = 500, dist = 200, rate = 600 } },
+  log = { { kind = "log", name = "L", xp = 1000, dist = 300, rate = 300, left = {} } } })
+check("next: the near hand-in wins on XP per minute", ne and ne.name == "Near")
 
 -- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
 local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },

@@ -1,0 +1,417 @@
+-- Glance minimap: square, top-right, with the zone, coordinates and clock
+-- under it. Addon buttons (LibDBIcon) fold into a drawer behind one tab.
+local addonName, ns = ...
+
+local SIZE = 190          -- default; /glance map or the edit-mode corner changes it
+local MIN, MAX = 120, 400
+local mm = {}
+ns.minimap = mm
+
+-- LibDBIcon and HereBeDragons (Questie) ask this to place buttons and pins.
+function GetMinimapShape() return "SQUARE" end
+
+local function hide(f)
+  if type(f) == "table" then
+    ns.safe("hide minimap part", function()
+      f:Hide()
+      f:SetAlpha(0)
+      if f.EnableMouse then f:EnableMouse(false) end
+    end)
+  end
+end
+
+function mm.coords()
+  if not (C_Map and C_Map.GetBestMapForUnit) then return nil end
+  local map = C_Map.GetBestMapForUnit("player")
+  local pos = map and C_Map.GetPlayerMapPosition(map, "player")
+  if not pos then return nil end
+  local x, y = pos:GetXY()
+  if not x or (x == 0 and y == 0) then return nil end
+  return string.format("%.1f, %.1f", x * 100, y * 100)
+end
+
+function mm.clock()
+  local h, m = GetGameTime()
+  return string.format("%d:%02d", h, m)
+end
+
+-- Addon buttons: every LibDBIcon button, wherever it sits.
+function mm.addonButtons()
+  local list = {}
+  local function scan(parent)
+    if not parent or not parent.GetChildren then return end
+    for _, child in ipairs({ parent:GetChildren() }) do
+      local name = child.GetName and child:GetName()
+      if name and name:match("^LibDBIcon10_") then table.insert(list, child) end
+    end
+  end
+  scan(Minimap)
+  scan(MinimapBackdrop)
+  scan(mm.drawer)
+  table.sort(list, function(a, b) return a:GetName() < b:GetName() end)
+  return list
+end
+
+local laying = false
+function mm.layoutDrawer()
+  if laying or not mm.drawer then return end
+  laying = true
+  local list = mm.addonButtons()
+  local per = 6
+  for i, b in ipairs(list) do
+    b:SetParent(mm.drawer)
+    b:ClearAllPoints()
+    b:SetPoint("TOPLEFT", mm.drawer, "TOPLEFT", 4 + ((i - 1) % per) * 31, -4 - math.floor((i - 1) / per) * 31)
+    b:SetScript("OnDragStart", nil)
+    b:SetScript("OnDragStop", nil)
+    if not b.glanceHooked then
+      b.glanceHooked = true
+      hooksecurefunc(b, "SetPoint", function()
+        if not laying then C_Timer.After(0, mm.layoutDrawer) end
+      end)
+    end
+  end
+  local rows = math.max(1, math.ceil(#list / per))
+  mm.drawer:SetSize(8 + math.min(#list, per) * 31, 8 + rows * 31)
+  mm.tab.text:SetText(#list > 0 and ("Addons " .. #list) or "Addons")
+  laying = false
+end
+
+local function chip(parent, text)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetHeight(16)
+  b.bg = b:CreateTexture(nil, "BACKGROUND")
+  b.bg:SetAllPoints()
+  b.bg:SetColorTexture(0, 0, 0, 0.4)
+  b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  b.text:SetPoint("CENTER")
+  b.text:SetText(text)
+  b:SetWidth(64)
+  return b
+end
+mm.chip = chip
+
+function mm.setSize(size)
+  size = math.floor(math.max(MIN, math.min(MAX, size)) + 0.5)
+  ns.db.mapSize = size
+  if not mm.holder then return size end
+  mm.holder:SetSize(size, size)
+  Minimap:SetSize(size, size)
+  -- Nudge the zoom so the game redraws the map at the new size.
+  local z = Minimap:GetZoom()
+  Minimap:SetZoom(z > 0 and z - 1 or z + 1)
+  Minimap:SetZoom(z)
+  return size
+end
+
+ns.commands.map = function(rest)
+  local n = tonumber(rest)
+  if not n then return ns.print("/glance map SIZE, " .. MIN .. " to " .. MAX .. " (now " .. (ns.db.mapSize or SIZE) .. ")") end
+  ns.print("Minimap " .. mm.setSize(n) .. " px.")
+end
+
+ns.module("minimap", function()
+  local holder = CreateFrame("Frame", "GlanceMinimap", UIParent)
+  mm.holder = holder
+  holder:SetSize(ns.db.mapSize or SIZE, ns.db.mapSize or SIZE)
+  local pos = ns.db.mapPos
+  if pos then holder:SetPoint(pos[1], UIParent, pos[1], pos[2], pos[3])
+  else holder:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -16) end
+  -- In edit mode (Glance's or the game's), drag the map to move it.
+  holder:SetMovable(true)
+  holder:SetClampedToScreen(true)
+
+  Minimap:SetParent(holder)
+  Minimap:ClearAllPoints()
+  Minimap:SetAllPoints(holder)
+  Minimap:SetSize(ns.db.mapSize or SIZE, ns.db.mapSize or SIZE)
+
+  -- Resizing: a gold grip on the bottom-left corner, faint until the mouse
+  -- is over the map; drag it to resize (no edit mode needed).
+  local grip = CreateFrame("Button", "GlanceMinimapGrip", holder)
+  mm.grip = grip
+  grip:SetSize(20, 20)
+  -- Its own strata: the Minimap keeps a strata of its own after the
+  -- reparent and would draw over a grip that only has a higher level.
+  grip:SetFrameStrata("HIGH")
+  grip:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0)
+  grip:SetFrameLevel((Minimap.GetFrameLevel and Minimap:GetFrameLevel() or 1) + 10)
+  grip.tex = grip:CreateTexture(nil, "OVERLAY")
+  grip.tex:SetAllPoints()
+  grip.tex:SetColorTexture(1, 0.85, 0.3, 0.8)
+  local function lit(on) grip:SetAlpha(on and 0.9 or 0.25) end
+  lit(false)
+  grip:SetScript("OnEnter", function() lit(true) end)
+  grip:SetScript("OnLeave", function(self) if not self.from then lit(false) end end)
+  Minimap:HookScript("OnEnter", function() lit(true) end)
+  Minimap:HookScript("OnLeave", function() if not grip.from then lit(false) end end)
+  grip:SetScript("OnMouseDown", function(self)
+    local x, y = GetCursorPosition()
+    self.from = { x = x, y = y, size = holder:GetWidth() }
+  end)
+  grip:SetScript("OnMouseUp", function(self)
+    self.from = nil
+    lit(self:IsMouseOver() or Minimap:IsMouseOver())
+  end)
+  grip:SetScript("OnUpdate", function(self)
+    if not self.from then return end
+    local x, y = GetCursorPosition()
+    local scale = holder:GetEffectiveScale()
+    -- Dragging left or down grows the map (it hangs from the top-right).
+    local grow = math.max(self.from.x - x, self.from.y - y) / scale
+    mm.setSize(self.from.size + grow)
+  end)
+  table.insert(ns.editHooks, function(on) lit(on) end)
+  Minimap:RegisterForDrag("LeftButton")
+  Minimap:HookScript("OnDragStart", function()
+    if ns.unlocked and not InCombatLockdown() then holder:StartMoving() end
+  end)
+  Minimap:HookScript("OnDragStop", function()
+    holder:StopMovingOrSizing()
+    -- Keep it hanging from its top-right corner so resizing grows it
+    -- down and left.
+    local right, top = holder:GetRight(), holder:GetTop()
+    local w, h = UIParent:GetWidth(), UIParent:GetHeight()
+    if right and top and w and h then
+      local x, y = right - w, top - h
+      holder:ClearAllPoints()
+      holder:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, y)
+      ns.db.mapPos = { "TOPRIGHT", x, y }
+    end
+  end)
+  Minimap:SetMaskTexture("Interface\\Buttons\\WHITE8X8")
+  Minimap:EnableMouseWheel(true)
+  Minimap:SetScript("OnMouseWheel", function(self, d)
+    -- Shift+wheel resizes the map; the wheel alone zooms.
+    if IsShiftKeyDown and IsShiftKeyDown() then
+      mm.setSize((ns.db.mapSize or SIZE) + (d > 0 and 20 or -20))
+      return
+    end
+    local z = self:GetZoom() + (d > 0 and 1 or -1)
+    if z >= 0 and z <= self:GetZoomLevels() - 1 then self:SetZoom(z) end
+  end)
+  -- Right-click opens tracking, as on the old round minimap.
+  Minimap:HookScript("OnMouseUp", function(_, button)
+    if button == "RightButton" then
+      local t = MinimapCluster and MinimapCluster.Tracking
+      if t and t.Button and t.Button.OpenMenu then t.Button:OpenMenu() end
+    end
+  end)
+
+  local edge = holder:CreateTexture(nil, "BACKGROUND")
+  edge:SetPoint("TOPLEFT", -1, 1)
+  edge:SetPoint("BOTTOMRIGHT", 1, -1)
+  edge:SetColorTexture(1, 1, 1, 0.25)
+
+  hide(MinimapCompassTexture)
+  hide(MinimapBorder)
+  hide(MinimapBorderTop)
+  hide(MinimapZoomIn)
+  hide(MinimapZoomOut)
+  hide(MiniMapWorldMapButton)
+  hide(MinimapZoneTextButton)
+  hide(GameTimeFrame)
+  hide(TimeManagerClockButton)
+  if MinimapCluster then
+    hide(MinimapCluster.BorderTop)
+    hide(MinimapCluster.ZoneTextButton)
+    hide(MinimapCluster.Tracking)
+    -- Blizzard's own coordinates; ours are in the line under the map.
+    local box = MinimapCluster.MinimapContainer
+    if type(box) == "table" then hide(box.PlayerCoords) end
+  end
+  hide(Minimap.ZoomIn)
+  hide(Minimap.ZoomOut)
+  hide(Minimap.ZoomHitArea)
+  -- Mail and crafting-order icons: keep, in the bottom-right corner (the
+  -- resize grip has the bottom-left).
+  local ind = MinimapCluster and MinimapCluster.IndicatorFrame
+  if ind then
+    ind:SetParent(holder)
+    ind:ClearAllPoints()
+    ind:SetPoint("BOTTOMRIGHT", holder, "BOTTOMRIGHT", -2, 2)
+  end
+  if AddonCompartmentFrame then
+    AddonCompartmentFrame:SetParent(holder)
+    AddonCompartmentFrame:ClearAllPoints()
+    AddonCompartmentFrame:SetPoint("TOPRIGHT", holder, "TOPRIGHT", -2, -2)
+  end
+
+  -- Line 1: zone (full width). Line 2: Addons tab left, coords and clock right.
+  local zone = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  zone:SetPoint("TOPLEFT", holder, "BOTTOMLEFT", 0, -4)
+  zone:SetPoint("TOPRIGHT", holder, "BOTTOMRIGHT", 0, -4)
+  zone:SetJustifyH("LEFT")
+  zone:SetWordWrap(false)
+  local info = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  info:SetPoint("TOPRIGHT", zone, "BOTTOMRIGHT", 0, -5)
+  info:SetTextColor(0.78, 0.8, 0.82)
+  mm.zone, mm.info = zone, info
+
+  mm.tab = chip(holder, "Addons")
+  mm.tab:SetPoint("TOPLEFT", zone, "BOTTOMLEFT", 0, -2)
+  mm.drawer = CreateFrame("Frame", "GlanceAddonDrawer", holder)
+  mm.drawer:SetPoint("TOPRIGHT", holder, "BOTTOMRIGHT", 0, -62)
+  mm.drawer.bg = mm.drawer:CreateTexture(nil, "BACKGROUND")
+  mm.drawer.bg:SetAllPoints()
+  mm.drawer.bg:SetColorTexture(0, 0, 0, 0.55)
+  mm.drawer:SetFrameStrata("DIALOG")
+  mm.drawer:Hide()
+  mm.tab:SetScript("OnClick", function()
+    mm.layoutDrawer()
+    mm.drawer:SetShown(not mm.drawer:IsShown())
+  end)
+
+  local elapsed = 1
+  holder:SetScript("OnUpdate", function(_, dt)
+    elapsed = elapsed + dt
+    if elapsed < 0.25 then return end
+    elapsed = 0
+    ns.safe("minimap text", function()
+      zone:SetText(GetMinimapZoneText and GetMinimapZoneText() or "")
+      local c = mm.coords()
+      info:SetText((c and (c .. "  ") or "") .. mm.clock())
+    end)
+  end)
+
+  -- Addon buttons appear as their addons load; fold them in a few times.
+  ns.on("PLAYER_ENTERING_WORLD", function()
+    for _, t in ipairs({ 1, 4, 10 }) do C_Timer.After(t, mm.layoutDrawer) end
+  end)
+end)
+
+---------------------------------------------------------------------------
+-- Edge pointers: arrows on the minimap's rim for things off the map, so
+-- you see which way to go. Party members (class colours) built in; other
+-- addons add their own points with Glance.minimap.addPointerSource(fn),
+-- where fn() returns { { mapID, x, y, r, g, b, label }, ... } in map
+-- coordinates (0-1). QuestBoard uses it for quest targets.
+---------------------------------------------------------------------------
+mm.pointerSources = {}
+function mm.addPointerSource(fn) table.insert(mm.pointerSources, fn) end
+
+local function partyPoints()
+  local out = {}
+  if not (IsInGroup and IsInGroup()) then return out end
+  local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+  if not mapID then return out end
+  local n = GetNumSubgroupMembers and GetNumSubgroupMembers() or 0
+  for i = 1, n do
+    local u = "party" .. i
+    local pos = C_Map.GetPlayerMapPosition(mapID, u)
+    if pos then
+      local x, y = pos:GetXY()
+      x, y = ns.plain(x), ns.plain(y)
+      if x and y then
+        local _, class = UnitClass(u)
+        local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class] or { r = 0.4, g = 0.9, b = 1 }
+        table.insert(out, { mapID = mapID, x = x, y = y, r = c.r, g = c.g, b = c.b, label = UnitName(u) })
+      end
+    end
+  end
+  return out
+end
+mm.addPointerSource(partyPoints)
+
+-- Your map pin (the waypoint you set on the world map) and your corpse.
+mm.addPointerSource(function()
+  local out = {}
+  local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+  if C_Map and C_Map.GetUserWaypoint then
+    local wp = C_Map.GetUserWaypoint()
+    if wp and wp.position then
+      local x, y = wp.position:GetXY()
+      table.insert(out, { mapID = wp.uiMapID, x = x, y = y, r = 1, g = 0.85, b = 0.3, label = "Pin" })
+    end
+  end
+  if mapID and UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") and C_DeathInfo and C_DeathInfo.GetCorpseMapPosition then
+    local pos = C_DeathInfo.GetCorpseMapPosition(mapID)
+    if pos then
+      local x, y = pos:GetXY()
+      table.insert(out, { mapID = mapID, x = x, y = y, r = 0.85, g = 0.85, b = 0.85, label = "Corpse" })
+    end
+  end
+  return out
+end)
+
+local pointers = {}
+mm.pointers = pointers
+local function pointer(i)
+  local p = pointers[i]
+  if p then return p end
+  p = CreateFrame("Frame", nil, mm.pointerLayer)
+  p:SetSize(18, 18)
+  p.arrow = p:CreateTexture(nil, "OVERLAY")
+  p.arrow:SetAllPoints()
+  p.arrow:SetTexture("Interface\\Minimap\\MinimapArrow")
+  p.label = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  p.label:SetPoint("CENTER", 0, 0)
+  pointers[i] = p
+  return p
+end
+
+-- Where a point sits on the minimap, in pixels from its centre, or nil.
+function mm.offsetFor(pt, px, py, worldW, worldH, radius, half, facing)
+  local dx = (pt.x - px) * worldW            -- yards east
+  local dy = (pt.y - py) * worldH            -- yards south
+  local sx, sy = dx, -dy                     -- screen: right, up
+  if facing then
+    local c, s = math.cos(facing), math.sin(facing)
+    sx, sy = sx * c - sy * s, sx * s + sy * c
+  end
+  local k = half / radius
+  return sx * k, sy * k, math.sqrt(dx * dx + dy * dy)
+end
+
+function mm.updatePointers()
+  for _, p in ipairs(pointers) do p:Hide() end
+  if not (mm.holder and C_Map and C_Map.GetBestMapForUnit) then return end
+  local mapID = C_Map.GetBestMapForUnit("player")
+  local me = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
+  if not me then return end
+  local px, py = me:GetXY()
+  px, py = ns.plain(px), ns.plain(py)
+  if not (px and py) then return end
+  local w, h = C_Map.GetMapWorldSize(mapID)
+  w, h = ns.plain(w), ns.plain(h)
+  if not (w and h and w > 0) then return end
+  local radius = C_Minimap and C_Minimap.GetViewRadius and ns.plain(C_Minimap.GetViewRadius()) or 200
+  local half = (ns.db.mapSize or SIZE) / 2
+  local facing
+  if GetCVar and GetCVar("rotateMinimap") == "1" and GetPlayerFacing then facing = ns.plain(GetPlayerFacing()) end
+  local i = 0
+  for _, src in ipairs(mm.pointerSources) do
+    local ok, list = pcall(src)
+    for _, pt in ipairs(ok and list or {}) do
+      if pt.mapID == mapID then
+        local ox, oy, yards = mm.offsetFor(pt, px, py, w, h, radius, half, facing)
+        local edge = half - 8
+        if math.max(math.abs(ox), math.abs(oy)) > edge then
+          -- Off the map: clamp to the square's rim, point outwards.
+          local m = edge / math.max(math.abs(ox), math.abs(oy))
+          i = i + 1
+          local p = pointer(i)
+          p:ClearAllPoints()
+          p:SetPoint("CENTER", mm.holder, "CENTER", ox * m, oy * m)
+          p.arrow:SetRotation(math.atan2(-ox, oy))
+          p.arrow:SetVertexColor(pt.r or 1, pt.g or 0.85, pt.b or 0.3)
+          p.label:ClearAllPoints()
+          p.label:SetPoint("CENTER", p, "CENTER", -ox * m / edge * 18, -oy * m / edge * 14)
+          p.label:SetText(string.format("%s %d", pt.label or "", yards + 0.5))
+          p.label:SetTextColor(pt.r or 1, pt.g or 0.85, pt.b or 0.3)
+          p:Show()
+        end
+      end
+    end
+  end
+end
+
+ns.module("pointers", function()
+  if not mm.holder then return end
+  mm.pointerLayer = CreateFrame("Frame", "GlanceMinimapPointers", mm.holder)
+  mm.pointerLayer:SetAllPoints(mm.holder)
+  mm.pointerLayer:SetFrameStrata("HIGH")
+  if C_Timer and C_Timer.NewTicker then
+    C_Timer.NewTicker(0.1, function() ns.safe("pointers", mm.updatePointers) end)
+  end
+end)

@@ -5,10 +5,69 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
-## LootValue 0.1.1
+## Glance 0.1.0
+
+- New addon, a lighter HUD (`/glance`). Not in the releases yet: try it
+  with `dev.ps1 Glance`.
+- A large enemy cast bar near your character, with a COUNTERSPELL call-out
+  while you can interrupt. Click it in combat to interrupt.
+- A watch row of key spells (Blink, Counterspell ...) under your character.
+  Click an icon to cast it.
+- Range on the target frame: a green or red edge, exact yards for party
+  members and a yard bracket for anyone else.
+- Party members are easy to find: a large class-coloured name above each
+  one's nameplate while you are in a group (`/glance party off`).
+- Edge pointers on the minimap for party members, your map pin and your
+  corpse when they are off the map; addons can add their own.
+- The game's Edit Mode unlocks Glance too: move the bar and the minimap,
+  size the minimap.
+- A Reload button under the minimap.
+- An XP buff chip: time left, rested XP on hover, and a reminder in the
+  middle of the screen when no XP buff is on (`/glance xpremind off`).
+  It reads the buff tooltip too, and a click on the chip lets you mark a
+  buff it missed (`/glance xpbuff NAME`).
+- Alerts under the minimap: unspent talents, Legacy points, old ranks and
+  free bag slots, each a chip that opens the window.
+- Old spell ranks: an amber corner on the key, and `/glance ranks` swaps
+  in your best rank.
+- A keyboard bar: one button per key of the left hand (1-6, Tab Q W E R T,
+  A S D F G, Z X), laid out like the keyboard. At the first login it
+  reads your key bindings, so each spell shows on the key it is already on.
+  Movement keys and keys with other commands stay as they are. Drag a spell
+  onto a key to put it there; hold Shift to see and fill the Shift layer.
+  Drag a spell between keys to move or swap it (`/glance lock` makes that
+  need Alt). `/glance take all` puts
+  every key with another command (except Tab, the bag keys and the character pane) on the bar. In edit mode the
+  bar can be dragged to another place (`/glance reset` puts it back).
+- Small player and target bars under your character (health and mana as
+  numbers), and a cast bar below them. They hide Blizzard's player, target and cast frames
+  (`/glance blizzard on` brings those back).
+- A square minimap in the top-right corner: mouse-wheel zoom, the zone,
+  coordinates and clock under it, and the addon buttons in one drawer.
+  Drag the gold corner, use Shift+mouse wheel or type `/glance map SIZE` to resize it.
+- `/glance bars hide`: hides the Bartender4 bottom bars (the right-edge
+  bars 3 and 4 stay) and Blizzard's bottom bars, the
+  gryphon art and the old XP bar (a thin XP line replaces it).
+- Chat in the same look: faint panel, tabs only under the mouse, no side
+  buttons, text fades after 30 quiet seconds.
+- Shift layer and cooldown sweeps work in the game (first test round).
+- Works with the client's hidden (secret) health, power and cast values.
+
+## LootValue 0.2.0
 
 - The AddOns list names it "LootValue: Sell, Vendor or Disenchant", so it
   says what it does.
+- Auto-loot that leaves cheap junk on the body. It always takes money,
+  quest items, green or better items, cloth and other materials,
+  consumables, recipes, bags and keys. It takes other items only when
+  they are worth at least 10c a character level (vendor, AH or
+  disenchant, times the stack), or when they fit on a stack you carry.
+- The loot window stays open on what it left, so you can click an item to
+  take it after all (`/lv autoloot quiet` closes it and prints one chat
+  line instead). Shift+loot takes everything. `/lv skipped` lists the last
+  items it left. `/lv autoloot off` turns it off.
+- It turns off the game's own Auto Loot while it is on, and puts it back
+  when you turn it off.
 
 ## Omni 0.1.2
 
@@ -25,6 +84,36 @@ the same, and a test checks that every `.toc` version has a section here.
   When Questie lists a source but has no location for it (some Forever
   quests), a row says so, and the quests that need the item follow. An
   empty `from:` view says why (no such item, no source, Questie loading).
+
+## QuestBoard 0.1.1
+
+- XP colours: in each group, the best third of the XP (Turn in) or XP per
+  minute (Pick up, Party has, Areas) is green and the worst third grey.
+- Clearer grouping: a quest's two lines sit closer, quests have a small gap
+  between them, and each group name is gold with a thin rule under it and
+  more space above it.
+- Town group: the nearest innkeeper and flight master of your side, with
+  distance and arrow. Click (or `/qb town`) pins it on the map.
+- Active quests show a line per open objective, your party's progress
+  on it and where the chain leads (up to 5 lines).
+- Areas count only real stops: no item-started pick-ups (their place is a
+  drop or the finisher) and no party quests you cannot take. Inside an
+  area its name says "Around you", and Next no longer says to go there.
+- A quest you are not done with points to where you get its items (the
+  mob that drops them, the object that holds them or a vendor), found by
+  item id or name, never to the turn-in. When Questie does not know the
+  source, the row points to where you last made progress on it (saved
+  across sessions), or has no distance and the tooltip says so.
+- Time estimates count every kill or loot left (27 drops is not 2
+  minutes): your measured pace on that quest, else a guess of 30 s each,
+  and the tooltip says when it is a guess.
+- The Next line (when no quest is Active) picks the step with the best XP
+  per minute from where you are, travel included, not a far hand-in.
+- `/qb party off` hides party members' quests on the board (Party has,
+  "with" and Party lines) and turns off Questie's party objectives on
+  the map; `/qb party on` brings both back.
+- With Glance loaded, its minimap edge arrows also point to the Next
+  quest's place, the nearest hand-in and the inn and flight master.
 
 ## QuestBoard 0.1.0
 
