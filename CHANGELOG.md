@@ -52,6 +52,7 @@ the same, and a test checks that every `.toc` version has a section here.
   buttons, text fades after 30 quiet seconds.
 - Shift layer and cooldown sweeps work in the game (first test round).
 - Works with the client's hidden (secret) health, power and cast values.
+
 ## Omni 0.1.2
 
 - Search dungeons by name or short name ("bfd", "sm gy"). The row shows
