@@ -660,6 +660,12 @@ mods.ZoneDB.GetUiMapIdByAreaId = realUi2
 Glance = nil
 ns.pointers = {}
 
+-- Active detail: a line per objective, the party, the chain.
+local al = ns.activeLines({ target = "Kobold", left = { { text = "Candle: 2/8" }, { text = "Kobold Miner slain: 1/6" } },
+  party = { { name = "Ann", progress = "5/8" } } })
+check("active detail: one line each", #al == 3 and al[1] == "Candle: 2/8  (Kobold)" and al[2] == "Kobold Miner slain: 1/6"
+  and strip(al[3]) == "Party: Ann 5/8")
+
 -- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
 local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },
   { name = "c", xp = 2000 }, { name = "d", dist = 5000, xp = 1500 }, { name = "e", dist = 800, xp = 50 } }, "near")

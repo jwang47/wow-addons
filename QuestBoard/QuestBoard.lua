@@ -59,6 +59,26 @@ function ns.todo(e)
   return text
 end
 
+-- The lines under an Active quest: each open objective (the first with
+-- where to find it), who in your party has it, and where the chain leads.
+ns.ACTIVE_LINES = 5
+function ns.activeLines(e)
+  local lines = {}
+  for i, o in ipairs(e.left or {}) do
+    local text = o.text
+    if text and text ~= "" then
+      if i == 1 and e.target and not text:find(e.target, 1, true) then text = text .. "  (" .. e.target .. ")" end
+      table.insert(lines, text)
+    end
+  end
+  if #lines == 0 then local t = ns.todoBase(e) if t then table.insert(lines, t) end end
+  if e.party and #e.party > 0 then table.insert(lines, "|cff99ccffParty: " .. D.partyText(e.party) .. "|r") end
+  local tag = D.chainTag and D.chainTag(e.chain)
+  if tag then table.insert(lines, tag) end
+  while #lines > ns.ACTIVE_LINES do table.remove(lines) end
+  return lines
+end
+
 function ns.todoWho(e)
   local text = ns.todoBase(e)
   local with = e.party and #e.party > 0 and D.partyText(e.party)
@@ -462,6 +482,7 @@ local function makeRow(i)
   r.sub:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP)
   r.sub:SetJustifyH("LEFT")
   if r.sub.SetWordWrap then r.sub:SetWordWrap(false) end
+  r.more = {}   -- extra lines for Active quests
   r.pin = r:CreateTexture(nil, "OVERLAY")
   r.pin:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1")
   r.pin:SetSize(10, 10)
@@ -615,8 +636,31 @@ function ns.render()
           r.meta:SetText(ns.meta(e, kind))
           ns.setBar(r, e, kind)
           local todo = (not ns.db.compact) and (e.kind ~= "pickup" and ns.todo(e) or e.kind == "pickup" and D.chainTag(e.chain))
+          -- An Active quest gets a line per open objective and one for its
+          -- party; the rest keep one what-to-do line.
+          local lines = (not ns.db.compact and kind == "active") and ns.activeLines(e) or nil
+          if lines and #lines < 2 then lines = nil end
+          if lines then todo = lines[1] end
           r.sub:SetText(todo or "")
-          local rh = todo and ROW_H * 2 - SUB_UP or ROW_H
+          local n = lines and #lines or (todo and 1 or 0)
+          for i = 1, math.max(#r.more, n - 1) do
+            local fs = r.more[i]
+            if i <= n - 1 then
+              if not fs then
+                fs = r:CreateFontString(nil, "OVERLAY", FONT_DIM)
+                fs:SetPoint("TOPLEFT", 26, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
+                fs:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
+                fs:SetJustifyH("LEFT")
+                if fs.SetWordWrap then fs:SetWordWrap(false) end
+                r.more[i] = fs
+              end
+              fs:SetText(lines[i + 1])
+              fs:Show()
+            elseif fs then
+              fs:Hide()
+            end
+          end
+          local rh = n > 0 and (ROW_H + n * (ROW_H - SUB_UP)) or ROW_H
           r:SetHeight(rh)
           local gap = todo and ROW_GAP or 1
           table.insert(items, { f = r, y = cy, h = rh, row = true, gap = gap })

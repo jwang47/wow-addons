@@ -312,6 +312,9 @@ A small floating list, under the minimap, of the quests that matter now.
   orange, red). Each row shows the distance and an arrow that turns with
   you. The distance is green within 300 yards, yellow up to 1000 yards and
   grey beyond (`D.NEAR_YARDS`, `D.MID_YARDS`).
+- An Active quest with more to say gets a line per open objective (the
+  first with where to find it), a "Party:" line with each member's
+  progress, and the chain tag, up to 5 lines (`ns.ACTIVE_LINES`).
 - Minimap pointers: when Glance is loaded, QuestBoard gives its minimap
   edge arrows the Next quest's place, the nearest hand-in and the Town
   rows (`Glance.minimap.addPointerSource`, a list cached per refresh).

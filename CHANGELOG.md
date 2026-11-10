@@ -14,6 +14,8 @@ the same, and a test checks that every `.toc` version has a section here.
   more space above it.
 - Town group: the nearest innkeeper and flight master of your side, with
   distance and arrow. Click (or `/qb town`) pins it on the map.
+- Active quests show a line per open objective, your party's progress
+  on it and where the chain leads (up to 5 lines).
 - With Glance loaded, its minimap edge arrows also point to the Next
   quest's place, the nearest hand-in and the inn and flight master.
 
