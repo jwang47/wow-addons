@@ -1006,7 +1006,7 @@ check("known: a trainer recipe with its skill and price", bolt and bolt.source =
 check("known: a trainer recipe you know is left out", #kn == 2)
 -- The modern profession window (C_TradeSkillUI), as on Forever.
 C_TradeSkillUI = {
-  GetAllRecipeIDs = function() return { 1, 2 } end,
+  GetFilteredRecipeIDs = function() return { 1, 2 } end,
   GetRecipeInfo = function(id) return ({ { name = "Bolt of Silk Cloth", learned = true, relativeDifficulty = 1 },
     { name = "Silk Headband", learned = false, relativeDifficulty = 0 } })[id] end,
   GetRecipeSchematic = function(id) return ({ { outputItemID = 4305, quantityMin = 1,

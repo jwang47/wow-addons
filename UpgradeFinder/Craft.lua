@@ -356,7 +356,10 @@ end
 -- 0-3 is the skill-up colour.
 C.DIFFICULTY = { [0] = "optimal", [1] = "medium", [2] = "easy", [3] = "trivial" }
 function C.readProfession()
+  -- Blizzard's own list uses GetFilteredRecipeIDs; GetAllRecipeIDs skips
+  -- the window's filters where the client has it.
   local ids = call(api("C_TradeSkillUI.GetAllRecipeIDs"))
+  if type(ids) ~= "table" or #ids == 0 then ids = call(api("C_TradeSkillUI.GetFilteredRecipeIDs")) end
   if type(ids) ~= "table" or #ids == 0 then return false end
   local list, unlearned = {}, {}
   for _, rid in ipairs(ids) do
@@ -638,6 +641,7 @@ function C.hook()
       local after = api("C_Timer.After")
       if after then after(5, function() C.guard(C.learnNames) end) end
     elseif ev == "TRADE_SKILL_SHOW" or ev == "TRADE_SKILL_UPDATE" then C.guard(C.readTradeSkills)
+    elseif ev == "TRADE_SKILL_LIST_UPDATE" then C.guard(C.readProfession)
     elseif ev == "TRAINER_SHOW" or ev == "TRAINER_UPDATE" then C.guard(C.readTrainer)
     elseif name == "Blizzard_TradeSkillUI" then C.hookRows() end
   end)
@@ -646,6 +650,7 @@ function C.hook()
   pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
   pcall(f.RegisterEvent, f, "TRADE_SKILL_SHOW")
   pcall(f.RegisterEvent, f, "TRADE_SKILL_UPDATE")
+  pcall(f.RegisterEvent, f, "TRADE_SKILL_LIST_UPDATE")
   pcall(f.RegisterEvent, f, "TRAINER_SHOW")
   pcall(f.RegisterEvent, f, "TRAINER_UPDATE")
 end
