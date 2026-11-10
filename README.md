@@ -469,6 +469,8 @@ A small floating list, under the minimap, of the quests that matter now.
   they are placed by screen position (not anchored to the board, which
   would lock the board too), and a change made in combat waits for the
   fight to end.
+- Point at a quest to see its whole chain in the tooltip: each step with
+  its level, marked done, `>>` (this one), log or `...` (later).
 - Alt-click any quest row: "I'm doing this" (it stays in Active until
   you Alt-click it again or hand it in). This works for hand-ins and
   pick-ups too: a pinned pick-up waits in Active until you take it.

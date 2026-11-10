@@ -596,6 +596,34 @@ local rewardLine = false
 for _, l in ipairs(GameTooltip.lines) do if strip(l) == "Reward: [Murloc Charm]  (one of 2)" then rewardLine = true end end
 check("turn-in: tooltip names the reward", rewardLine)
 
+-- The whole chain in the tooltip: 124 comes before 125 (done), 125 is in
+-- your log, then 126 and 128.
+local PRE = { [125] = { 124 }, [126] = 125 }
+local QNAMES = { [124] = "Before", [125] = "Start", [126] = "Middle", [128] = "End" }
+mods.QuestieDB.QueryQuestSingle = function(id, key)
+  if key == "nextQuestInChain" then return NEXT[id] or 0 end
+  if key == "preQuestSingle" then return PRE[id] end
+  if key == "name" then return QNAMES[id] end
+  if key == "questLevel" then return 10 end
+end
+D.resetModules()
+local full, at = D.fullChain(126)
+check("chain: walks back and on", table.concat(full, ",") == "124,125,126,128" and at == 3)
+local steps = D.chainSteps(126, { [125] = true })
+check("chain: steps marked done, log, here, later", steps and steps[1].state == "done" and steps[2].state == "log"
+  and steps[3].state == "here" and steps[4].state == "later" and steps[4].name == "End")
+local lines = D.chainLines(D.chainSteps(126, {}))
+check("chain: tooltip lines", strip(lines[1]) == "Chain: quest 3 of 4" and strip(lines[4]) == "  >>  [10] Middle" and #lines == 5)
+check("chain: no chain, no lines", D.chainSteps(122, {}) == nil and #D.chainLines(nil) == 0)
+D.CHAIN_SHOW = 2
+local cut = D.chainLines(D.chainSteps(126, {}))
+check("chain: a long chain is cut around this quest", strip(cut[2]) == "  (1 earlier)" and strip(cut[#cut]) == "  (1 more)")
+D.CHAIN_SHOW = 8
+GameTooltip.lines = {}
+turnRow.scripts.OnEnter(turnRow)
+mods.QuestieDB.QueryQuestSingle = function(id, key) if key == "nextQuestInChain" then return NEXT[id] or 0 end end
+D.resetModules()
+
 -- Distances take a colour: green near, yellow a walk, grey far.
 check("distance colours", D.yardsText(120):find("^|cff") and D.yardsText(120) ~= D.yardsText(700)
   and D.yardsText(700) ~= D.yardsText(3000) and strip(D.yardsText(700)) == "700 yd")

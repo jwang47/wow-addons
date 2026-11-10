@@ -11,6 +11,10 @@ the same, and a test checks that every `.toc` version has a section here.
   hand-in or a pick-up goes to Active with a gold star too. A pinned
   pick-up stays pinned when you take it; a pin goes when you hand the
   quest in. Alt-click on an area pins its hand-ins and pick-ups as well.
+- The tooltip of each quest shows its whole chain (with Questie): "Chain:
+  quest 3 of 5", then each step with its level, marked done, ">>" (this
+  quest), log (in your log) or "..." (later). A long chain shows the 8
+  steps around this quest.
 
 ## GroupUp 0.1.0
 

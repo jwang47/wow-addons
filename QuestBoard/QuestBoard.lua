@@ -173,6 +173,17 @@ function ns.meta(e, kind)
   return table.concat(parts, "  ")
 end
 
+-- The quests in your log, from the last pass: questID -> true.
+function ns.inLog()
+  local set = {}
+  for _, kind in ipairs({ "active", "nearby", "turnin", "log" }) do
+    for _, e in ipairs(state and state[kind] or {}) do
+      if e.kind == "log" or e.kind == "turnin" then set[e.id] = true end
+    end
+  end
+  return set
+end
+
 local function facing() return D.plain(call(rawget(_G, "GetPlayerFacing"))) end
 
 local function updateArrow(r)
@@ -257,6 +268,9 @@ local function tooltip(r)
     else
       tip:AddLine("No gear at the end of this quest" .. (c.steps > 0 and " chain" or "") .. ": XP only, fine to drop", 0.6, 0.6, 0.6)
     end
+  end
+  if e.id and e.id > 0 and D.chainSteps then
+    for _, line in ipairs(D.chainLines(D.chainSteps(e.id, ns.inLog()))) do tip:AddLine(line, 0.85, 0.85, 0.85) end
   end
   if e.party and #e.party > 0 then
     tip:AddLine((e.kind == "party" and "Your party has it: " or "With ") .. D.partyText(e.party), 0.6, 0.8, 1)
