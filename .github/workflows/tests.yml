@@ -14,6 +14,8 @@ jobs:
       - run: lua5.1 tests/lootvalue.lua
       - run: lua5.1 tests/omni.lua
       - run: lua5.1 tests/upgradefinder.lua
+      - run: lua5.1 tests/questboard.lua
+      - run: lua5.1 tests/buffcheck.lua
       - run: lua5.1 tests/groupup.lua
       - run: python3 -m unittest tests/test_release.py
   updater:
