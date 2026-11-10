@@ -14,6 +14,65 @@ the same, and a test checks that every `.toc` version has a section here.
 - A "Thanks & leave" button while you are in a group (`/gu bye`): it thanks
   the party in chat and leaves 5 seconds later.
 
+## LootValue 0.2.0
+
+- Auto-loot that leaves cheap junk on the body. It always takes money,
+  quest items, green or better items, cloth and other materials,
+  consumables, recipes, bags and keys. It takes other items only when
+  they are worth at least 10c a character level (vendor, AH or
+  disenchant, times the stack), or when they fit on a stack you carry.
+- The loot window stays open on what it left, so you can click an item to
+  take it after all (`/lv autoloot quiet` closes it and prints one chat
+  line instead). Shift+loot takes everything. `/lv skipped` lists the last
+  items it left. `/lv autoloot off` turns it off.
+- It turns off the game's own Auto Loot while it is on, and puts it back
+  when you turn it off.
+
+## Omni 0.1.2
+
+- Search dungeons by name or short name ("bfd", "sm gy"). The row shows
+  the levels, the short name and the boss count.
+- Enter on a dungeon (or `loot: bfd`) lists each boss's drops, then the
+  dungeon's quests and their reward items (with Questie). Hover an item
+  for its tooltip; Enter links it.
+- Enter on an item shows where to get it (with Questie): the mobs that
+  drop it, the objects that hold it and the vendors that sell it, nearest
+  first, with yards on your map or the zone. Enter on one pins it on the
+  map. Shift+Enter links the item.
+  When Questie lists a source but has no location for it (some Forever
+  quests), a row says so, and the quests that need the item follow. An
+  empty `from:` view says why (no such item, no source, Questie loading).
+
+## QuestBoard 0.1.1
+
+- XP colours: in each group, the best third of the XP (Turn in) or XP per
+  minute (Pick up, Party has, Areas) is green and the worst third grey.
+- Clearer grouping: a quest's two lines sit closer, quests have a small gap
+  between them, and each group name is gold with a thin rule under it and
+  more space above it.
+- Town group: the nearest innkeeper and flight master of your side, with
+  distance and arrow. Click (or `/qb town`) pins it on the map.
+- Active quests show a line per open objective, your party's progress
+  on it and where the chain leads (up to 5 lines).
+- Areas count only real stops: no item-started pick-ups (their place is a
+  drop or the finisher) and no party quests you cannot take. Inside an
+  area its name says "Around you", and Next no longer says to go there.
+- A quest you are not done with points to where you get its items (the
+  mob that drops them, the object that holds them or a vendor), found by
+  item id or name, never to the turn-in. When Questie does not know the
+  source, the row points to where you last made progress on it (saved
+  across sessions), or has no distance and the tooltip says so.
+- Time estimates count every kill or loot left (27 drops is not 2
+  minutes): your measured pace on that quest, else a guess of 30 s each,
+  and the tooltip says when it is a guess.
+- The Next line (when no quest is Active) picks the step with the best XP
+  per minute from where you are, travel included, not a far hand-in.
+- `/qb party off` hides party members' quests on the board (Party has,
+  "with" and Party lines) and turns off Questie's party objectives on
+  the map; `/qb party on` brings both back.
+- With Glance loaded, its minimap edge arrows also point to the Next
+  quest's place, the nearest hand-in and the inn and flight master.
+
 ## QuestBoard 0.1.0
 
 - New addon (`/qb`): a small board of the quests that matter now.
