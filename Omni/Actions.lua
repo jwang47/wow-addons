@@ -311,22 +311,37 @@ function A.ago(stamp)
   return math.floor(s / 86400) .. "d ago"
 end
 
--- The last Auctionator scan: a full scan or a browse scan, whichever is newer.
-function A.lastScan()
+-- The last Auctionator scan. kind "full": a full scan (GetAll, Replicate),
+-- which sees every listing; "search": the last browse scan, which changes on
+-- every AH search and sees only what it showed; nil: whichever is newer.
+function A.lastScan(kind)
   local st = api("Auctionator.SavedState")
   if type(st) ~= "table" then return nil end
-  local t = math.max(tonumber(st.TimeOfLastGetAllScan) or 0, tonumber(st.TimeOfLastBrowseScan) or 0,
-    tonumber(st.TimeOfLastReplicateScan) or 0)
+  local full = math.max(tonumber(st.TimeOfLastGetAllScan) or 0, tonumber(st.TimeOfLastReplicateScan) or 0)
+  local search = tonumber(st.TimeOfLastBrowseScan) or 0
+  local t = kind == "full" and full or kind == "search" and search or math.max(full, search)
   return t > 0 and t or nil
 end
 
--- "AH scan 3h ago": LootValue's own text when it is loaded, so the wording
--- matches its tooltip line; else the same from A.lastScan.
+-- "AH full scan 3h ago" or "AH search 13m ago, no full scan": LootValue's
+-- own text when it is loaded, so the wording matches its tooltip line;
+-- else the same from A.lastScan.
 function A.scanText()
   local lv = call(api("LootValue.scanText"))
   if type(lv) == "string" then return lv end
-  local ago = A.ago(A.lastScan())
-  return ago and ("AH scan " .. ago) or nil
+  local full = A.ago(A.lastScan("full"))
+  if full then return "AH full scan " .. full end
+  local search = A.ago(A.lastScan("search"))
+  return search and ("AH search " .. search .. ", no full scan") or nil
+end
+
+-- True when a full scan ran since local midnight (Auctionator's price day).
+function A.fullScanToday()
+  local full, now = A.lastScan("full"), call(rawget(_G, "time"))
+  local date = rawget(_G, "date") or (os and os.date)
+  local t = type(now) == "number" and call(date, "*t", now)
+  if not full or type(t) ~= "table" then return false end
+  return full >= now - (t.hour or 0) * 3600 - (t.min or 0) * 60 - (t.sec or 0)
 end
 
 -- The right-hand text of a row, worked out only for rows on screen.
@@ -394,7 +409,11 @@ function A.tooltip(tt, e)
       -- nil age: unknown (no age API, or not seen in 21 days); say only what we know.
       local parts = {}
       local age = A.ahAge(e.id)
-      if age then table.insert(parts, "AH price seen " .. age) end
+      if age then
+        -- A full scan today that did not see it: no listings now.
+        local unlisted = age ~= "today" and A.fullScanToday()
+        table.insert(parts, "AH price seen " .. age .. (unlisted and ", not in today's full scan" or ""))
+      end
       local scan = A.scanText()
       if scan then table.insert(parts, scan) end
       if #parts > 0 then tt:AddLine(table.concat(parts, "; "), 0.6, 0.6, 0.6) end

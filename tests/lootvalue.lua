@@ -97,10 +97,22 @@ check("cheap item, AH pays 14x the vendor", has(LV.adviceLine("|Hitem:9003:0|h",
 
 -- Scan age -------------------------------------------------------------------
 check("no scan time: nothing shown", LV.scanText() == nil and has(robe, "AH 42s") and not has(robe, "AH scan"))
+SAVED.TimeOfLastBrowseScan = os.time() - 13 * 60
+check("only searches: says so", LV.scanText() == "AH search 13m ago, no full scan")
 SAVED.TimeOfLastGetAllScan = os.time() - 3 * 3600 - 5
-SAVED.TimeOfLastBrowseScan = os.time() - 5 * 3600
-check("newest scan as an age", LV.scanText() == "AH scan 3h ago")
-check("scan age on a line with an AH price", has(LV.adviceLine("|Hitem:9001:0|h", true, CTX), "· AH scan 3h ago"))
+check("a full scan wins over a newer search", LV.scanText() == "AH full scan 3h ago")
+check("scan age on a line with an AH price", has(LV.adviceLine("|Hitem:9001:0|h", true, CTX), "· AH full scan 3h ago"))
+-- A full scan since midnight that did not see the item: its price is old,
+-- and yesterday's listings and trend no longer count.
+local realMidnight = LV.midnight
+LV.midnight = function() return os.time() - 4 * 3600 end
+AGE[9003], HIST[9003] = 1, { { available = 9999, minSeen = 300 }, { minSeen = 400 } }
+local mi = LV.marketInfo("|Hitem:9003:0|h")
+check("not in today's full scan", mi.unlisted and mi.note == "not in today's full scan" and mi.slow)
+LV.midnight = function() return os.time() - 2 * 3600 end
+check("full scan before midnight: the old notes", LV.marketInfo("|Hitem:9003:0|h").note == "slow: 9999 listed, price falling")
+AGE[9003], HIST[9003], LV.midnight = nil, nil, realMidnight
+check("midnight is today", LV.midnight() <= os.time() and LV.midnight() > os.time() - 86400)
 check("age wording", LV.ago(os.time() - 30) == "just now" and LV.ago(os.time() - 600) == "10m ago"
   and LV.ago(os.time() - 2 * 86400) == "2d ago")
 

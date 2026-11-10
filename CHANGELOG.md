@@ -5,6 +5,30 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## UpgradeFinder 0.2.0
+
+- New: crafting lines on recipes. Hover a pattern or other recipe item, or
+  a recipe in your profession window, to see the cost to craft, what the
+  made item sells for (AH, vendor or disenchant), the profit or loss, and
+  the score of the made item against what you wear. `/uf craft` turns them
+  off.
+- Hovering a row in the profession window's recipe list now shows the made
+  item's tooltip.
+
+## LootValue 0.2.1
+
+- The AH scan time on the tooltip names the kind of scan: "AH full scan 3h
+  ago", or "AH search 13m ago, no full scan" when Auctionator only saw
+  searches. Before, any AH search counted as a scan, so a price could look
+  a day old just after a "scan".
+- An item that today's full scan did not see says "not in today's full
+  scan" instead of yesterday's listings and price trend.
+
+## Omni 0.1.3
+
+- The item tooltip uses the same AH scan wording as LootValue, and says
+  "not in today's full scan" next to an old price.
+
 ## GroupUp 0.1.0
 
 - New: a panel that helps you decide whether to group up (`/gu`). It

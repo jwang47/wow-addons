@@ -156,7 +156,7 @@ ns.DUNGEONS = {
   { "Shadowfang Keep", "SFK", 11, 30, { "Arugal", 111 } },
 }
 
-for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Stats.lua", "Calib.lua", "Spells.lua", "Build.lua", "UI.lua", "Weights.lua", "BuildUI.lua" }) do
+for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Craft.lua", "Stats.lua", "Calib.lua", "Spells.lua", "Build.lua", "UI.lua", "Weights.lua", "BuildUI.lua" }) do
   assert(loadfile(root .. "UpgradeFinder/" .. file))("UpgradeFinder", ns)
 end
 local S = ns.score
@@ -841,6 +841,70 @@ check("tooltip: no run-on Changes line", not hasSingle("Changes:"))
 local cl, bl = hasDouble("^Craft$"), hasDouble("^Buy it made$")
 check("tooltip: craft cost and buy line", cl and cl[2] == "4g 04s +?" and bl and bl[2] == "binds on pickup"
   and hasDouble("^  Fine Thread x4$")[2] == "4s 00c (vendor)")
+
+
+-- Crafting lines on recipes ------------------------------------------------
+local Cr = ns.craft
+-- A tooltip that keeps its lines, with TextLeft globals like the game's.
+local function fakeTooltip(name, link)
+  local t = { lines = {} }
+  function t:GetName() return name end
+  function t:GetItem() return "x", link end
+  function t:NumLines() return #self.lines end
+  function t:AddLine(l) table.insert(self.lines, { l }) rawset(_G, name .. "TextLeft" .. #self.lines, { GetText = function() return l end }) end
+  function t:AddDoubleLine(l, r) self:AddLine(l) self.lines[#self.lines][2] = r end
+  function t:Show() end
+  function t:find(label) for _, l in ipairs(self.lines) do if l[1] == label then return l[2] or true end end end
+  return t
+end
+-- name, link, quality, ilvl, _, _, _, _, loc, _, sell, classID, _, bind
+local INFO = { ["Silk Robe"] = { 117, 2, 25, "INVTYPE_CHEST", 900, 4, 2 }, ["Frost Circlet"] = { 119, 2, 25, "INVTYPE_HEAD", 600, 4, 1 },
+  ["Bolt of Silk Cloth"] = { 900, 1, 1, "", 0, 7 }, ["Fine Thread"] = { 901, 1, 1, "", 0, 7 } }
+local byId = {}
+for n, v in pairs(INFO) do byId[v[1]] = n end
+local oldInfo = C_Item.GetItemInfo
+C_Item.GetItemInfo = function(x)
+  local name = INFO[x] and x or byId[tonumber(tostring(x):match("item:(%d+)"))]
+  local v = INFO[name]
+  if not v then return nil end
+  return name, "item:" .. v[1], v[2], v[3], 1, "", "", 1, v[4], 0, v[5], v[6], 0, v[7]
+end
+local tt = fakeTooltip("FakeTipA", "item:118")
+Cr.onTooltip(tt)
+-- Silk Robe: 2 x Fine Thread at 1s (vendor) = 2s; sells on the AH for 2g less 5%.
+check("craft: cost to craft line", tt:find("Cost to craft") == "2s 00c")
+check("craft: sells for the best of AH and vendor", tt:find("Sells for") == "~1g 90s AH")
+check("craft: profit", tt:find("Profit") == "+1g 88s")
+check("craft: score of the made item vs what you wear", tostring(tt:find("Score of the made item")):match("^%d+%.%d %([%+%-]%d+%.%d vs your chest%)$") ~= nil)
+local n = #tt.lines
+Cr.onTooltip(tt)
+check("craft: a second item hook adds nothing", #tt.lines == n)
+-- Frost Circlet: Bleach has no price; the circlet binds on pickup, so only the vendor buys it.
+tt = fakeTooltip("FakeTipB", "item:114")
+Cr.onTooltip(tt)
+check("craft: a reagent without a price", tt:find("Cost to craft") == "4g 04s +?" and tt:find("  No price: Bleach"))
+check("craft: bind on pickup sells to the vendor only", tt:find("Sells for") == "6s 00c vendor" and tt:find("Loss") == "-3g 98s ?")
+tt = fakeTooltip("FakeTipC", "item:106")
+Cr.onTooltip(tt)
+check("craft: not a recipe, no lines", #tt.lines == 0)
+-- The profession window: 2 x Fine Thread makes one Silk Robe.
+GetTradeSkillItemLink = function(i) return i == 1 and "|Hitem:117::|h[Silk Robe]|h" or nil end
+GetTradeSkillNumReagents = function(i) return i == 1 and 1 or 0 end
+GetTradeSkillReagentInfo = function() return "Fine Thread", "icon", 2, 5 end
+GetTradeSkillReagentItemLink = function() return "|Hitem:901::|h[Fine Thread]|h" end
+GetTradeSkillNumMade = function() return 2, 2 end
+local ts = Cr.forTradeSkill(1)
+local function lineOf(lines, label) for _, l in ipairs(lines) do if l[1] == label then return l[2] end end end
+check("trade skill: cost, two made and the profit", lineOf(ts, "Cost to craft") == "2s 00c"
+  and lineOf(ts, "Sells for (x2)") == "~3g 80s AH" and lineOf(ts, "Profit") == "+3g 78s"
+  and lineOf(ts, "Score of the made item") ~= nil)
+check("trade skill: no reagents, no lines", Cr.forTradeSkill(2) == nil)
+SlashCmdList.UPGRADEFINDER("craft")
+tt = fakeTooltip("FakeTipD", "item:118")
+Cr.onTooltip(tt)
+check("/uf craft turns the lines off", #tt.lines == 0 and UpgradeFinderDB.opts.craft == false)
+SlashCmdList.UPGRADEFINDER("craft")
+C_Item.GetItemInfo = oldInfo
 
 print(failures == 0 and "all UpgradeFinder tests passed" or (failures .. " UpgradeFinder test(s) failed"))
 os.exit(failures == 0 and 0 or 1)

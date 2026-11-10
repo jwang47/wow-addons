@@ -31,18 +31,39 @@ function LV.hasAuctionator() return api() ~= nil end
 
 -- When Auctionator last scanned the AH (unix seconds), or nil. Auctionator
 -- keeps TimeOfLast...Scan fields in its saved state (Auctionator.SavedState,
--- the AUCTIONATOR_SAVEDVARS table); the newest one is the snapshot time.
--- Omni and MageMentor use LootValue.scanText() too.
-function LV.lastScan()
+-- the AUCTIONATOR_SAVEDVARS table). TimeOfLastBrowseScan changes on every AH
+-- search or browse page, which sees only the items it showed; the other
+-- fields (GetAll, Replicate) are full scans of every listing.
+-- kind: "full", "search" or nil (any). Omni and MageMentor use
+-- LootValue.scanText() too.
+function LV.lastScan(kind)
   local state = Auctionator and Auctionator.SavedState
   if type(state) ~= "table" then state = rawget(_G, "AUCTIONATOR_SAVEDVARS") end
   if type(state) ~= "table" then return nil end
   local newest
   for k, v in pairs(state) do
+    local search = k == "TimeOfLastBrowseScan"
     if type(k) == "string" and k:find("^TimeOfLast.*Scan$") and type(v) == "number" and v > 0
-      and (not newest or v > newest) then newest = v end
+      and (not kind or (kind == "search") == search) and (not newest or v > newest) then newest = v end
   end
   return newest
+end
+
+-- Local midnight today (unix seconds). Auctionator counts price days from
+-- local midnight, so a full scan after it holds today's price of every
+-- item that was listed.
+function LV.midnight()
+  local now = time and time() or 0
+  local date = rawget(_G, "date") or (os and os.date)
+  local ok, t = pcall(date, "*t", now)
+  if not ok or type(t) ~= "table" then return nil end
+  return now - (t.hour or 0) * 3600 - (t.min or 0) * 60 - (t.sec or 0)
+end
+
+-- True when a full scan ran today: an item with an older price was not listed.
+function LV.fullScanToday()
+  local full, midnight = LV.lastScan("full"), LV.midnight()
+  return full ~= nil and midnight ~= nil and full >= midnight
 end
 
 -- "5m ago", "3h ago", "2d ago".
@@ -54,10 +75,13 @@ function LV.ago(t)
   return math.floor(s / 86400) .. "d ago"
 end
 
--- "AH scan 3h ago", or nil when the scan time is unknown.
+-- "AH full scan 3h ago", or "AH search 13m ago, no full scan" when
+-- Auctionator only saw searches; nil when the scan time is unknown.
 function LV.scanText()
-  local t = LV.lastScan()
-  return t and ("AH scan " .. LV.ago(t)) or nil
+  local full = LV.lastScan("full")
+  if full then return "AH full scan " .. LV.ago(full) end
+  local search = LV.lastScan("search")
+  return search and ("AH search " .. LV.ago(search) .. ", no full scan") or nil
 end
 
 function LV.money(copper)
@@ -185,7 +209,7 @@ end
 -- How the AH market for an item looks, from Auctionator's history (today's
 -- listings, price trend) and price age: { listed, age, slow, note }.
 -- "slow" when many are listed (50+ items, or 50+ full stacks), the low fell 10% or more since the last
--- scan day, or the price is 3+ days old.
+-- scan day, the price is 3+ days old, or today's full scan did not see the item.
 function LV.marketInfo(link)
   local info = {}
   local db = Auctionator and Auctionator.Database
@@ -214,9 +238,18 @@ function LV.marketInfo(link)
     if ok and type(n) == "number" and n > 1 then stack = n end
   end
   local notes = {}
-  if info.listed and info.listed >= 50 * stack then table.insert(notes, "slow: " .. info.listed .. " listed") end
-  if info.falling then table.insert(notes, "price falling") end
-  if info.age and info.age >= 3 then table.insert(notes, "price " .. info.age .. " days old") end
+  -- Today's full scan did not see it: the listings and trend are old news.
+  info.unlisted = info.age ~= nil and info.age >= 1 and LV.fullScanToday()
+  if info.unlisted then
+    table.insert(notes, "not in today's full scan")
+  end
+  if not info.unlisted and info.listed and info.listed >= 50 * stack then
+    table.insert(notes, "slow: " .. info.listed .. " listed")
+  end
+  if not info.unlisted and info.falling then table.insert(notes, "price falling") end
+  if not info.unlisted and info.age and info.age >= 3 then
+    table.insert(notes, "price " .. info.age .. " days old")
+  end
   info.slow = #notes > 0
   info.note = #notes > 0 and table.concat(notes, ", ") or nil
   return info
