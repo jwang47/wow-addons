@@ -312,10 +312,14 @@ check("/qb shows again", QuestBoardFrame.shown)
 -- Dragging a row moves the board and saves the place; /qb lock stops it.
 local moved = 0
 QuestBoardFrame.StartMoving = function() moved = moved + 1 end
-QuestBoardFrame.GetPoint = function() return "TOPLEFT", nil, nil, 100, -200 end
+QuestBoardFrame.GetLeft = function() return 100 end
+QuestBoardFrame.GetTop = function() return 700 end
+local anchor
+QuestBoardFrame.SetPoint = function(_, a, _, b, x, y) anchor = { a, b, x, y } end
 firstRow.scripts.OnDragStart(firstRow)
 firstRow.scripts.OnDragStop(firstRow)
 check("dragging a row moves the board", moved == 1 and QuestBoardDB.point[1] == "TOPLEFT" and QuestBoardDB.point[2] == 100)
+check("after a drag the board hangs from its top edge", anchor[1] == "TOPLEFT" and anchor[2] == "BOTTOMLEFT" and anchor[4] == 700)
 SlashCmdList.QUESTBOARD("lock")
 firstRow.scripts.OnDragStart(firstRow)
 check("/qb lock stops dragging", moved == 1 and QuestBoardDB.locked)

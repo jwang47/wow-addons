@@ -240,8 +240,18 @@ local function dragStop()
   panel:StopMovingOrSizing()
   panel.isMoving = false
   ns.dragEnded = rawget(_G, "GetTime") and GetTime() or nil
-  local p, _, _, x, y = panel:GetPoint(1)
-  ns.db.point = { p, x, y }
+  ns.pinTop()
+end
+
+-- Keeps the board's top edge in place: it is anchored by its top-left
+-- corner, so it grows and shrinks downward only (the game re-anchors a
+-- dragged frame to its centre, which made the board grow both ways).
+function ns.pinTop()
+  local left, top = panel:GetLeft(), panel:GetTop()
+  if not (left and top) then return end
+  panel:ClearAllPoints()
+  panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+  ns.db.point = { "TOPLEFT", left, top, "BOTTOMLEFT" }
 end
 ns.dragStart, ns.dragStop = dragStart, dragStop
 local function draggable(f)
@@ -462,7 +472,10 @@ local function build()
   panel.next:SetTextColor(1, 0.85, 0.35)
   if panel.next.SetWordWrap then panel.next:SetWordWrap(false) end
   local p = ns.db.point
-  if p then panel:SetPoint(p[1], UIParent, p[1], p[2], p[3])
+  if p then
+    panel:SetPoint(p[1], UIParent, p[4] or p[1], p[2], p[3])
+    -- A place saved by an older build may be the centre: move it to the top.
+    if p[1] ~= "TOPLEFT" and p[1] ~= "TOPRIGHT" and p[1] ~= "TOP" then ns.pinTop() end
   else panel:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -260) end
   panel:SetMovable(true)
   panel:EnableMouse(true)
@@ -566,7 +579,11 @@ events:SetScript("OnEvent", function(_, event)
     ns.applyTrackers()
     -- Questie builds its quest lists a few seconds after login.
     if C_Timer then
-      C_Timer.After(5, function() ns.refresh() ns.applyTrackers() end)
+      C_Timer.After(5, function()
+        ns.refresh()
+        ns.applyTrackers()
+        if ns.db.point and ns.db.point[1] ~= "TOPLEFT" then ns.pinTop() end
+      end)
       C_Timer.After(15, ns.refresh)
     end
     return
