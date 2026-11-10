@@ -148,7 +148,8 @@ function M.hasSelfBuff(class, auras)
   for _, n in ipairs(list) do
     if auras[n] then return true end
   end
-  return auras.partial and nil or false
+  if auras.partial then return nil end
+  return false
 end
 
 -- The macro for one cast. `who` is a unit token for you and your group
