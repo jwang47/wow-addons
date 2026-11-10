@@ -5,6 +5,20 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## LootValue 0.1.1
+
+- The AddOns list names it "LootValue: Sell, Vendor or Disenchant", so it
+  says what it does.
+
+## Omni 0.1.2
+
+- The AddOns list names it "Omni: Search Everything".
+
+## UpgradeFinder 0.1.9
+
+- The AddOns list names it "UpgradeFinder: Gear Upgrades".
+- Chat messages start with "UpgradeFinder:" instead of "Upgrades:".
+
 ## Omni 0.1.1
 
 - Nearby is always the first group in the results.

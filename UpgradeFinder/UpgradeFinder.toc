@@ -1,8 +1,8 @@
 ## Interface: 16001
-## Title: UpgradeFinder
+## Title: UpgradeFinder: Gear Upgrades
 ## Notes: Gear from your Auctionator scan, your bags and the dungeon drops that beats what you wear, for your class. /uf or the Upgrades button on the Auction House.
 ## Author: jwang47
-## Version: 0.1.8
+## Version: 0.1.9
 ## SavedVariables: UpgradeFinderDB
 ## OptionalDeps: Auctionator, MageMentor, Questie
 
