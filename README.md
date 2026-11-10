@@ -68,6 +68,15 @@ the 5% cut, the disenchant value).
   from local midnight, so an item seen only last night is "1 day old" in
   the morning.
 
+- Your own sales: the tooltip adds "Your AH sales: sold 18 of 20 (90%),
+  ~1s15c each, 2 up, last 3h ago" for an item you sold or posted. It
+  counts your posts and your "Auction successful" and "Auction expired"
+  mails (read when you open the mailbox, each mail once; counts start when
+  you install this version). "each" is what you got per item after the AH
+  cut. Under half of 4+ finished auctions sold makes the AH advice count
+  the market as slow. `/lv sales` lists your best sellers; `/lv sales
+  reset` clears the counts.
+
 ### Auto-loot
 
 LootValue also loots for you and leaves cheap junk (murloc fins and the

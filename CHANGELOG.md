@@ -5,6 +5,19 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## LootValue 0.3.0
+
+- Your AH sales on the item tooltip: "Your AH sales: sold 18 of 20 (90%),
+  ~1s15c each, 2 up, last 3h ago". LootValue counts the auctions you post
+  and your "Auction successful" and "Auction expired" mails, per item. It
+  reads the mail when you open your mailbox, and counts each mail once.
+  "~1s15c each" is what you got per item, after the AH cut.
+- When under half of your last 4 or more finished auctions of an item
+  sold, the AH advice counts the market as slow ("AH 57s (you sold 2 of
+  6)"), so it asks for a bigger margin before it says AH.
+- `/lv sales` lists the items you sold most, with sold and finished
+  auctions. `/lv sales reset` clears the counts.
+
 ## UpgradeFinder 0.2.0
 
 - New: crafting lines on recipes. Hover a pattern or other recipe item, or

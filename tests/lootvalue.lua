@@ -263,5 +263,76 @@ do
   C_Item.GetItemInfo = realInfo
 end
 
+-- Sales: your own auctions, from posts and mails -----------------------------
+local hooks = {}
+hooksecurefunc = function(a, b, c)
+  if type(a) == "string" then hooks[a] = b else hooks[b] = c end
+end
+function PostAuction() end
+local SELL = { "Linen Cloth", nil, 20 }
+GetAuctionSellItemInfo = function() return unpack(SELL) end
+UnitName = function() return "Mage" end
+GetRealmName = function() return "Forever" end
+local INBOX = {} -- { subject, money, daysLeft, hasItem, invoiceCount, itemCount }
+GetInboxNumItems = function() return #INBOX end
+GetInboxHeaderInfo = function(i)
+  local m = INBOX[i]
+  return nil, nil, "Alliance Auction House", m[1], m[2], 0, m[3], m[4]
+end
+GetInboxInvoiceInfo = function(i)
+  local m = INBOX[i]
+  return "seller", "x", "Buyer", 0, 0, 0, 0, 0, 0, m[5]
+end
+GetInboxItem = function(i) return "x", 1, nil, INBOX[i][6] end
+assert(loadfile(root .. "LootValue/Sales.lua"))("LootValue", {})
+local SL = LV.sales
+local sframe = LAST_FRAME
+sframe.onEvent(sframe, "PLAYER_LOGIN")
+check("hooks posting", hooks.PostAuction ~= nil)
+hooks.PostAuction(100, 200, 1, 20, 3)
+local r = LootValueDB.sales["Linen Cloth"]
+check("counts posted stacks", r and r.posted == 3 and r.stack == 20)
+
+local k, n, c = SL.parseSubject("Auction successful: Linen Cloth (20)")
+check("parses a sold stack subject", k == "sold" and n == "Linen Cloth" and c == 20)
+k, n, c = SL.parseSubject("Auction expired: Bandit Cloak of the Monkey")
+check("parses an expired subject", k == "expired" and n == "Bandit Cloak of the Monkey" and c == nil)
+check("other mail is not an auction", SL.parseSubject("Auction won: Linen Cloth") == nil
+  and SL.parseSubject("Hello") == nil)
+
+INBOX = {
+  { "Auction successful: Linen Cloth", 2280, 29.5, false, 20 },
+  { "Auction successful: Linen Cloth", 2280, 29.5, false, nil }, -- same mail twice: a second sale
+  { "Auction expired: Linen Cloth", 0, 29.9, true, nil, 20 },
+}
+check("counts three new auction mails", SL.scanInbox() == 3)
+check("a second look counts nothing", SL.scanInbox() == 0)
+table.remove(INBOX, 1)
+check("taking a mail counts nothing", SL.scanInbox() == 0)
+check("sold counts and items", r.sold == 2 and r.expired == 1 and r.soldItems == 40 and r.net == 4560)
+local line = SL.line("|Hitem:2589:0|h[Linen Cloth]|h")
+check("tooltip line", has(line, "Your AH sales: sold 2 of 3 (67%), ~1s14c each, last just now"))
+check("no line for an item you never sold", SL.line("|Hitem:2592:0|h[Wool Cloth]|h") == nil)
+check("2 of 3 is not slow yet", SL.slowNote("Linen Cloth") == nil)
+for i = 1, 3 do table.insert(INBOX, { "Auction expired: Linen Cloth", 0, 20 + i, true, nil, 20 }) end
+SL.scanInbox()
+check("2 of 6 sold is slow", SL.slowNote("Linen Cloth") == "you sold 2 of 6")
+-- Item 9003 prices at 3s53c; name it Linen Cloth through its link.
+local m = LV.marketInfo("|Hitem:9003:0|h[Linen Cloth]|h")
+check("own slow sales make the market slow", m.slow and has(m.note, "you sold 2 of 6"))
+
+lines = {}
+local tip2 = { GetName = function() return "GameTooltip" end, NumLines = function() return 0 end,
+  GetItem = function() return "Linen Cloth", "|Hitem:2589:0|h[Linen Cloth]|h" end,
+  AddLine = function(_, l) table.insert(lines, l) end, Show = function() end }
+LV.deferTo = "MageMentor"
+hooked(tip2)
+check("sales line shows even when MageMentor draws the advice", #lines == 1 and has(lines[1], "Your AH sales"))
+LV.deferTo = nil
+AL.slash("sales")
+check("/lv sales lists items", has(chat[#chat], "Linen Cloth 2/6"))
+AL.slash("sales reset")
+check("/lv sales reset clears", next(LootValueDB.sales) == nil)
+
 if failures > 0 then error(failures .. " LootValue test(s) failed") end
 print("all LootValue tests passed")

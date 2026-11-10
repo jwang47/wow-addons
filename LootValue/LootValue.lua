@@ -205,7 +205,8 @@ end
 -- How the AH market for an item looks, from Auctionator's history (today's
 -- listings, price trend) and price age: { listed, age, slow, note }.
 -- "slow" when many are listed (50+ items, or 50+ full stacks), the low fell 10% or more since the last
--- scan day, the price is 3+ days old, or today's full scan did not see the item.
+-- scan day, the price is 3+ days old, today's full scan did not see the item,
+-- or under half of your own last 4+ finished auctions of it sold.
 function LV.marketInfo(link)
   local info = {}
   local db = Auctionator and Auctionator.Database
@@ -246,6 +247,9 @@ function LV.marketInfo(link)
   if not info.unlisted and info.age and info.age >= 3 then
     table.insert(notes, "price " .. info.age .. " days old")
   end
+  -- Your own auctions of it mostly expire (Sales.lua).
+  local own = LV.sales and LV.sales.slowNote(LV.sales.itemName(link))
+  if own then table.insert(notes, own) end
   info.slow = #notes > 0
   info.note = #notes > 0 and table.concat(notes, ", ") or nil
   return info
@@ -374,18 +378,26 @@ function LV.tooltipLink(tooltip, data)
   return nil
 end
 
--- MageMentor sets LootValue.deferTo = "MageMentor" and draws the line itself.
+-- MageMentor sets LootValue.deferTo = "MageMentor" and draws the advice
+-- line itself; the sales line (Sales.lua) shows either way.
 function LV.onTooltipItem(tooltip, data)
-  if LV.deferTo or not tooltip.GetItem then return end
+  if not tooltip.GetItem then return end
   local name = tooltip.GetName and tooltip:GetName()
   if name and name:find("Scan") then return end
   local link = LV.tooltipLink(tooltip, data)
   if not link then return end
-  local line = LV.adviceLine(link, LV.isGear(link), readContext(tooltip))
+  local added = false
+  local line = not LV.deferTo and LV.adviceLine(link, LV.isGear(link), readContext(tooltip))
   if line then
     tooltip:AddLine(line)
-    tooltip:Show()
+    added = true
   end
+  local sales = LV.salesLine and LV.salesLine(link)
+  if sales then
+    tooltip:AddLine(sales)
+    added = true
+  end
+  if added then tooltip:Show() end
 end
 
 local function guarded(tt, data)
