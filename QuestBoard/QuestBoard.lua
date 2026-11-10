@@ -58,6 +58,14 @@ end
 
 function ns.todoBase(e)
   if e.kind == "turnin" then return e.target and ("Hand in to " .. e.target) or "Hand it in" end
+  if e.fromItem then
+    local what = e.item and ("Loot " .. e.item) or "Starts from an item"
+    return what .. (e.dropFrom and (" from " .. e.dropFrom) or "") .. (e.finisher and (", hand in to " .. e.finisher) or "")
+  end
+  if e.deliver and e.target then
+    local o = e.left and e.left[1]
+    return (o and o.text and (o.text .. "  -  ") or "") .. "Take it to " .. e.target
+  end
   if e.kind == "pickup" or e.kind == "party" then return e.target and ("Get it from " .. e.target) or nil end
   local o = e.left and e.left[1]
   local text = o and o.text
@@ -120,9 +128,12 @@ local function tooltip(r)
   local verb = e.kind == "turnin" and "Turn in at " or (e.kind == "pickup" or e.kind == "party") and "Get it from " or "Nearest: "
   if e.target then
     tip:AddLine(verb .. e.target .. (e.dist and ("  " .. D.yards(e.dist) .. " " .. D.compass(e.angle)) or ""), 1, 1, 1)
-  elseif e.fromItem then
-    tip:AddLine("Starts from an item that drops", 0.8, 0.8, 0.8)
   end
+  if e.fromItem then
+    tip:AddLine("Starts from an item" .. (e.item and (": " .. e.item) or "") .. (e.dropFrom and (", drops from " .. e.dropFrom) or ""), 0.8, 0.8, 0.8)
+    if e.finisher then tip:AddLine("Hand in to " .. e.finisher, 0.8, 0.8, 0.8) end
+  end
+  if not e.spawn then tip:AddLine("Questie has no place for this quest", 0.8, 0.5, 0.5) end
   for _, o in ipairs(e.left or {}) do
     if o.text then tip:AddLine("- " .. o.text, 0.8, 0.8, 0.8) end
   end
@@ -175,18 +186,31 @@ end
 function ns.pin(e)
   local zdb = D.module("ZoneDB")
   local s = e.spawn
-  if not (zdb and s and s[1] and s[1] >= 0) then say(e.name .. ": no place known") return false end
+  if not (zdb and s and s[1] and s[1] >= 0) then
+    -- No place: open the quest log at it instead (your quests), and say so
+    -- once per quest, not on every click.
+    if e.kind ~= "pickup" and e.kind ~= "party" then ns.openLog(e) end
+    ns.sayOnce("noplace:" .. tostring(e.id), e.name .. ": Questie has no place for it" ..
+      (s and s[1] and s[1] < 0 and " (it is in a dungeon)" or ""))
+    return false
+  end
   local mapID = call(zdb.GetUiMapIdByAreaId, zdb, e.zone)
   if mapID then ns.openMap(mapID) end
   local id, px, py
   if mapID then id, px, py = pinPoint(mapID, s[1] / 100, s[2] / 100) end
   local point, set = api("UiMapPoint.CreateFromCoordinates"), api("C_Map.SetUserWaypoint")
-  if not (id and point and set) then say(e.name .. ": the map takes no pin here") return false end
+  if not (id and point and set) then ns.sayOnce("nopin:" .. tostring(e.id), e.name .. ": the map takes no pin here") return false end
   local ok, wasSet = pcall(set, call(point, id, px, py))
-  if not ok or wasSet == false then say(e.name .. ": the map takes no pin here") return false end
+  if not ok or wasSet == false then ns.sayOnce("nopin:" .. tostring(e.id), e.name .. ": the map takes no pin here") return false end
   call(api("C_SuperTrack.SetSuperTrackedUserWaypoint"), true)
-  say(string.format("%s: pin set at %s (%.0f, %.0f)", e.name, e.target or "the place", s[1], s[2]))
   return true
+end
+
+local said = {}
+function ns.sayOnce(key, msg)
+  if said[key] then return end
+  said[key] = true
+  say(msg)
 end
 
 function ns.link(e)

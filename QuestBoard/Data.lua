@@ -236,7 +236,42 @@ function D.placeLog(e)
   elseif quest.Objectives then
     place(e, call(du.GetNearestSpawnForQuest, quest))
   end
+  -- No place for the objectives (a letter or item to deliver, or Questie
+  -- has no spawns for them): the place is the NPC who takes it in.
+  if not e.spawn and quest.Finisher then
+    place(e, call(du.GetNearestFinisherOrStarter, quest.Finisher))
+    if e.spawn then
+      e.npc = D.npcNamed(quest.Finisher.NPC, e.target)
+      e.deliver = true
+    end
+  end
   return e
+end
+
+-- Where the item that starts a quest drops: the nearest spawn of a
+-- monster that drops it. Fills e.item, e.dropFrom and the place.
+function D.placeItemStart(e, quest)
+  local qdb, du = D.module("QuestieDB"), D.module("DistanceUtils")
+  local itemID = quest.Starts and quest.Starts.Item and quest.Starts.Item[1]
+  if not (qdb and du and itemID) then return end
+  local item = call(qdb.GetItem, qdb, itemID)
+  if type(item) ~= "table" then return end
+  e.item = item.name
+  local best
+  for _, npcID in ipairs(type(item.npcDrops) == "table" and item.npcDrops or {}) do
+    local npc = call(qdb.GetNPC, qdb, npcID)
+    if type(npc) == "table" and type(npc.spawns) == "table" then
+      local spawn, zone, dist = call(du.GetNearestSpawn, npc.spawns)
+      dist = plain(dist)
+      if spawn and dist and (not best or dist < best.dist) then
+        best = { spawn = spawn, zone = zone, dist = dist, name = npc.name, id = npcID }
+      end
+    end
+  end
+  if best then
+    e.dropFrom = best.name
+    place(e, best.spawn, best.zone, best.name, best.dist)
+  end
 end
 
 function D.logSecs(e)
@@ -293,8 +328,16 @@ function D.pickup(id, level, maxAbove, kind)
     place(e, call(du.GetNearestFinisherOrStarter, quest.Starts))
     e.npc = D.npcNamed(quest.Starts.NPC, e.target)
   end
-  -- Started by an item that drops: no giver to walk to.
-  if not e.spawn and quest.Starts and quest.Starts.Item then e.fromItem = true end
+  -- Started by an item that drops: no giver to walk to. The place is where
+  -- the item drops; the hand-in NPC goes in the tooltip.
+  if not e.spawn and quest.Starts and quest.Starts.Item then
+    e.fromItem = true
+    D.placeItemStart(e, quest)
+    if du and quest.Finisher then
+      local _, _, name = call(du.GetNearestFinisherOrStarter, quest.Finisher)
+      e.finisher = name
+    end
+  end
   return e
 end
 

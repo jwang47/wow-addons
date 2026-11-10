@@ -406,6 +406,37 @@ C_QuestLog.IsUnitOnQuest = nil
 D.resetModules()
 check("no party: no party group", #D.collect({}).party == 0)
 
+-- A quest that starts from an item: where it drops and who takes it in.
+QUESTS[207] = { level = 26, requiredLevel = 20, name = "The Glowing Shard", place = { 0, "" }, xp = 1500, obj = 1 }
+local realGetQuest = mods.QuestieDB.GetQuest
+mods.QuestieDB.GetQuest = function(id)
+  local q = realGetQuest(id)
+  if id == 207 then q.Starts = { Item = { 10441 } } end
+  return q
+end
+mods.QuestieDB.GetItem = function(_, id) if id == 10441 then return { name = "Glowing Shard", npcDrops = { 3654 } } end end
+mods.QuestieDB.GetNPC = function(_, id) if id == 3654 then return { name = "Mutanus the Devourer", spawns = { [718] = { { -1, -1 } } } } end end
+mods.DistanceUtils.GetNearestSpawn = function() return { 46, 36 }, 17, 900 end
+local realFinisher = mods.DistanceUtils.GetNearestFinisherOrStarter
+mods.DistanceUtils.GetNearestFinisherOrStarter = function(who)
+  if who.NPC and who.NPC[1] == 2071 then return { 62, 38 }, 17, "Sputtervalve", 2000 end
+  if who.NPC and who.NPC[1] == 2070 then return nil end
+  return realFinisher(who)
+end
+local shard = D.pickup(207, 27, 3)
+check("item quest: where the item drops", shard.fromItem and shard.item == "Glowing Shard" and shard.dropFrom == "Mutanus the Devourer" and shard.dist == 900)
+check("item quest: who takes it in", shard.finisher == "Sputtervalve")
+check("item quest: what to do", ns.todo(shard) == "Loot Glowing Shard from Mutanus the Devourer, hand in to Sputtervalve")
+mods.QuestieDB.GetQuest = realGetQuest
+mods.DistanceUtils.GetNearestFinisherOrStarter = realFinisher
+QUESTS[207] = nil
+
+-- A quest with no place says so once, not on every click.
+local before = #chat
+ns.pin({ id = 999, name = "Lost Letter", kind = "pickup" })
+ns.pin({ id = 999, name = "Lost Letter", kind = "pickup" })
+check("no place: one chat line, not one per click", #chat == before + 1 and chat[#chat]:find("Lost Letter", 1, true))
+
 ---------------------------------------------------------------------------
 -- Without Questie: the log only, no errors.
 questieOn = false
