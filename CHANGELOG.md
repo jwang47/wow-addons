@@ -16,6 +16,9 @@ the same, and a test checks that every `.toc` version has a section here.
   distance and arrow. Click (or `/qb town`) pins it on the map.
 - Active quests show a line per open objective, your party's progress
   on it and where the chain leads (up to 5 lines).
+- Areas count only real stops: no item-started pick-ups (their place is a
+  drop or the finisher) and no party quests you cannot take. Inside an
+  area its name says "Around you", and Next no longer says to go there.
 - With Glance loaded, its minimap edge arrows also point to the Next
   quest's place, the nearest hand-in and the inn and flight master.
 

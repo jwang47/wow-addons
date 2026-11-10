@@ -124,8 +124,9 @@ end
 function ns.nextStep(st)
   if not st then return nil end
   -- With nothing on the go, the best area (several stops in one trip).
+  -- Not when you are already there: then the nearest stop is the next step.
   local best = not st.active[1] and st.area and st.area[1]
-  if best and #best.stops >= 3 then
+  if best and #best.stops >= 3 and (best.dist or 0) > D.AREA_YARDS then
     return "Go " .. best.name:lower() .. ": " .. D.areaText(best) .. "  " .. D.yards(best.dist), best
   end
   local e = st.active[1] or st.turnin[1] or st.nearby[1] or st.log[1]

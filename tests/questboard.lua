@@ -519,8 +519,20 @@ check("areas: again unmarks them", next(QuestBoardDB.doing) == nil and not ns.ar
 check("areas: a hand-in is not marked", (function()
   for _, q in ipairs(ns.areaQuests(area)) do if q.kind == "turnin" then return false end end return true end)())
 D.heldAt = {}
+local here = ns.nextStep(withAreas)
+check("next step: not 'go to' an area you are in", not here:find("^Go "))
+local savedDist = withAreas.area[1].dist
+withAreas.area[1].dist = 2000
 local nextArea = ns.nextStep(withAreas)
-check("next step: the best area when nothing is active", nextArea:find("^Go near ") ~= nil)
+check("next step: the best area when nothing is active", nextArea:find("^Go ") ~= nil)
+withAreas.area[1].dist = savedDist
+local fake = { log = { { kind = "log", id = 1, name = "L", target = "Stoutfist", wx = 0, wy = 0, dist = 10, xp = 100, left = {} } },
+  pickup = { { kind = "pickup", id = 2, fromItem = true, wx = 5, wy = 0, dist = 15, xp = 100 },
+    { kind = "pickup", id = 3, wx = 6, wy = 0, dist = 16, xp = 100 } },
+  party = { { kind = "party", id = 4, wx = 7, wy = 0, dist = 17, xp = 100 } } }
+local fa = D.areas(fake)[1]
+check("areas: no item-started pick-ups, no party quests you cannot take", fa and #fa.stops == 2 and D.areaText(fa) == "1 objective, 1 pick up")
+check("areas: inside one, the name says so", fa.name:find("^Around you") ~= nil)
 D.AREA_YARDS = 0
 HBD.GetWorldCoordinatesFromZone = function() return 100, 0, 0 end
 

@@ -535,7 +535,11 @@ function D.areas(out)
   local pts = {}
   for _, kind in ipairs(D.AREA_KINDS) do
     for _, e in ipairs(out[kind] or {}) do
-      if e.wx and e.dist then table.insert(pts, e) end
+      -- Only real stops: not an item-started quest (no giver to visit; its
+      -- place is a drop or the finisher), not a party quest you cannot take.
+      local stop = not (e.fromItem and (e.kind == "pickup" or e.kind == "party"))
+        and not (e.kind == "party" and not e.canTake)
+      if stop and e.wx and e.dist then table.insert(pts, e) end
     end
   end
   table.sort(pts, function(a, b) return a.dist < b.dist end)
@@ -559,7 +563,8 @@ function D.areas(out)
       if #a.stops >= 2 then
         a.secs = D.travelSecs(a.dist) + a.work
         a.rate = a.xp > 0 and D.rate(a.xp, a.secs) or nil
-        a.name = "Near " .. (seed.target or seed.name)
+        -- Inside it: say so, the stops can be anywhere within AREA_YARDS.
+        a.name = (a.dist <= D.AREA_YARDS and "Around you, by " or "Near ") .. (seed.target or seed.name)
         table.insert(list, a)
       end
     end
@@ -686,6 +691,9 @@ function D.collect(opts)
     end
   end
   if out.questie then
+    local avail = {}
+    for _, id in ipairs(D.availableIDs()) do avail[id] = true end
+    for _, e in ipairs(out.party) do e.canTake = avail[e.id] or nil end
     for _, id in ipairs(D.availableIDs()) do
       if not inLog[id] then
         local e = D.pickup(id, level, opts.maxAbove)
