@@ -600,10 +600,11 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   buff by "experience" or "XP" in its name, spell text or tooltip. If it
   misses one, click the XP chip and tick the buff (or `/glance xpbuff NAME`);
   the mark is kept for all your characters. Click one to open that window; it hides when done.
-- **Enemy cast bar**: when your target casts, a large bar with the spell
+- **Enemy cast bar**: when your target casts, a bar with the spell
   name shows just above your unit frames. Orange when it can be
   interrupted, grey when not; "COUNTERSPELL" and a gold edge while your
-  Counterspell is ready (from the watch row). In combat, click the bar or
+  Counterspell is ready (from the watch row), and a grey "Counterspell 12s"
+  while it cools down. In combat, click the bar or
   the call-out to cast your interrupt (Counterspell, Kick, Pummel or Earth
   Shock) on your target. The click area stays there in combat while you
   target a living enemy, even between casts, because the game does not let

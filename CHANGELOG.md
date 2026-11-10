@@ -23,8 +23,9 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - New addon, a lighter HUD (`/glance`). Not in the releases yet: try it
   with `dev.ps1 Glance`.
-- A large enemy cast bar near your character, with a COUNTERSPELL call-out
-  while you can interrupt. Click it in combat to interrupt.
+- An enemy cast bar near your character, with a COUNTERSPELL call-out
+  while you can interrupt and the cooldown left while you cannot. Click it
+  in combat to interrupt.
 - A watch row of key spells (Blink, Counterspell ...) under your character.
   Click an icon to cast it.
 - Range on the target frame: a green or red edge, exact yards for party

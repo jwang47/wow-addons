@@ -513,6 +513,13 @@ check("counterspell call-out", TC.kick.text == "COUNTERSPELL" and TC.glow.shown)
 local KB = _G.GlanceKickButton
 check("click on the call-out casts counterspell", KB and KB.attrs.type == "spell" and KB.attrs.spell == "Counterspell" and KB.attrs.unit == "target")
 check("kick button shown by the game in combat", drivers[KB] == "[combat,harm,nodead]show;hide")
+local csCD = C_Spell.GetSpellCooldown
+C_Spell.GetSpellCooldown = function(id) if id == 2139 then return { startTime = GetTime() - 4, duration = 24 } end return csCD(id) end
+W.paint()
+ns.units.castUpdate(TC)
+check("counterspell cooldown on the call-out", TC.kick.text == "Counterspell 20s" and not TC.glow.shown, TC.kick.text)
+C_Spell.GetSpellCooldown = csCD
+W.paint()
 UnitCastingInfo = function(u) if u == "target" then return "Shield Wall", "", 1, 1000, 3000, false, 7, true, 134 end end
 ns.units.castUpdate(TC)
 check("no call-out when it cannot be interrupted", TC.kick.text == "" and not TC.glow.shown)

@@ -240,13 +240,39 @@ local cast, tcast
 -- Cast and channel times can be secret, so the bar runs on the game's own
 -- timer (SetTimerDuration with UnitCastingDuration) where the client has
 -- it, and on our own sums only where the times are plain numbers.
-local function counterspellReady()
+-- Counterspell from the watch row: ready (true/false, nil when it is not
+-- watched) and the seconds left on its cooldown when the game tells us.
+local function counterspellState()
   local w = ns.units.watch
   for i, id in ipairs(w and w.ids or {}) do
     local n = C_Spell and C_Spell.GetSpellName and ns.plain(C_Spell.GetSpellName(id))
-    if n == "Counterspell" then return not w.icons[i].cooling end
+    if n == "Counterspell" then
+      if not w.icons[i].cooling then return true end
+      local info = C_Spell.GetSpellCooldown and C_Spell.GetSpellCooldown(id)
+      local st, d = info and ns.plain(info.startTime), info and ns.plain(info.duration)
+      local left = type(st) == "number" and type(d) == "number" and st + d - GetTime() or nil
+      return false, left and left > 0 and left or nil
+    end
   end
   return nil
+end
+
+-- The call-out over the enemy cast bar: gold "COUNTERSPELL" while ready,
+-- grey "Counterspell 12s" while it cools down.
+local function paintKick(c)
+  local ready, left = counterspellState()
+  if ready == nil then
+    c.kick:SetText("")
+    c.glow:Hide()
+  elseif ready then
+    c.kick:SetText("COUNTERSPELL")
+    c.kick:SetTextColor(1, 0.85, 0.3)
+    c.glow:Show()
+  else
+    c.kick:SetText("Counterspell " .. (left and string.format("%ds", math.ceil(left)) or "on cooldown"))
+    c.kick:SetTextColor(0.6, 0.6, 0.6)
+    c.glow:Hide()
+  end
 end
 
 local function castUpdate(c)
@@ -296,9 +322,7 @@ local function castUpdate(c)
       c.glow:Hide()
     else
       c.bar:SetStatusBarColor(1, 0.45, 0.1)
-      local ready = counterspellReady()
-      c.kick:SetText(ready and "COUNTERSPELL" or "")
-      c.glow:SetShown(ready and true or false)
+      paintKick(c)
     end
   end
   c:Show()
@@ -350,11 +374,11 @@ makeKickButton = function(c)
   local spell = INTERRUPTS[class or ""]
   if not spell then return nil end
   local b = CreateFrame("Button", "GlanceKickButton", UIParent, "SecureActionButtonTemplate")
-  b:SetSize(300, 44)
+  b:SetSize(220, 32)
   -- Anchored to UIParent, not the bar: a secure frame anchored to the bar
   -- would lock the bar's Show and Hide in combat too.
   local _, _, _, _, y = c:GetPoint(1)
-  b:SetPoint("BOTTOM", UIParent, "CENTER", 0, (y or -84) - (c:GetHeight() or 22))
+  b:SetPoint("BOTTOM", UIParent, "CENTER", 0, (y or -84) - (c:GetHeight() or 16))
   b:RegisterForClicks("AnyUp", "AnyDown")
   b:SetAttribute("type", "spell")
   b:SetAttribute("spell", spell)
@@ -373,15 +397,15 @@ end
 local function makeTargetCast()
   -- Enemy cast bar: big, just above your unit frames, close to your
   -- character, so a Counterspell window is hard to miss.
-  local c = makeCast("target", "GlanceTargetCastBar", -84, 300, 22, 14)
+  local c = makeCast("target", "GlanceTargetCastBar", -84, 220, 16, 11)
   c.glow = c:CreateTexture(nil, "BACKGROUND")
-  c.glow:SetPoint("TOPLEFT", -3, 3)
-  c.glow:SetPoint("BOTTOMRIGHT", 3, -3)
-  c.glow:SetColorTexture(1, 0.85, 0.3, 0.9)
+  c.glow:SetPoint("TOPLEFT", -2, 2)
+  c.glow:SetPoint("BOTTOMRIGHT", 2, -2)
+  c.glow:SetColorTexture(1, 0.85, 0.3, 0.6)
   c.glow:Hide()
   c.kick = c:CreateFontString(nil, "OVERLAY", FONT)
   c.kick:SetPoint("BOTTOM", c, "TOP", 0, 3)
-  if c.kick.SetFont and STANDARD_TEXT_FONT then c.kick:SetFont(STANDARD_TEXT_FONT, 16, "THICKOUTLINE") end
+  if c.kick.SetFont and STANDARD_TEXT_FONT then c.kick:SetFont(STANDARD_TEXT_FONT, 12, "OUTLINE") end
   c.kick:SetTextColor(1, 0.85, 0.3)
   -- Counterspell can come off cooldown mid-cast: check it a few times a second.
   local acc = 0
@@ -389,9 +413,7 @@ local function makeTargetCast()
     acc = acc + (dt or 0)
     if acc < 0.15 or self.locked then return end
     acc = 0
-    local ready = counterspellReady()
-    self.kick:SetText(ready and "COUNTERSPELL" or "")
-    self.glow:SetShown(ready and true or false)
+    paintKick(self)
   end)
   ns.units.tcast = c
   ns.units.kick = makeKickButton(c)
