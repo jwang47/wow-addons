@@ -19,6 +19,11 @@ the same, and a test checks that every `.toc` version has a section here.
   craft gains or loses ("Make into Bolt of Silk Cloth (4 each)").
 - Reagents the client has not seen yet get their AH price too: UpgradeFinder
   learns the item names in the Auctionator scan once and saves them.
+- Fix: an item that comes into your bags before the game has loaded it (a
+  quest reward you just handed in) now shows in the list. Before, it was
+  missing until the next full Rescan. UpgradeFinder now asks the game for
+  it and looks again, and an item that arrives during a scan joins the
+  list at the scan's end.
 
 ## LootValue 0.2.1
 
