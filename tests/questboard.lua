@@ -551,6 +551,17 @@ check("turn-in: tooltip names the reward", rewardLine)
 check("distance colours", D.yardsText(120):find("^|cff") and D.yardsText(120) ~= D.yardsText(700)
   and D.yardsText(700) ~= D.yardsText(3000) and strip(D.yardsText(700)) == "700 yd")
 
+-- A far hand-in names its zone.
+C_Map.GetMapInfo = function(id) if id == 1453 then return { name = "Stormwind City" } end end
+local realUi = mods.ZoneDB and mods.ZoneDB.GetUiMapIdByAreaId
+check("far hand-in: the mock has ZoneDB", mods.ZoneDB ~= nil)
+if mods.ZoneDB then
+  mods.ZoneDB.GetUiMapIdByAreaId = function(_, z) if z == 1519 then return 1453 end return realUi and realUi(_, z) end
+  check("far hand-in: names the zone", ns.todoBase({ kind = "turnin", target = "Bob", far = true, zone = 1519 }) == "Hand in to Bob in Stormwind City")
+  mods.ZoneDB.GetUiMapIdByAreaId = realUi
+end
+C_Map.GetMapInfo = nil
+
 -- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
 local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },
   { name = "c", xp = 2000 }, { name = "d", dist = 5000, xp = 1500 }, { name = "e", dist = 800, xp = 50 } }, "near")

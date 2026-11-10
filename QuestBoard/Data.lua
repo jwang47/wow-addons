@@ -133,6 +133,14 @@ function D.world(spawn, zone)
   return call(lib.GetWorldCoordinatesFromZone, lib, spawn[1] / 100, spawn[2] / 100, uiMap)
 end
 
+-- The zone's name for a Questie area id, or nil.
+function D.zoneName(zone)
+  local zdb = D.module("ZoneDB")
+  local uiMap = zdb and zone and call(zdb.GetUiMapIdByAreaId, zdb, zone)
+  local info = uiMap and call(api("C_Map.GetMapInfo"), uiMap)
+  return type(info) == "table" and type(info.name) == "string" and info.name or nil
+end
+
 function D.bearing(spawn, zone)
   local lib = hbd()
   local dx, dy, di = D.world(spawn, zone)

@@ -67,7 +67,11 @@ end
 
 function ns.todoBase(e)
   if e.kind == "area" then return D.areaText(e) end
-  if e.kind == "turnin" then return e.target and ("Hand in to " .. e.target) or "Hand it in" end
+  if e.kind == "turnin" then
+    -- Far away (another continent or an instance): say where.
+    local where = e.far and D.zoneName(e.zone)
+    return (e.target and ("Hand in to " .. e.target) or "Hand it in") .. (where and (" in " .. where) or "")
+  end
   if e.fromItem then
     local what = e.item and ((e.dropHow == "vendor" and "Buy " or "Loot ") .. e.item) or "Starts from an item"
     local from = e.dropFrom and (" from " .. e.dropFrom) or (e.kind == "pickup" or e.kind == "party") and " (drop unknown)" or ""
