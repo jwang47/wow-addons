@@ -579,6 +579,15 @@ end
 local shard = D.pickup(207, 27, 3)
 check("item quest: where the item drops", shard.fromItem and shard.startItem == "Glowing Shard" and not shard.item and shard.dropFrom == "Mutanus the Devourer" and shard.dist == 900)
 check("a pinned item-start pickup does not break the item buttons", pcall(ns.itemList, { active = { shard } }))
+do
+  -- Long lines wrap at a space (5 units a letter here), at most two lines.
+  local realProbe = ns.probe
+  ns.probe = { SetText = function(self, t) self.t = t end, GetStringWidth = function(self) return #self.t * 5 end }
+  local out = ns.wrapLines({ "short", "Loot Titan Relic from a far place, hand in to Prospector" }, 150)
+  check("a short line stays one line", out[1] == "short")
+  check("a long line wraps at a space", out[2] == "Loot Titan Relic from a far" and out[3] == "  place, hand in to Prospector" and #out == 3)
+  ns.probe = realProbe
+end
 check("item quest: who takes it in", shard.finisher == "Sputtervalve")
 check("item quest: what to do", ns.todo(shard) == "Loot Glowing Shard from Mutanus the Devourer, hand in to Sputtervalve")
 -- In a chest: the object's place.

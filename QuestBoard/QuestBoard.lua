@@ -42,6 +42,9 @@ ns.say = say
 -- frame art, small text, colour only for quest level.
 ---------------------------------------------------------------------------
 local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6   -- W: the board width, from ns.db.width
+local LVL_W = 26                 -- the level column: room for "33D"
+local TEXT_X = LVL_W + 6         -- where the name and the lines under it start
+local WRAP_MAX = 2               -- screen lines one text line may take
 ns.MIN_W, ns.MAX_W = 220, 560
 -- Spacing that shows the grouping: a quest's two lines sit close, quests
 -- have a small gap between them, groups a bigger one.
@@ -606,14 +609,44 @@ local function wheel(f)
   f:SetScript("OnMouseWheel", function(_, delta) ns.scrollBy(delta) end)
 end
 
+-- Splits each line that is wider than width into screen lines, at spaces,
+-- at most WRAP_MAX for one line (the last one is cut with "..." by the
+-- game). Measures with a hidden font string; without one, keeps the lines.
+function ns.wrapLines(lines, width)
+  if not ns.probe and panel then
+    ns.probe = panel:CreateFontString(nil, "OVERLAY", FONT_DIM)
+    if ns.probe.Hide then ns.probe:Hide() end
+  end
+  local probe = ns.probe
+  if not (probe and probe.GetStringWidth and width and width > 0) then return lines end
+  local function wide(text) probe:SetText(text) return (probe:GetStringWidth() or 0) > width end
+  local out = {}
+  for _, line in ipairs(lines) do
+    local rest, parts = line, 0
+    while rest ~= "" and wide(rest) and parts < WRAP_MAX - 1 do
+      local cut
+      for pos in rest:gmatch("() ") do
+        if pos > 1 and not wide(rest:sub(1, pos - 1)) then cut = pos else break end
+      end
+      if not cut then break end
+      table.insert(out, rest:sub(1, cut - 1))
+      rest = "  " .. rest:sub(cut + 1)
+      parts = parts + 1
+    end
+    table.insert(out, rest)
+  end
+  return out
+end
+
 local function makeRow(i)
   local r = CreateFrame("Button", nil, panel)
   r:SetHeight(ROW_H)
   r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   r.lvl = r:CreateFontString(nil, "OVERLAY", FONT)
   r.lvl:SetPoint("TOPLEFT", 0, -1)
-  r.lvl:SetWidth(20)
+  r.lvl:SetWidth(LVL_W)
   r.lvl:SetJustifyH("RIGHT")
+  if r.lvl.SetWordWrap then r.lvl:SetWordWrap(false) end
   r.arrow = r:CreateTexture(nil, "OVERLAY")
   r.arrow:SetTexture("Interface\\Minimap\\MinimapArrow")
   r.arrow:SetSize(14, 14)
@@ -622,13 +655,13 @@ local function makeRow(i)
   r.meta:SetPoint("TOPRIGHT", -16, -1)
   r.meta:SetJustifyH("RIGHT")
   r.name = r:CreateFontString(nil, "OVERLAY", FONT)
-  r.name:SetPoint("LEFT", r.lvl, "RIGHT", 6, 0)
-  r.name:SetPoint("RIGHT", r.meta, "LEFT", -6, 0)
+  r.name:SetPoint("TOPLEFT", r.lvl, "TOPRIGHT", 6, 0)
+  r.name:SetPoint("TOPRIGHT", r.meta, "TOPLEFT", -6, 0)
   r.name:SetJustifyH("LEFT")
   if r.name.SetWordWrap then r.name:SetWordWrap(false) end
   -- The "what to do" line under the name.
   r.sub = r:CreateFontString(nil, "OVERLAY", FONT_DIM)
-  r.sub:SetPoint("TOPLEFT", 26, -ROW_H + SUB_UP)
+  r.sub:SetPoint("TOPLEFT", TEXT_X, -ROW_H + SUB_UP)
   r.sub:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP)
   r.sub:SetJustifyH("LEFT")
   if r.sub.SetWordWrap then r.sub:SetWordWrap(false) end
@@ -636,7 +669,7 @@ local function makeRow(i)
   r.pin = r:CreateTexture(nil, "OVERLAY")
   r.pin:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1")
   r.pin:SetSize(10, 10)
-  r.pin:SetPoint("LEFT", r.lvl, "RIGHT", 5, 0)
+  r.pin:SetPoint("TOPLEFT", r.lvl, "TOPRIGHT", 5, 0)
   r.pin:Hide()
   wheel(r)
   -- Progress bar along the bottom of a quest you are on.
@@ -947,8 +980,8 @@ function ns.render()
           if e.kind == "area" then e.pinned = ns.areaPinned(e) or nil end
           if e.kind == "zone" then e.pinned = ns.listPinned({ e }) or nil end
           r.name:ClearAllPoints()
-          r.name:SetPoint("LEFT", r.lvl, "RIGHT", e.pinned and 18 or 6, 0)
-          r.name:SetPoint("RIGHT", r.meta, "LEFT", -6, 0)
+          r.name:SetPoint("TOPLEFT", r.lvl, "TOPRIGHT", e.pinned and 18 or 6, 0)
+          r.name:SetPoint("TOPRIGHT", r.meta, "TOPLEFT", -6, 0)
           if e.pinned then r.pin:Show() else r.pin:Hide() end
           r.meta:SetText(ns.meta(e, kind))
           ns.setBar(r, e, kind)
@@ -958,14 +991,16 @@ function ns.render()
           local lines = (not ns.db.compact and kind == "active") and ns.activeLines(e) or nil
           if lines and #lines < 2 then lines = nil end
           if lines then todo = lines[1] end
-          r.sub:SetText(todo or "")
-          local n = lines and #lines or (todo and 1 or 0)
+          -- A line too long for the board goes on to the next line.
+          lines = ns.wrapLines(lines or (todo and { todo }) or {}, W - 2 * PAD - TEXT_X - 16)
+          r.sub:SetText(lines[1] or "")
+          local n = #lines
           for i = 1, math.max(#r.more, n - 1) do
             local fs = r.more[i]
             if i <= n - 1 then
               if not fs then
                 fs = r:CreateFontString(nil, "OVERLAY", FONT_DIM)
-                fs:SetPoint("TOPLEFT", 26, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
+                fs:SetPoint("TOPLEFT", TEXT_X, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
                 fs:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
                 fs:SetJustifyH("LEFT")
                 if fs.SetWordWrap then fs:SetWordWrap(false) end

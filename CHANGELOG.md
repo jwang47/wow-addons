@@ -38,6 +38,9 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - Fix: a Lua error ("Items.lua:60: table index is nil") when a pinned
   quest that starts from an item was on the board.
+- Fix: a level with a tag ("33G") no longer wraps and pushes the name
+  down over the line under it. A what-to-do line that is too long for the
+  board goes on to a second line in place of being cut.
 - New layout: four tabs for what you are doing, in place of nine groups.
   Doing (picked by itself while a quest is Active): the quests you are on,
   the stops on the way, your party, and one line that counts the rest of
