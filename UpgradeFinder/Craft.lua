@@ -385,6 +385,7 @@ end
 local reported = false
 function C.guard(fn, ...)
   local ok, err = pcall(fn, ...)
+  if not ok then C.lastError = tostring(err) end
   if not ok and not reported then
     reported = true
     if ns.say then ns.say("crafting lines error: " .. tostring(err)) end
@@ -610,7 +611,7 @@ function C.shopButton()
   shopButton = CreateFrame("Button", "UpgradeFinderShopButton", frame, "UIPanelButtonTemplate")
   shopButton:SetSize(72, 20)
   if shopButton.SetFrameLevel and frame.GetFrameLevel then shopButton:SetFrameLevel((frame:GetFrameLevel() or 0) + 20) end
-  if label then shopButton:SetPoint("LEFT", label, "RIGHT", 10, 0)
+  if label and label.IsVisible and label:IsVisible() then shopButton:SetPoint("LEFT", label, "RIGHT", 10, 0)
   else shopButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -40, -50) end
   if shopButton.SetNormalFontObject and rawget(_G, "GameFontNormalSmall") then
     shopButton:SetNormalFontObject(rawget(_G, "GameFontNormalSmall"))
@@ -632,6 +633,27 @@ function C.shopButton()
   if box and box.HookScript then box:HookScript("OnTextChanged", function() pcall(shopText) end) end
   shopText()
   return shopButton
+end
+
+-- /uf shop debug: where the Shop button is, for a profession window that
+-- does not show it.
+function C.shopDebug()
+  local function region(n, r)
+    r = r or rawget(_G, n)
+    if not r then return n .. ": none" end
+    local function m(f) local ok, v = pcall(r[f], r) if ok then return v end end
+    local x, y = m("GetLeft"), m("GetTop")
+    return string.format("%s: shown %s, visible %s, at %s,%s, level %s, parent %s", n, tostring(m("IsShown")),
+      tostring(m("IsVisible")), x and math.floor(x) or "?", y and math.floor(y) or "?", tostring(m("GetFrameLevel")),
+      tostring(r.GetParent and r:GetParent() and r:GetParent().GetName and r:GetParent():GetName()))
+  end
+  local out = { region("UpgradeFinderShopButton", shopButton) }
+  for _, n in ipairs({ "TradeSkillFrame", "TradeSkillReagentLabel", "TradeSkillDescription",
+    "TradeSkillDetailScrollChildFrame", "TradeSkillInputBox", "TradeSkillCreateAllButton", "AuctionatorCraftingInfo" }) do
+    table.insert(out, region(n))
+  end
+  table.insert(out, "last error: " .. tostring(C.lastError))
+  return out
 end
 
 local hooked = false

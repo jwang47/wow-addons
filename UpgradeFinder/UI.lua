@@ -530,6 +530,9 @@ function ns.slash(msg)
     local o = ns.db().opts
     o.where = o.where == false
     say("\"Get it:\" lines on item tooltips " .. (o.where and "on" or "off"))
+  elseif cmd == "shop" and a == "debug" then
+    ns.craft.guard(ns.craft.shopButton)
+    for _, l in ipairs(ns.craft.shopDebug()) do say(l) end
   elseif cmd == "shop" and a == "clear" then
     ns.db().shop = nil
     say("crafting shopping list cleared")

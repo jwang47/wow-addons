@@ -1042,6 +1042,10 @@ check("shop: a Shop button with the Create box count", sb and sb:GetText() == "S
 GetTradeSkillSelectionIndex = function() return 3 end
 sb.scripts.OnClick(sb)
 check("shop: the button shops for the selected recipe", UpgradeFinderDB.shop and UpgradeFinderDB.shop.crafts[1] == "3x Bolt of Silk Cloth")
+nChat = #chat
+SlashCmdList.UPGRADEFINDER("shop debug")
+check("/uf shop debug says where the button is", tostring(chat[nChat + 1]):find("^UpgradeFinderShopButton: shown") ~= nil
+  and tostring(chat[#chat]):find("^last error") ~= nil)
 TradeSkillFrame, TradeSkillReagentLabel = nil, nil
 Cr.bankSeen(false)
 Auctionator.API.v1.CreateShoppingList, Auctionator.API.v1.ConvertToSearchString = nil, nil
