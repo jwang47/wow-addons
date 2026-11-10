@@ -5,6 +5,20 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## LootValue 0.2.0
+
+- Auto-loot that leaves cheap junk on the body. It always takes money,
+  quest items, green or better items, cloth and other materials,
+  consumables, recipes, bags and keys. It takes other items only when
+  they are worth at least 10c a character level (vendor, AH or
+  disenchant, times the stack), or when they fit on a stack you carry.
+- The loot window stays open on what it left, so you can click an item to
+  take it after all (`/lv autoloot quiet` closes it and prints one chat
+  line instead). Shift+loot takes everything. `/lv skipped` lists the last
+  items it left. `/lv autoloot off` turns it off.
+- It turns off the game's own Auto Loot while it is on, and puts it back
+  when you turn it off.
+
 ## Omni 0.1.1
 
 - Nearby is always the first group in the results.

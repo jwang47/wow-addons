@@ -57,6 +57,32 @@ the 5% cut, the disenchant value).
 - With an AH price on the line, it says how old Auctionator's last scan is
   ("AH scan 3h ago").
 
+### Auto-loot
+
+LootValue also loots for you and leaves cheap junk (murloc fins and the
+like) on the body. It is on by default; `/lv` shows the settings.
+
+- Always taken: money, quest items, green or better, cloth, leather, ore,
+  herbs and other materials, consumables, recipes, bags, keys, reagents,
+  and any item the game has no info for yet.
+- Other items (grey junk, white meat and parts): taken when the stack is
+  worth at least 10c a character level (2s80c at level 28). The value is
+  the best of vendor, AH (only when the AH clearly pays more, as on the
+  tooltip) and disenchant. With 3 or fewer free bag slots the bar is 3x.
+  An item that fits on a stack you carry needs no slot, so any value takes
+  it. `/lv autoloot min 5s` sets your own bar; `min auto` goes back.
+- **review** mode (the default): the loot window stays open on what it
+  left, so you can click an item to take it after all. **quiet** mode
+  (`/lv autoloot quiet`): the window closes and one chat line lists what
+  it left. It never closes the window while a wanted item is still there
+  (bags full, a bind confirmation).
+- Shift+loot (the game's auto-loot key) takes everything. Fishing loot is
+  always taken whole.
+- `/lv skipped` lists the last 10 items it left (30 are kept).
+- `/lv autoloot off` turns it off. While it is on it keeps the game's own
+  Auto Loot option off (it can only choose when the game does not take
+  everything first), and `off` puts your old setting back.
+
 Its functions are on the global `LootValue` table (`adviceLine`,
 `marketInfo`, `ahWins`, `money`, `scanText`). Another addon can set
 `LootValue.deferTo = "<its name>"` and draw the line itself; LootValue's own
