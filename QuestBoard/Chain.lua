@@ -79,23 +79,25 @@ local cache = {}
 function D.resetChains() cache = {} end
 
 -- { steps (quests after this one), best = item facts or nil, at = quest of
--- the best reward, here = best is this quest's own reward }, or nil while
+-- the best reward, here = best is this quest's own reward, own = the best of
+-- this quest's own rewards (any item), count = how many it offers }, or nil while
 -- the reward index is not ready.
 function D.chainInfo(id)
   if not D.rewardsByQuest then return nil end
   if cache[id] then return cache[id] end
   local chain = D.chain(id)
-  local best, at, unknown = nil, nil, false
+  local best, at, own, unknown = nil, nil, nil, false
+  local function score(f) return f and ((f.gear and 10 or 0) + (f.quality or 1)) or -1 end
   for _, q in ipairs(chain) do
     for _, item in ipairs(D.rewardsByQuest[q] or {}) do
       local f = itemFacts(item)
       if not f.quality then unknown = true end
-      local score = (f.gear and 10 or 0) + (f.quality or 1)
-      local bestScore = best and ((best.gear and 10 or 0) + (best.quality or 1)) or -1
-      if score > bestScore then best, at = f, q end
+      if score(f) > score(best) then best, at = f, q end
+      if q == id and score(f) > score(own) then own = f end
     end
   end
-  local info = { steps = #chain - 1, best = best, at = at, here = at == id }
+  local info = { steps = #chain - 1, best = best, at = at, here = at == id, own = own,
+    count = #(D.rewardsByQuest[id] or {}) }
   if not unknown then cache[id] = info end   -- ask again once item data loads
   return info
 end
@@ -114,4 +116,23 @@ function D.chainTag(info)
   end
   if info.steps > 0 then return "chain +" .. info.steps .. ", XP only" end
   return "XP only"
+end
+
+local function itemText(f)
+  local hex = D.QUALITY_HEX[f.quality or 1] or "ffffff"
+  return "|cff" .. hex .. "[" .. (f.name or ("item " .. f.id)) .. "]|r"
+end
+D.itemText = itemText
+
+-- What handing a quest in gives: "[Item]" (best of its own rewards, "or 2
+-- more" when it is a choice), then where the chain goes if it leads to
+-- better gear. "no item" when it gives only XP. Nil when nothing is known.
+function D.rewardTag(info)
+  if not info then return nil end
+  local text = info.own and (itemText(info.own) .. (info.count > 1 and (" +" .. (info.count - 1)) or "")) or "no item"
+  local b = info.best
+  if b and not info.here and b.gear and (b.quality or 2) >= 2 then
+    text = text .. ", chain -> " .. itemText(b)
+  end
+  return text
 end

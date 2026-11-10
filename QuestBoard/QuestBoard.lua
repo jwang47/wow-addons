@@ -22,6 +22,7 @@ local defaults = {
   compact = false,       -- /qb compact: one line per quest, no "what to do" line
   focus = true,          -- in combat and instances: only Next and Active until mouse-over
   point = nil,           -- saved position { point, x, y }
+  maxHeight = nil,       -- drag the grip (or /qb height N): scroll past it
 }
 
 local function say(msg)
@@ -48,7 +49,8 @@ local function rgb(name) local c = D.COLORS[name] or D.COLORS.yellow return c[1]
 -- (Questie's nearest mob, object or NPC for it), or who takes it in.
 function ns.todo(e)
   local text = ns.todoWho(e)
-  local tag = D.chainTag and D.chainTag(e.chain)
+  -- A hand-in shows what it gives, so you can judge the trip.
+  local tag = e.kind == "turnin" and D.rewardTag and D.rewardTag(e.chain) or D.chainTag and D.chainTag(e.chain)
   if tag then text = (text and (text .. "   ") or "") .. tag end
   return text
 end
@@ -100,7 +102,8 @@ function ns.nextStep(st)
   return todo and (todo .. (e.dist and ("  " .. D.yards(e.dist)) or "")), e
 end
 
--- Right-hand text of a row: progress, XP/min (pick-ups), distance. The
+-- Right-hand text of a row: progress, XP (hand-ins), XP/min (pick-ups),
+-- distance. The
 -- progress is in the "what to do" line unless the board is compact.
 function ns.meta(e)
   local parts = {}
@@ -108,9 +111,10 @@ function ns.meta(e)
     local p = D.progress(e)
     if p ~= "" then table.insert(parts, p) end
   end
+  if e.kind == "turnin" and e.xp then table.insert(parts, D.short(e.xp) .. " xp") end
   if (e.kind == "pickup" or e.kind == "area") and e.rate then table.insert(parts, "~" .. D.short(e.rate) .. " xp/m") end
-  if e.dist then table.insert(parts, D.yards(e.dist))
-  elseif e.far then table.insert(parts, "far")
+  if e.dist then table.insert(parts, D.yardsText(e.dist))
+  elseif e.far then table.insert(parts, "|cff909090far|r")
   elseif e.fromItem then table.insert(parts, "item") end
   return table.concat(parts, "  ")
 end
@@ -167,8 +171,13 @@ local function tooltip(r)
   tip:AddLine("Click: show it on the map   Shift-click: link", 0.5, 0.5, 0.5)
   if e.item then tip:AddLine("Quest item: the button left of the board uses it", 0.6, 0.8, 1) end
   local c = e.chain
+  if c and c.own then
+    tip:AddLine("Reward: " .. D.itemText(c.own) .. (c.count > 1 and ("  (one of " .. c.count .. ")") or ""), 1, 1, 1)
+  end
   if c then
-    if c.best and c.best.gear then
+    if c.best and c.best.gear and c.here then
+      -- The reward line above already names it.
+    elseif c.best and c.best.gear then
       tip:AddLine((c.here and "Reward: " or ("Chain (" .. c.steps .. " more quest" .. (c.steps == 1 and "" or "s") .. ") leads to: ")) ..
         (D.chainTag({ steps = 0, here = true, best = c.best }):gsub("^%-> ", "")), 1, 1, 1)
     else
@@ -354,6 +363,13 @@ local function draggable(f)
   f:SetScript("OnDragStop", dragStop)
 end
 
+-- Rows and heads take the mouse, so they pass the wheel to the board.
+local function wheel(f)
+  if not f.EnableMouseWheel then return end
+  f:EnableMouseWheel(true)
+  f:SetScript("OnMouseWheel", function(_, delta) ns.scrollBy(delta) end)
+end
+
 local function makeRow(i)
   local r = CreateFrame("Button", nil, panel)
   r:SetHeight(ROW_H)
@@ -380,6 +396,12 @@ local function makeRow(i)
   r.sub:SetPoint("TOPRIGHT", -16, -ROW_H + 1)
   r.sub:SetJustifyH("LEFT")
   if r.sub.SetWordWrap then r.sub:SetWordWrap(false) end
+  r.pin = r:CreateTexture(nil, "OVERLAY")
+  r.pin:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1")
+  r.pin:SetSize(10, 10)
+  r.pin:SetPoint("LEFT", r.lvl, "RIGHT", 5, 0)
+  r.pin:Hide()
+  wheel(r)
   r.hl = r:CreateTexture(nil, "BACKGROUND")
   r.hl:SetAllPoints()
   r.hl:SetColorTexture(1, 1, 1, 0.06)
@@ -414,14 +436,31 @@ local function makeHead(kind)
     ns.refresh()
   end)
   draggable(h)
+  wheel(h)
   heads[kind] = h
   return h
 end
 
--- Lays out the groups from the last result.
+-- Group order by context: when you are on no quest and a hand-in is near,
+-- the hand-ins come first; else the quests you are doing now.
+ns.TURNIN_TOP_YARDS = 600
+function ns.order(st)
+  local t = st and st.turnin and st.turnin[1]
+  if st and #(st.active or {}) == 0 and t and t.dist and t.dist <= ns.TURNIN_TOP_YARDS then
+    return { "turnin", "nearby", "area", "active", "log", "party", "pickup" }
+  end
+  return ORDER
+end
+
+ns.scroll = 0            -- pixels scrolled down inside the groups
+ns.MIN_HEIGHT = 80
+
+-- Lays out the groups from the last result. The title and the Next line
+-- stay at the top; the groups below scroll when the board is taller than
+-- the max height you set (drag the grip at the bottom right).
 function ns.render()
   if not panel then return end
-  local y, used = -PAD, 0
+  local y = -PAD
   local level = state and state.level or D.playerLevel()
   panel.title:SetText("Quests")
   panel.sub:SetText(state and (state.questie and ("level " .. level) or "level " .. level .. "  (no Questie: log only)") or "")
@@ -437,52 +476,139 @@ function ns.render()
   else
     panel.next:Hide()
   end
-  for _, kind in ipairs(ORDER) do
+  local top = y
+  -- First pass: what goes where, from the top of the groups (cy).
+  local items, cy, used = {}, 0, 0
+  for _, kind in ipairs(ns.order(state)) do
     local list = state and state[kind] or {}
     local h = heads[kind] or makeHead(kind)
     local show = #list > 0 or kind == "pickup" and state and state.questie
     -- Focus: only the quests you are on now, the rest on mouse-over.
     if ns.focused() and kind ~= "active" then show = false end
+    h:Hide()
     if show then
-      h:ClearAllPoints()
-      h:SetPoint("TOPLEFT", PAD, y)
-      h:SetPoint("TOPRIGHT", -PAD, y)
       local collapsed = ns.db.collapsed[kind]
       h.text:SetText((collapsed and "+ " or "") .. HEADS[kind] .. "  " .. #list)
       local sortKey = kind == "pickup" and "sortPickup" or kind == "log" and "sortLog"
       h.right:SetText(kind == "active" and "doing now" or kind == "nearby" and "within 300 yd" or kind == "area" and "best XP"
         or sortKey and (ns.db[sortKey] == "xp" and "best XP" or "nearest") or "nearest")
-      h:Show()
-      y = y - HEAD_H
+      table.insert(items, { f = h, y = cy, h = HEAD_H })
+      cy = cy + HEAD_H
       if not collapsed then
         for i = 1, math.min(#list, ns.db.rows[kind] or 6) do
           used = used + 1
           local r = rows[used] or makeRow(used)
           local e = list[i]
           r.entry = e
-          r:ClearAllPoints()
-          r:SetPoint("TOPLEFT", PAD, y)
-          r:SetPoint("TOPRIGHT", -PAD, y)
           r.lvl:SetText(e.kind == "area" and #e.stops or e.level or "?")
           r.lvl:SetTextColor(rgb(e.color))
           r.name:SetText(e.name)
           if e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55) else r.name:SetTextColor(0.92, 0.92, 0.92) end
+          -- Your Alt-click mark: a gold star before the name.
+          r.name:ClearAllPoints()
+          r.name:SetPoint("LEFT", r.lvl, "RIGHT", e.pinned and 18 or 6, 0)
+          r.name:SetPoint("RIGHT", r.meta, "LEFT", -6, 0)
+          if e.pinned then r.pin:Show() else r.pin:Hide() end
           r.meta:SetText(ns.meta(e))
           local todo = (not ns.db.compact) and (e.kind ~= "pickup" and ns.todo(e) or e.kind == "pickup" and D.chainTag(e.chain))
           r.sub:SetText(todo or "")
-          r:SetHeight(todo and ROW_H * 2 - 2 or ROW_H)
-          updateArrow(r)
-          r:Show()
-          y = y - (todo and ROW_H * 2 - 2 or ROW_H)
+          local rh = todo and ROW_H * 2 - 2 or ROW_H
+          r:SetHeight(rh)
+          table.insert(items, { f = r, y = cy, h = rh, row = true })
+          cy = cy + rh
         end
       end
-      y = y - 4
-    else
-      h:Hide()
+      cy = cy + 4
+      if items[#items] then items[#items].gap = 4 end
     end
   end
   for i = used + 1, #rows do rows[i]:Hide() rows[i].entry = nil end
-  panel:SetHeight(-y + PAD - 4)
+  -- Second pass: the part that fits under the max height.
+  local full = cy
+  local view = full
+  local maxH = ns.db.maxHeight
+  if maxH then
+    view = math.max(ROW_H, maxH - (-top) - PAD - ROW_H)   -- room for the "more" line
+    if full <= maxH - (-top) - PAD + 4 then view = full end
+  end
+  local clipped = view < full
+  -- Scrolling goes by whole lines (a head or a row): ns.scroll is the first
+  -- line shown, at most the one from which the rest fits.
+  local last = 1
+  if clipped then
+    local rest = 0
+    for i = #items, 1, -1 do
+      rest = rest + items[i].h + (items[i].gap or 0)
+      if rest > view then break end
+      last = i
+    end
+  end
+  ns.scroll = clipped and math.max(0, math.min(ns.scroll or 0, last - 1)) or 0
+  local above, below, at = 0, 0, 0
+  for i, it in ipairs(items) do
+    local f = it.f
+    local fits = i > ns.scroll and at + it.h <= view
+    if fits then
+      f:ClearAllPoints()
+      f:SetPoint("TOPLEFT", PAD, top - at)
+      f:SetPoint("TOPRIGHT", -PAD, top - at)
+      at = at + it.h + (it.gap or 0)
+      if it.row then updateArrow(f) end
+      f:Show()
+    else
+      f:Hide()
+      if it.row then
+        if i <= ns.scroll then above = above + 1 else below = below + 1 end
+      end
+      if i > ns.scroll then at = view + 1 end   -- nothing after a line that did not fit
+    end
+  end
+  ns.hiddenAbove, ns.hiddenBelow = above, below
+  local height = -top + (clipped and view or full) + PAD - 4
+  if clipped then
+    local parts = {}
+    if above > 0 then table.insert(parts, above .. " above") end
+    if below > 0 then table.insert(parts, below .. " more below") end
+    panel.more:SetText((#parts > 0 and table.concat(parts, ", ") or "") .. "  (scroll)")
+    panel.more:Show()
+    height = height + ROW_H
+  else
+    panel.more:Hide()
+  end
+  panel:SetHeight(height)
+end
+
+-- Mouse wheel over the board: one line (a head or a row) at a time.
+function ns.scrollBy(delta)
+  ns.scroll = math.max(0, (ns.scroll or 0) - delta)
+  ns.render()
+end
+
+-- The grip at the bottom right sets the max height: drag it; right-click
+-- takes the limit off.
+local function cursorY()
+  local _, cy = call(rawget(_G, "GetCursorPosition"))
+  local scale = UIParent.GetEffectiveScale and UIParent:GetEffectiveScale() or 1
+  return (cy or 0) / scale
+end
+function ns.sizeStart()
+  ns.sizing = { y = cursorY(), h = panel:GetHeight() or 200 }
+end
+function ns.sizeMove()
+  if not ns.sizing then return end
+  local h = ns.sizing.h + (ns.sizing.y - cursorY())
+  ns.db.maxHeight = math.floor(math.max(ns.MIN_HEIGHT, h) + 0.5)
+  ns.render()
+end
+function ns.sizeStop()
+  if not ns.sizing then return end
+  ns.sizing = nil
+  say("max height " .. ns.db.maxHeight .. " (right-click the grip, or /qb height off, for no limit)")
+end
+function ns.setMaxHeight(h)
+  ns.db.maxHeight = h and math.max(ns.MIN_HEIGHT, h) or nil
+  ns.scroll = 0
+  ns.render()
 end
 
 ---------------------------------------------------------------------------
@@ -575,6 +701,30 @@ local function build()
   panel.next:SetJustifyH("LEFT")
   panel.next:SetTextColor(1, 0.85, 0.35)
   if panel.next.SetWordWrap then panel.next:SetWordWrap(false) end
+  panel.more = panel:CreateFontString(nil, "OVERLAY", FONT_DIM)
+  panel.more:SetPoint("BOTTOMLEFT", PAD, PAD - 2)
+  panel.more:Hide()
+  local grip = CreateFrame("Button", nil, panel)
+  grip:SetSize(12, 12)
+  grip:SetPoint("BOTTOMRIGHT", -1, 1)
+  grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+  grip:RegisterForClicks("RightButtonUp")
+  grip:SetScript("OnMouseDown", function(_, button) if button == "LeftButton" then ns.sizeStart() end end)
+  grip:SetScript("OnMouseUp", function(_, button) if button == "LeftButton" then ns.sizeStop() end end)
+  grip:SetScript("OnUpdate", function() if ns.sizing then ns.sizeMove() end end)
+  grip:SetScript("OnClick", function() ns.setMaxHeight(nil) say("no max height") end)
+  grip:SetScript("OnEnter", function(self)
+    local tip = rawget(_G, "GameTooltip")
+    if not tip then return end
+    tip:SetOwner(self, "ANCHOR_RIGHT")
+    tip:AddLine("Drag: set the board's max height", 1, 1, 1)
+    tip:AddLine("Mouse wheel scrolls past it. Right-click: no limit", 0.6, 0.6, 0.6)
+    tip:Show()
+  end)
+  grip:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+  panel.grip = grip
+  wheel(panel)
   local p = ns.db.point
   if p then
     panel:SetPoint(p[1], UIParent, p[4] or p[1], p[2], p[3])
@@ -717,6 +867,7 @@ local help = {
   "Click a group name to fold it; right-click it to sort by nearest or best XP.",
   "/qb range N - pick-ups at most N levels over you (now %d)",
   "/qb rows N - rows per group (now %d)",
+  "/qb height N - at most N pixels tall, scroll for the rest (off: no limit; or drag the grip)",
   "/qb reset - put the board back under the minimap",
   "/qb tracker off - hide the game's quest tracker (on brings it back)",
   "/qb far on - show enemy nameplates from as far as the game allows (off puts it back)",
@@ -762,6 +913,10 @@ SlashCmdList.QUESTBOARD = function(text)
   elseif cmd == "lock" then
     ns.db.locked = not ns.db.locked
     say(ns.db.locked and "locked: dragging does not move the board" or "unlocked: drag the board to move it")
+    return
+  elseif cmd == "height" and (n or rest == "off") then
+    ns.setMaxHeight(n)
+    say(n and ("max height " .. ns.db.maxHeight .. ", scroll for the rest") or "no max height")
     return
   elseif cmd == "reset" then
     ns.db.point = nil

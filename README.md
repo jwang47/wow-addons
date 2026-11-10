@@ -299,7 +299,20 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   line.
 - The level number is in the quest log colours (grey, green, yellow,
   orange, red). Each row shows the distance and an arrow that turns with
-  you.
+  you. The distance is green within 300 yards, yellow up to 1000 yards and
+  grey beyond (`D.NEAR_YARDS`, `D.MID_YARDS`).
+- A Turn in row shows the XP and the best item that the quest gives
+  ("[Murloc Charm] +1" when you choose one of two), or "no item". When the
+  chain goes on to better gear, the row says so ("chain -> [Axe]"). The
+  item index comes from Questie's item data (`questRewards`).
+- A quest you Alt-clicked (pinned) has a gold star before its name.
+- Group order follows what you do: when no quest is Active and a hand-in
+  is within 600 yards (`ns.TURNIN_TOP_YARDS`), Turn in comes first. Else
+  Active and Nearby come first.
+- Max height: drag the grip at the bottom right corner, or `/qb height N`.
+  The title and the Next line stay; the groups scroll with the mouse wheel,
+  one line at a time, and a dim line says how many rows are above and
+  below. Right-click the grip or `/qb height off` for no limit.
 - Click a row: open the world map (M) at the place, and set and track the
   game's map pin there. Shift-click:
   link the quest in chat. Right-click: open the quest log (your quests) or

@@ -188,8 +188,8 @@ local e201
 for _, e in ipairs(out.pickup) do if e.id == 201 then e201 = e end end
 local secs = 150 / 7 + 30 + 90 + 60
 check("XP per minute estimate", math.abs(e201.rate - 2000 / (secs / 60)) < 0.01)
-check("row meta for a pick-up", ns.meta(e201):match("^~%d+ xp/m  150 yd$") ~= nil)
-check("row meta for a log quest", ns.meta(out.log[2]) == "900 yd")
+check("row meta for a pick-up", strip(ns.meta(e201)):match("^~%d+ xp/m  150 yd$") ~= nil)
+check("row meta for a log quest", strip(ns.meta(out.log[2])) == "900 yd")
 check("what to do: the objective", ns.todo(out.log[2]) == "Underbelly Whelp Scale: 3/6")
 check("what to do: and where, when the name is not in it",
   ns.todo({ kind = "log", left = { { text = "Gnoll Paw: 2/8" } }, target = "Redridge Mystic" }) == "Gnoll Paw: 2/8  (Redridge Mystic)")
@@ -494,15 +494,17 @@ D.rewardsByQuest = nil
 D.resetChains()
 local NEXT = { [125] = 126, [126] = 128 }
 mods.QuestieDB.QueryQuestSingle = function(id, key) if key == "nextQuestInChain" then return NEXT[id] or 0 end end
-local ITEMS = { [900] = { name = "Ironforge Gladius", class = 2, q = { 128 } }, [901] = { name = "Healing Potion", class = 0, q = { 122 } } }
-mods.QuestieDB.ItemPointers = { [900] = 1, [901] = 1 }
+local ITEMS = { [900] = { name = "Ironforge Gladius", class = 2, q = { 128 } }, [901] = { name = "Healing Potion", class = 0, q = { 122 } },
+  [902] = { name = "Murloc Charm", class = 4, q = { 127 } }, [903] = { name = "Fin Soup", class = 0, q = { 127 } } }
+mods.QuestieDB.ItemPointers = { [900] = 1, [901] = 1, [902] = 1, [903] = 1 }
 mods.QuestieDB.QueryItemSingle = function(id, key)
   local it = ITEMS[id]
   if not it then return nil end
   if key == "questRewards" then return it.q end
   return it[key]
 end
-C_Item = { GetItemInfo = function(id) if id == 900 then return "Ironforge Gladius", nil, 3 end if id == 901 then return "Healing Potion", nil, 1 end end }
+local QUALITY = { [900] = 3, [901] = 1, [902] = 2, [903] = 1 }
+C_Item = { GetItemInfo = function(id) if ITEMS[id] then return ITEMS[id].name, nil, QUALITY[id] end end }
 D.resetModules()
 local chained = D.collect({})
 local q125, q122
@@ -513,6 +515,78 @@ check("chain: leads to a blue weapon two quests on", q125.chain and q125.chain.s
 check("chain: the tag names it in blue", D.chainTag(q125.chain) == "chain +2 -> |cff0070dd[Ironforge Gladius]|r")
 check("chain: a potion only is XP only", D.chainTag(q122.chain) == "XP only")
 check("chain: the tag is on the what-to-do line", ns.todo(q125):find("Ironforge Gladius", 1, true) ~= nil)
+
+-- Hand-ins show their XP and reward, so you can judge the trip.
+local q127 = chained.turnin[1]
+check("turn-in: reward is the best own item, a choice of two", q127.chain.own and q127.chain.own.id == 902 and q127.chain.count == 2)
+check("turn-in: what-to-do line names the reward", strip(ns.todo(q127)) == "Hand in to Wiley   [Murloc Charm] +1")
+check("turn-in: meta has the XP", strip(ns.meta(q127)) == "1.5k xp  300 yd")
+check("turn-in: no item says so", D.rewardTag({ steps = 0, count = 0 }) == "no item")
+check("turn-in: better gear on down the chain",
+  strip(D.rewardTag({ steps = 1, count = 1, own = { id = 1, name = "Pie", quality = 1 }, best = { id = 2, name = "Axe", quality = 3, gear = true } })) == "[Pie], chain -> [Axe]")
+GameTooltip.lines = {}
+local turnRow
+ns.refresh()
+for _ = 1, 50 do ns.step() end
+for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.entry.id == 127 then turnRow = f end end
+turnRow.scripts.OnEnter(turnRow)
+local rewardLine = false
+for _, l in ipairs(GameTooltip.lines) do if strip(l) == "Reward: [Murloc Charm]  (one of 2)" then rewardLine = true end end
+check("turn-in: tooltip names the reward", rewardLine)
+
+-- Distances take a colour: green near, yellow a walk, grey far.
+check("distance colours", D.yardsText(120):find("^|cff") and D.yardsText(120) ~= D.yardsText(700)
+  and D.yardsText(700) ~= D.yardsText(3000) and strip(D.yardsText(700)) == "700 yd")
+
+-- Group order: hand-ins first when nothing is active and one is near;
+-- Active first while you are on a quest.
+local function order(st) return table.concat(ns.order(st), ",") end
+check("order: a near hand-in leads when nothing is active", order({ active = {}, turnin = { { dist = 300 } } }):find("^turnin,nearby") ~= nil)
+check("order: a far hand-in does not", order({ active = {}, turnin = { { dist = 3000 } } }):find("^active") ~= nil)
+check("order: Active leads while you do a quest", order({ active = { {} }, turnin = { { dist = 100 } } }):find("^active,nearby") ~= nil)
+
+-- Pinned quests get a gold star.
+QuestBoardDB.doing = { [122] = true }
+ns.refresh()
+for _ = 1, 50 do ns.step() end
+local starred, others = false, false
+for _, f in ipairs(frames) do
+  if f.kind == "Button" and f.entry and f.shown and f.pin then
+    if f.entry.id == 122 then starred = f.pin.shown elseif f.pin.shown then others = true end
+  end
+end
+check("pinned: a star on the quest you marked", starred and not others)
+QuestBoardDB.doing = {}
+D.heldAt = {}
+
+-- Max height: rows past it hide, the wheel scrolls, the grip sets it.
+local board = QuestBoardFrame
+function board:SetHeight(h) self.h = h end
+function board:GetHeight() return self.h end
+ns.refresh()
+for _ = 1, 50 do ns.step() end
+local fullH, fullRows = board.h, countRows()
+SlashCmdList.QUESTBOARD("height 120")
+check("height: the board is no taller than the max", board.h <= 120 and countRows() < fullRows and board.more.shown)
+check("height: it says how many are below", (board.more.text or ""):find("more below", 1, true) ~= nil)
+local before = {}
+for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown then before[f] = true end end
+ns.scrollBy(-1)
+ns.scrollBy(-1)
+local moved = false
+for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and not before[f] then moved = true end end
+check("height: the wheel shows rows further down", moved and ns.scroll > 0 and (board.more.text or ""):find("above", 1, true) ~= nil)
+ns.scrollBy(100)
+check("height: scroll stops at the top", ns.scroll == 0)
+local cursor = 500
+function GetCursorPosition() return 0, cursor end
+ns.sizeStart()
+cursor = 400
+ns.sizeMove()
+ns.sizeStop()
+check("height: dragging the grip down raises the max", QuestBoardDB.maxHeight == math.floor(120 + 100 + 0.5) or QuestBoardDB.maxHeight >= 200)
+SlashCmdList.QUESTBOARD("height off")
+check("height off: the whole board again", QuestBoardDB.maxHeight == nil and board.h == fullH and countRows() == fullRows and not board.more.shown)
 mods.QuestieDB.QueryQuestSingle, mods.QuestieDB.ItemPointers, mods.QuestieDB.QueryItemSingle, C_Item = nil, nil, nil, nil
 D.rewardBuild = { state = "idle", i = 1 }
 D.rewardsByQuest = nil

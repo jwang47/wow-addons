@@ -657,6 +657,15 @@ function D.yards(d)
   return string.format("%d yd", math.floor(d / 10 + 0.5) * 10)
 end
 
+-- Distance in a colour by how far: green within the Nearby range, yellow
+-- up to a short ride, grey beyond.
+D.NEAR_YARDS, D.MID_YARDS = 300, 1000
+function D.yardsText(d)
+  if not d then return "" end
+  local hex = d <= D.NEAR_YARDS and "60d060" or d <= D.MID_YARDS and "e0c040" or "909090"
+  return "|cff" .. hex .. D.yards(d) .. "|r"
+end
+
 function D.short(n)
   if not n then return "" end
   if n >= 10000 then return string.format("%dk", math.floor(n / 1000 + 0.5)) end
