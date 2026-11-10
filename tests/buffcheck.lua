@@ -40,7 +40,7 @@ local T = 1000
 local W = {
   combat = false, mounted = false,
   units = {
-    player = { first = "Ded", last = "Rats", class = "MAGE", auras = { ["Frost Armor"] = 0 } },
+    player = { first = "Mira", last = "Ashby", class = "MAGE", auras = { ["Frost Armor"] = 0 } },
     party1 = { first = "Kan", last = "Food", class = "WARRIOR", auras = {} },
     party2 = { first = "Ramen", last = "Enjoyer", class = "PRIEST",
                auras = { ["Arcane Intellect"] = T + 100 } },
@@ -96,8 +96,8 @@ load("BuffCheck.lua")
 local M = ns.logic
 
 -- Logic
-check("joinName joins the Forever surname", M.joinName("Ded", "Rats") == "Ded Rats")
-check("joinName without a second name", M.joinName("Ded", nil) == "Ded")
+check("joinName joins the Forever surname", M.joinName("Mira", "Ashby") == "Mira Ashby")
+check("joinName without a second name", M.joinName("Mira", nil) == "Mira")
 local int = M.BUFFS[1]
 check("state on", M.state({ ["Arcane Intellect"] = { expires = T + 900 } }, int, T) == "on")
 local s, left = M.state({ ["Arcane Brilliance"] = { expires = T + 90 } }, int, T)

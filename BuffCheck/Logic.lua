@@ -177,7 +177,7 @@ end
 M.plain = plain
 
 -- UnitName's two returns as one name. On Forever the second is the
--- surname ("Ded", "Rats"), so the full name is "Ded Rats", which /target
+-- surname ("Mira", "Ashby"), so the full name is "Mira Ashby", which /target
 -- finds. Elsewhere it is a realm, or nil.
 function M.joinName(first, second)
   first, second = plain(first), plain(second)
