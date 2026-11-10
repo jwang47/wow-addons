@@ -264,13 +264,14 @@ end
 -- vendor price for 24 h, as on the Classic AH), it pays 1.5x as much and at
 -- least 1s more (2x when the market looks slow). With no sure option it wins.
 -- With chance (0-1, from LootValue's full scans) the AH counts at its
--- expected value: chance x the sale, less the lost deposit otherwise; it
--- then needs 1.2x and 1s more.
+-- expected value: chance x the sale, else you get the item back and still
+-- have the sure option, less the lost deposit. It then needs 1.2x and 1s
+-- more, for the trouble.
 function LV.ahWins(ah, vendor, sure, slow, chance)
   if not sure or sure <= 0 then return true end
   local deposit = math.floor((vendor or 0) * 0.3)
   if chance then
-    local expected = chance * math.floor(ah * 0.95) - (1 - chance) * deposit
+    local expected = chance * math.floor(ah * 0.95) + (1 - chance) * (sure - deposit)
     return expected >= sure * 1.2 and expected - sure >= 100
   end
   local net = math.floor(ah * 0.95) - deposit

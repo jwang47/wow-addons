@@ -35,10 +35,14 @@ the same, and a test checks that every `.toc` version has a section here.
   Auctionator's lowest price. "sold at" is the median price per item of
   what sold, so one big stack does not pull it.
 - How likely it sells: the AH entry says "AH 57s (80% sells in 24h,
-  ~5h)". It counts the items listed cheaper than the fair price (buyers
-  take those first) and the rate items sold between your scans. The
-  advice then weighs the AH by that chance (the sale times the chance,
-  less the lost deposit otherwise) and wants 1.2x the sure option.
+  ~5h)". It counts the auctions listed cheaper than the fair price
+  (buyers take those first) and the rate auctions sold between your
+  scans, smoothed, and moved toward your own sell-through for the item.
+  The advice then weighs the AH by that chance (an unsold listing comes
+  back, less the deposit) and wants 1.2x the sure option.
+- Scan gaps of 8 hours or more cannot tell a sale from an expiry, so they
+  add no sales and no time; the tooltip asks for a scan within 8 hours.
+  Your own auctions, bid-only auctions and reposts never count as sales.
 - With 10+ listed and none sold across your scans, the AH advice counts
   the market as slow ("none sold in 8h").
 

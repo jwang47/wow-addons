@@ -155,10 +155,9 @@ function S.scanInbox()
         seen[subject] = list
         used[subject][#list] = true
         local items = subjectCount
-        if kind == "sold" and GetInboxInvoiceInfo then
-          local ok, _, _, _, _, _, _, _, _, _, n = pcall(GetInboxInvoiceInfo, i)
-          if ok and type(n) == "number" and n > 0 then items = n end
-        elseif kind ~= "sold" and hasItem and GetInboxItem then
+        -- Not GetInboxInvoiceInfo's count: its returns differ between
+        -- clients, so a sold stack comes from the subject or your last post.
+        if kind ~= "sold" and hasItem and GetInboxItem then
           local ok, _, _, _, n = pcall(GetInboxItem, i, 1)
           if ok and type(n) == "number" and n > 0 then items = n end
         end

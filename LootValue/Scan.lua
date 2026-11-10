@@ -33,7 +33,7 @@ S.SLICE = 100         -- rows between clock checks
 S.GAP = 15 * 60       -- the server allows one full scan per 15 minutes
 S.MIN_DT = 120        -- a scan this soon after the last one is ignored
 S.KEEP = 3 * 86400    -- compare results kept per item
-S.KEEP_N = 12
+S.KEEP_N = 8
 S.SHOW = 2 * 86400    -- the tooltip sums the last 2 days
 -- Least time an auction had left, by time-left band (1 short ... 4 very
 -- long): under 30 min, 30 min to 2 h, 2 to 8 h, over 8 h.
@@ -198,10 +198,12 @@ function S.wmedian(list)
 end
 
 -- A fair buyout price per item from one scan's auctions, with outliers
--- dropped: the cheapest 15% of the items listed (up to 30% while the
--- price climbs less than 20% a step), then without the prices more than
--- 1.5 standard deviations from that window's mean. So one cheap or silly
--- listing does not set the price. nil without buyouts.
+-- dropped. Take the cheapest auctions until they hold 15% of the items
+-- listed and at least 3 auctions (up to 30% while the price climbs less
+-- than 20% a step). Drop the ones under 0.6x or over 1.67x the median
+-- auction of that window, so a lone cheap or silly listing does not set
+-- the price, even in a thin market; the price is the item-weighted mean
+-- of the rest. nil with fewer than 2 auctions with a buyout.
 function S.fairPrice(entries)
   local units, total = {}, 0
   for _, e in ipairs(entries) do
@@ -210,93 +212,126 @@ function S.fairPrice(entries)
       total = total + e[2]
     end
   end
-  if total == 0 then return nil end
+  if #units < 2 then return nil end
   table.sort(units, function(a, b) return a[1] < b[1] end)
   local window, cum = {}, 0
   for i, u in ipairs(units) do
     local prev = units[i - 1]
-    if cum >= total * 0.15 and (cum >= total * 0.3 or (prev and u[1] > prev[1] * 1.2)) then break end
+    if cum >= total * 0.15 and #window >= 3
+      and (cum >= total * 0.3 or (prev and u[1] > prev[1] * 1.2)) then break end
     window[#window + 1] = u
     cum = cum + u[2]
   end
-  local function mean(list)
-    local sum, w = 0, 0
-    for _, u in ipairs(list) do sum, w = sum + u[1] * u[2], w + u[2] end
-    return w > 0 and sum / w or nil, w
+  local mid = window[math.floor((#window + 1) / 2)][1] -- by auction, not by item
+  local sum, w = 0, 0
+  for _, u in ipairs(window) do
+    if u[1] >= mid * 0.6 and u[1] <= mid / 0.6 then sum, w = sum + u[1] * u[2], w + u[2] end
   end
-  local mu, w = mean(window)
-  local var = 0
-  for _, u in ipairs(window) do var = var + u[2] * (u[1] - mu) ^ 2 end
-  local sd = math.sqrt(var / w)
-  if sd > 0 then
-    local kept = {}
-    for _, u in ipairs(window) do
-      if math.abs(u[1] - mu) <= 1.5 * sd then kept[#kept + 1] = u end
-    end
-    if #kept > 0 then mu = mean(kept) end
-  end
-  return math.floor(mu + 0.5)
+  if w == 0 then return math.floor(mid + 0.5) end
+  return math.floor(sum / w + 0.5)
+end
+
+-- How a vanished auction ended can only be told from its time-left band:
+-- gone while it had more time left than passed between the scans, it did
+-- not expire. A band outside 1-4 tells nothing.
+local function canSee(band, dt)
+  local least = S.MIN_LEFT[band]
+  return least ~= nil and dt < least
 end
 
 -- Compares one item's auctions: prev and new are lists of
--- { owner, count, buyout, band }; dt is seconds between the scans.
--- Returns sold, gone, listed, posted (items), the median price per item
--- of the sold ones with a buyout and how many items that is, and the
--- sold auctions.
-function S.compare(prev, new, dt)
-  local before, after = {}, {}
+-- { owner, count, buyout, band }; dt is seconds between the scans; me is
+-- your own name (your auctions are left out: the mails count those).
+-- Returns a table: sold and soldN (items and auctions that sold), gone,
+-- listed, posted (items), median and priced (median price per item of
+-- the sold ones, and their items), atRisk and prevListed (items in the
+-- last scan whose end the compare could see, and all of them).
+function S.compare(prev, new, dt, me)
+  local r = { sold = 0, soldN = 0, gone = 0, listed = 0, posted = 0, median = 0, priced = 0,
+    atRisk = 0, prevListed = 0 }
+  local function mine(e) return me and e[1] == me end
+  -- Match the auctions that stayed: same seller, stack and buyout.
+  local before = {}
   for _, e in ipairs(prev) do
-    local k = e[1] .. "|" .. e[2] .. "|" .. e[3]
-    before[k] = before[k] or {}
-    table.insert(before[k], e)
+    if not mine(e) then
+      local k = e[1] .. "|" .. e[2] .. "|" .. e[3]
+      before[k] = before[k] or {}
+      table.insert(before[k], e)
+      r.prevListed = r.prevListed + e[2]
+      if e[3] > 0 and canSee(e[4], dt) then r.atRisk = r.atRisk + e[2] end
+    end
   end
-  local listed = 0
+  local appeared = {}
   for _, e in ipairs(new) do
-    local k = e[1] .. "|" .. e[2] .. "|" .. e[3]
-    after[k] = (after[k] or 0) + 1
-    listed = listed + e[2]
-  end
-  -- New auctions by seller and stack: a seller who cancels and posts the
-  -- same stack at another price did not sell it.
-  local posted, newBy = 0, {}
-  for _, e in ipairs(new) do
-    local k = e[1] .. "|" .. e[2] .. "|" .. e[3]
-    local had = before[k] and #before[k] or 0
-    if (after[k] or 0) > had then
-      after[k] = after[k] - 1 -- count each new one once
-      posted = posted + e[2]
-      if e[1] ~= "" then
-        local by = e[1] .. "|" .. e[2]
-        newBy[by] = (newBy[by] or 0) + 1
+    if not mine(e) then
+      r.listed = r.listed + e[2]
+      local k = e[1] .. "|" .. e[2] .. "|" .. e[3]
+      local list = before[k]
+      if list and #list > 0 then
+        -- The one with the most time left stays; the shortest ones went.
+        table.sort(list, function(a, b) return a[4] < b[4] end)
+        table.remove(list)
+      else
+        appeared[#appeared + 1] = e
       end
     end
   end
-  -- after[k] now holds the kept count per key.
-  local sold, gone, soldN, prices = 0, 0, 0, {}
-  for k, list in pairs(before) do
-    local kept = after[k] or 0
-    local vanished = #list - kept
-    if vanished > 0 then
-      -- The ones with the least time left are the likeliest to expire.
-      table.sort(list, function(a, b) return a[4] < b[4] end)
-      for i = 1, vanished do
-        local e = list[i]
-        gone = gone + e[2]
-        if dt < (S.MIN_LEFT[e[4]] or math.huge) then
-          local by = e[1] .. "|" .. e[2]
-          if e[1] ~= "" and (newBy[by] or 0) > 0 then
-            newBy[by] = newBy[by] - 1 -- a repost
-          else
-            sold, soldN = sold + e[2], soldN + 1
-            if e[3] > 0 then prices[#prices + 1] = { e[3] / e[2], e[2] } end
-          end
-        end
+  local vanished = {}
+  for _, list in pairs(before) do
+    for _, e in ipairs(list) do vanished[#vanished + 1] = e end
+  end
+  -- A seller name the client did not know in one of the scans: match
+  -- again on stack and buyout alone.
+  local byStack = {}
+  for i, e in ipairs(appeared) do
+    local k = e[2] .. "|" .. e[3]
+    byStack[k] = byStack[k] or {}
+    table.insert(byStack[k], i)
+  end
+  local still = {}
+  for _, e in ipairs(vanished) do
+    local list = byStack[e[2] .. "|" .. e[3]]
+    local hit
+    if list then
+      for j, i in ipairs(list) do
+        local a = appeared[i]
+        if a and (a[1] == "" or e[1] == "") then hit = j break end
+      end
+    end
+    if hit then
+      appeared[list[hit]] = false
+      table.remove(list, hit)
+    else
+      still[#still + 1] = e
+    end
+  end
+  -- New items per seller: a seller who took auctions down and posted the
+  -- same item again (any price or stack size) did not sell those.
+  local postedBy = {}
+  for _, a in ipairs(appeared) do
+    if a then
+      r.posted = r.posted + a[2]
+      if a[1] ~= "" then postedBy[a[1]] = (postedBy[a[1]] or 0) + a[2] end
+    end
+  end
+  local prices = {}
+  for _, e in ipairs(still) do
+    r.gone = r.gone + e[2]
+    -- No buyout: a bid-only auction gone early was taken down.
+    if e[3] > 0 and canSee(e[4], dt) then
+      local re = e[1] ~= "" and math.min(postedBy[e[1]] or 0, e[2]) or 0
+      if re > 0 then postedBy[e[1]] = postedBy[e[1]] - re end
+      local n = e[2] - re
+      if n > 0 then
+        r.sold = r.sold + n
+        r.soldN = r.soldN + (re > 0 and 0 or 1)
+        prices[#prices + 1] = { e[3] / e[2], n }
+        r.priced = r.priced + n
       end
     end
   end
-  local priced = 0
-  for _, p in ipairs(prices) do priced = priced + p[2] end
-  return sold, gone, listed, posted, math.floor((S.wmedian(prices) or 0) + 0.5), priced, soldN
+  r.median = math.floor((S.wmedian(prices) or 0) + 0.5)
+  return r
 end
 
 ---------------------------------------------------------------------------
@@ -353,6 +388,8 @@ local function work(rows, owners)
   local ownerIdx = {}
   for i, o in ipairs(owners) do ownerIdx[o] = i end
   local soldAuctions = 0
+  local me = UnitName and UnitName("player")
+  local visited = {}
   for i, id in ipairs(ids) do
     local new = rows[id] or {}
     if #new > 0 then
@@ -367,18 +404,30 @@ local function work(rows, owners)
     end
     if prev and prev.items then
       local old = S.decode(prev.items[id], prev.owners or {})
-      local sold, gone, listed, posted, value, vi, soldN = S.compare(old, new, dt)
-      soldAuctions = soldAuctions + soldN
+      local c = S.compare(old, new, dt, me)
+      soldAuctions = soldAuctions + c.soldN
       local hist = d.market[id] or {}
-      hist[#hist + 1] = string.format("%d,%d,%d,%d,%d,%d,%d,%d", t, dt, sold, gone, listed, posted, value, vi)
+      -- t, dt, sold, soldN, gone, listed, posted, median, priced, atRisk, prevListed
+      hist[#hist + 1] = string.format("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", t, dt, c.sold, c.soldN, c.gone,
+        c.listed, c.posted, c.median, c.priced, c.atRisk, c.prevListed)
       while #hist > S.KEEP_N or (hist[1] and tonumber(hist[1]:match("^(%d+)")) < t - S.KEEP) do
         table.remove(hist, 1)
       end
       d.market[id] = #hist > 0 and hist or nil
+      visited[id] = true
     end
     job.done = i
     if i % S.SLICE == 0 and S.deadline() then coroutine.yield() end
   end
+  -- Items gone from the AH for longer than the history keeps.
+  local old = {}
+  for id, hist in pairs(d.market) do
+    if not visited[id] then
+      local last = hist[#hist] and tonumber(hist[#hist]:match("^(%d+)"))
+      if not last or last < t - S.KEEP then old[#old + 1] = id end
+    end
+  end
+  for _, id in ipairs(old) do d.market[id] = nil end
   return snap, prev, soldAuctions
 end
 
@@ -396,7 +445,7 @@ local function read(total)
       end
       local list = rows[id] or {}
       rows[id] = list
-      list[#list + 1] = { owner, tonumber(count) or 1, tonumber(buyout) or 0, tonumber(tl) or 4 }
+      list[#list + 1] = { owner, tonumber(count) or 1, tonumber(buyout) or 0, tonumber(tl) or 1 }
     end
     job.done = i
     if i % S.SLICE == 0 and S.deadline() then
@@ -466,26 +515,34 @@ end
 ---------------------------------------------------------------------------
 
 -- { sold, gone, listed, each, scans, span } over the last 2 days, or nil.
+-- Over the last 2 days of scans: sold and soldN (items and auctions
+-- seen to sell), gone, listed (now), each (median price of what sold),
+-- span (time covered) and seen (the part of that time the compares could
+-- see sales: each interval counts by the share of items whose end it
+-- could tell). An interval of 8 h or more sees nothing, so it adds no
+-- seen time. rate and rateN are items and auctions a second, or nil.
 function S.stats(id)
   local hist = id and db().market[id]
   if not hist or #hist == 0 then return nil end
   local t = now()
-  local r = { sold = 0, gone = 0, scans = 0, span = 0 }
+  local r = { sold = 0, soldN = 0, gone = 0, scans = 0, span = 0, seen = 0 }
   local prices = {}
   for _, line in ipairs(hist) do
-    local at, dt, sold, gone, listed, _, value, vi = line:match("^(%d+),(%d+),(%d+),(%d+),(%d+),(%d+),(%d+),(%d+)")
-    at = tonumber(at)
-    if at and at >= t - S.SHOW then
-      r.sold = r.sold + tonumber(sold)
-      r.gone = r.gone + tonumber(gone)
-      if tonumber(vi) > 0 then prices[#prices + 1] = { tonumber(value), tonumber(vi) } end
+    local f = {}
+    for n in line:gmatch("%d+") do f[#f + 1] = tonumber(n) end
+    -- t, dt, sold, soldN, gone, listed, posted, median, priced, atRisk, prevListed
+    if #f == 11 and f[1] >= t - S.SHOW then
+      r.sold, r.soldN, r.gone = r.sold + f[3], r.soldN + f[4], r.gone + f[5]
+      if f[9] > 0 then prices[#prices + 1] = { f[8], f[9] } end
       r.scans = r.scans + 1
-      r.span = r.span + tonumber(dt)
-      r.listed = tonumber(listed)
+      r.span = r.span + f[2]
+      if f[11] > 0 then r.seen = r.seen + f[2] * f[10] / f[11] end
+      r.listed = f[6]
     end
   end
   if r.scans == 0 then return nil end
   r.each = S.wmedian(prices)
+  if r.seen > 0 then r.rate, r.rateN = r.sold / r.seen, r.soldN / r.seen end
   return r
 end
 
@@ -501,7 +558,11 @@ S.FRESH = 86400       -- the fair price counts for a day after its scan
 function S.price(id)
   local snap = db().snap
   if not id or not snap or not snap.fair or not snap.t or now() - snap.t > S.FRESH then return nil end
-  return snap.fair[id]
+  local fair = snap.fair[id]
+  -- One silly listing in a thin market: keep it near what really sold.
+  local st = fair and S.stats(id)
+  if st and st.each and st.each > 0 then fair = math.max(st.each * 0.5, math.min(st.each * 3, fair)) end
+  return fair and math.floor(fair + 0.5)
 end
 LV.fairPrice = S.price
 
@@ -511,9 +572,15 @@ function S.line(link)
   if not s and not fair then return nil end
   local parts = {}
   if s then
-    local sold = s.sold > 0 and ("~" .. s.sold .. " sold") or "none sold"
-    if s.each then sold = sold .. " at ~" .. LV.money(s.each) end
-    table.insert(parts, sold .. " in " .. span(s.span))
+    if s.rate then
+      -- Seen sales scaled up to all the time the scans cover.
+      local est = math.floor(s.rate * s.span + 0.5)
+      local sold = est > 0 and ("~" .. est .. " sold") or "none sold"
+      if s.each then sold = sold .. " at ~" .. LV.money(s.each) end
+      table.insert(parts, sold .. " in " .. span(s.span))
+    else
+      table.insert(parts, "scan again within 8h to see sales")
+    end
     table.insert(parts, (s.listed or 0) .. " listed")
   end
   if fair then table.insert(parts, "fair price ~" .. LV.money(fair)) end
@@ -531,7 +598,7 @@ LV.marketLine = S.line
 ---------------------------------------------------------------------------
 
 S.LISTING = 24 * 3600
-S.MIN_SPAN = 3 * 3600   -- less scan time than this gives no rate
+S.MIN_SPAN = 3 * 3600   -- less seen scan time than this gives no odds
 
 -- P(N >= k) for N ~ Poisson(m).
 function S.tail(m, k)
@@ -554,27 +621,44 @@ function S.tail(m, k)
 end
 
 -- Items listed under a price per item in the last full scan.
+-- Auctions listed under a price per item in the last full scan (not
+-- yours); auctions at that price (within 1%) count half, as buyers pick
+-- among them.
 function S.ahead(id, price)
   local snap = db().snap
   if not snap or not snap.items or not snap.items[id] then return 0 end
+  local me = UnitName and UnitName("player")
   local n = 0
   for _, e in ipairs(S.decode(snap.items[id], snap.owners or {})) do
-    if e[3] > 0 and e[3] / e[2] < price then n = n + e[2] end
+    if e[3] > 0 and e[1] ~= me then
+      local unit = e[3] / e[2]
+      if unit < price * 0.99 then n = n + 1
+      elseif unit <= price * 1.01 then n = n + 0.5 end
+    end
   end
   return n
 end
 
--- { hours, chance (within 24 h), ahead } for a listing of stack items at
--- price per item, or nil when the scans have too little data.
-function S.odds(id, price, stack)
+S.PRIOR = 12 * 3600    -- smoothing: half a sale over 12 h of seen time
+S.MAIL_WEIGHT = 4      -- your own finished auctions count against 4 "virtual" ones
+
+-- { hours, chance (within 24 h), ahead } for one auction at price per
+-- item, or nil when the scans saw too little (under 3 h of seen time).
+-- Counts auctions, not items: buyers take whole stacks. The rate is
+-- smoothed so a quiet stretch does not give 0%. With your own sold and
+-- expired mails for the item (Sales.lua, name), the chance moves toward
+-- your own sell-through.
+function S.odds(id, price, name)
   local s = S.stats(id)
-  if not s or s.span < S.MIN_SPAN or not price then return nil end
-  stack = math.max(1, stack or 1)
+  if not s or s.seen < S.MIN_SPAN or not price then return nil end
   local ahead = S.ahead(id, price)
-  local rate = s.sold / s.span -- items a second
-  local need = ahead + stack
-  local o = { ahead = ahead, chance = S.tail(rate * S.LISTING, need) }
-  o.hours = rate > 0 and need / rate / 3600 or nil
+  local rate = (s.soldN + 0.5) / (s.seen + S.PRIOR) -- auctions a second
+  local need = math.floor(ahead + 0.5) + 1
+  local o = { ahead = ahead, chance = S.tail(rate * S.LISTING, need), hours = need / rate / 3600 }
+  local own = name and LV.sales and LV.sales.stats(name)
+  if own and own.finished > 0 then
+    o.chance = (S.MAIL_WEIGHT * o.chance + own.sold) / (S.MAIL_WEIGHT + own.finished)
+  end
   return o
 end
 
@@ -588,16 +672,12 @@ function S.oddsText(o)
   return pctText
 end
 
--- Odds for one item at its fair price: your last posted stack size
--- (Sales.lua), else 1.
+-- Odds for one auction of the item at its fair price.
 function S.itemOdds(link)
   local id = tonumber(link and link:match("item:(%d+)"))
   local price = S.price(id)
   if not price then return nil end
-  local stack = 1
-  local sales = LV.sales and LV.sales.db().sales[LV.sales.itemName(link) or ""]
-  if sales and sales.stack then stack = sales.stack end
-  return S.odds(id, price, stack)
+  return S.odds(id, price, LV.sales and LV.sales.itemName(link))
 end
 LV.sellOdds = S.itemOdds
 
@@ -605,7 +685,7 @@ LV.sellOdds = S.itemOdds
 -- "none sold in 1d" when the scans saw 10+ listed and no sales, else nil.
 function S.slowNote(link)
   local s = S.stats(tonumber(link and link:match("item:(%d+)")))
-  if s and s.sold == 0 and (s.listed or 0) >= 10 and s.span >= 6 * 3600 then
+  if s and s.sold == 0 and (s.listed or 0) >= 10 and s.seen >= 6 * 3600 then
     return "none sold in " .. span(s.span)
   end
   return nil

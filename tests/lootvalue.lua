@@ -415,11 +415,29 @@ LIST = {
 SC.onRequest()
 ev("AUCTION_ITEM_LIST_UPDATE")
 runTimers()
-local sold, gone, listed, posted = SC.compare({}, {}, 0)
-check("scan: compare of nothing is zero", sold == 0 and gone == 0 and listed == 0 and posted == 0)
+local c0 = SC.compare({}, {}, 0)
+check("scan: compare of nothing is zero", c0.sold == 0 and c0.gone == 0 and c0.listed == 0 and c0.posted == 0)
 local st = SC.stats(2589)
 check("scan: one sale, the rest expired or reposted", st and st.sold == 20 and st.gone == 80 and st.listed == 60)
-check("scan: tooltip market line", has(SC.line("|Hitem:2589:0|h[Linen Cloth]|h"), "AH market: ~20 sold at ~1s in 6h, 60 listed, fair price ~85c"))
+-- Compare rules from the review.
+local cc = SC.compare({ { "", 20, 2000, 4 } }, { { "Bob", 20, 2000, 4 } }, 3600)
+check("an owner the client did not know yet is the same auction", cc.sold == 0 and cc.posted == 0)
+cc = SC.compare({ { "Bob", 20, 0, 4 } }, {}, 3600)
+check("a bid-only auction gone early is not a sale", cc.sold == 0 and cc.gone == 20)
+cc = SC.compare({ { "Bob", 20, 2000, 4 } }, { { "Bob", 10, 900, 4 }, { "Bob", 10, 900, 4 } }, 3600)
+check("a stack split and reposted is not a sale", cc.sold == 0 and cc.posted == 20)
+cc = SC.compare({ { "Bob", 1, 100, 5 } }, {}, 3600)
+check("an unknown band is not a sale", cc.sold == 0)
+cc = SC.compare({ { "Mage", 1, 100, 4 } }, {}, 3600, "Mage")
+check("your own auctions are left out", cc.sold == 0 and cc.gone == 0)
+cc = SC.compare({ { "Bob", 1, 100, 4 } }, {}, 9 * 3600)
+check("a 9h gap sees nothing", cc.sold == 0 and cc.atRisk == 0)
+check("thin market: one cheap listing does not set the price",
+  SC.fairPrice({ { "a", 1, 10, 4 }, { "b", 1, 100, 4 }, { "c", 1, 105, 4 }, { "d", 1, 110, 4 }, { "e", 1, 120, 4 } }) == 103)
+check("thin market: a cheap big stack does not set the price",
+  SC.fairPrice({ { "a", 20, 20, 4 }, { "b", 1, 100, 4 }, { "c", 1, 100, 4 } }) == 100)
+check("one listing gives no fair price", SC.fairPrice({ { "a", 1, 100, 4 } }) == nil)
+check("scan: tooltip market line", has(SC.line("|Hitem:2589:0|h[Linen Cloth]|h"), "AH market: ~33 sold at ~1s in 6h, 60 listed, fair price ~93c"))
 -- Fair price: one cheap and one silly listing do not set it.
 local many = { { "a", 1, 1, 4 }, { "z", 1, 99999, 4 } }
 for i = 1, 30 do table.insert(many, { "s" .. i, 20, 20 * (1000 + i * 5), 4 }) end
@@ -427,18 +445,21 @@ local fair = SC.fairPrice(many)
 check("fair price drops a 1c undercut", fair and fair >= 1000 and fair <= 1100)
 check("fair price of nothing is nil", SC.fairPrice({ { "a", 1, 0, 4 } }) == nil)
 check("weighted median", SC.wmedian({ { 5, 1 }, { 9, 10 }, { 1, 1 } }) == 9)
-check("advice uses the fresh fair price", LV.fairPrice(2589) == 85
-  and has(LV.adviceLine("|Hitem:2589:0|h[Linen Cloth]|h", false, CTX), "AH 80c"))
+check("advice uses the fresh fair price", LV.fairPrice(2589) == 93
+  and has(LV.adviceLine("|Hitem:2589:0|h[Linen Cloth]|h", false, CTX), "AH 88c"))
 check("poisson tail", math.abs(SC.tail(5, 5) - 0.5595) < 0.001 and SC.tail(0, 1) == 0 and SC.tail(3, 0) == 1
   and math.abs(SC.tail(1000, 1000) - 0.5) < 0.02)
 local odds = LV.sellOdds("|Hitem:2589:0|h[Linen Cloth]|h")
-check("sell odds at the fair price", odds and odds.ahead == 0 and odds.chance > 0.99 and odds.hours < 1)
-check("sell odds text", SC.oddsText(odds) == "100% sells in 24h, ~<1h")
-local slowOdds = SC.odds(2589, 200, 400) -- far more than sells in a day
-check("a big stack above the price is unlikely", slowOdds.ahead == 60 and slowOdds.chance < 0.01)
-check("advice shows the odds", has(LV.adviceLine("|Hitem:2589:0|h[Linen Cloth]|h", false, CTX), "100% sells in 24h"))
-check("ahWins: expected value with odds", LV.ahWins(1000, 0, 200, false, 0.9)
-  and not LV.ahWins(1000, 0, 200, false, 0.2))
+check("sell odds at the fair price", odds and odds.ahead == 1 and math.abs(odds.chance - 0.671) < 0.01)
+check("sell odds text", SC.oddsText(odds) == "67% sells in 24h, ~21h")
+local high = SC.odds(2589, 200)
+check("a higher price waits behind more auctions", high.ahead == 3 and high.chance < odds.chance)
+check("advice shows the odds", has(LV.adviceLine("|Hitem:2589:0|h[Linen Cloth]|h", false, CTX), "67% sells in 24h"))
+check("ahWins: an unsold listing keeps the sure option", LV.ahWins(1000, 0, 200, false, 0.2)
+  and not LV.ahWins(1000, 0, 200, false, 0.05))
+LootValueDB.sales["Linen Cloth"] = { posted = 10, sold = 0, expired = 10, cancelled = 0, soldItems = 0, net = 0 }
+check("your own expired auctions pull the odds down", SC.odds(2589, 93, "Linen Cloth").chance < 0.25)
+LootValueDB.sales["Linen Cloth"] = nil
 local T2 = T
 T = T + 2 * 86400
 check("an old scan's fair price is not used", LV.fairPrice(2589) == nil)
@@ -459,8 +480,8 @@ listGone = false
 check("scan: AH closed while reading drops the scan", LootValueDB.snap == before and SC.job.state == "failed"
   and has(SC.statusText(), "the AH closed at"))
 -- A market with 10+ listed and no sales is slow.
-LootValueDB.market[9003] = { string.format("%d,%d,0,0,40,0,0,0", T, 8 * 3600) }
-check("scan: none sold makes the market slow", has(LV.marketInfo("|Hitem:9003:0|h[Thing]|h").note, "none sold in 8h"))
+LootValueDB.market[9003] = { string.format("%d,%d,0,0,0,40,0,0,0,40,40", T, 7 * 3600) }
+check("scan: none sold makes the market slow", has(LV.marketInfo("|Hitem:9003:0|h[Thing]|h").note, "none sold in 7h"))
 check("scan: thousands", SC.number(164749) == "164,749" and SC.number(100) == "100" and SC.number(1000000) == "1,000,000")
 AL.slash("scan")
 check("/lv scan prints the status", has(chat[#chat], "last full scan"))
