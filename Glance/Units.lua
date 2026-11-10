@@ -112,6 +112,79 @@ local function makeUnit(unit, x)
 end
 
 ---------------------------------------------------------------------------
+-- Range to the target, from your own spells: each Glance key whose spell
+-- has a range says in or out of range, and the spells' ranges bracket the
+-- distance. The target frame edge turns green while your longest spell
+-- reaches, red when it does not; the text gives the bracket ("< 30 yd").
+---------------------------------------------------------------------------
+local function spellRange(id)
+  if C_Spell and C_Spell.GetSpellInfo then
+    local info = C_Spell.GetSpellInfo(id)
+    return info and ns.plain(info.maxRange)
+  end
+  if GetSpellInfo then return ns.plain(select(6, GetSpellInfo(id))) end
+end
+
+-- Returns reach (true/false/nil for unknown) and the bracket text.
+function ns.units.range()
+  if not (UnitExists("target") and GetActionInfo) then return nil end
+  if UnitIsUnit("target", "player") then return nil end
+  local api, seen = ns.api, {}
+  local inMin, outMax, longest, longestIn
+  for _, b in pairs(ns.keybar and ns.keybar.buttons or {}) do
+    for _, slot in ipairs({ b.plainSlot, b.shiftSlot }) do
+      if slot and not seen[slot] then
+        seen[slot] = true
+        local kind, id = GetActionInfo(slot)
+        kind, id = ns.plain(kind), ns.plain(id)
+        local r = (kind == "spell" and type(id) == "number") and spellRange(id) or nil
+        local hit
+        if type(r) == "number" and r > 0 then hit = ns.plain(api.IsActionInRange(slot)) end
+        if hit ~= nil then
+          hit = hit and true or false
+          if hit then inMin = math.min(inMin or r, r) else outMax = math.max(outMax or r, r) end
+          if not longest or r > longest then longest, longestIn = r, hit end
+        end
+      end
+    end
+  end
+  if not longest then return nil end
+  local text
+  if inMin and outMax and outMax < inMin then text = outMax .. "-" .. inMin .. " yd"
+  elseif inMin then text = "< " .. inMin .. " yd"
+  else text = "> " .. outMax .. " yd" end
+  return longestIn and true or false, text
+end
+
+local function paintRange()
+  local f = frames.target
+  if not (f and f.range) then return end
+  local reach, text = ns.units.range()
+  if reach == nil then
+    f.range:SetText("")
+    f.edge:Hide()
+    return
+  end
+  local r, g, b = 0.35, 0.9, 0.4
+  if not reach then r, g, b = 1, 0.3, 0.25 end
+  f.range:SetText(text)
+  f.range:SetTextColor(r, g, b)
+  f.edge:SetColorTexture(r, g, b, 0.8)
+  f.edge:Show()
+end
+ns.units.paintRange = paintRange
+
+local function addRange(f)
+  f.edge = f:CreateTexture(nil, "BACKGROUND")
+  f.edge:SetPoint("TOPLEFT", f.hp, "TOPLEFT", -2, 2)
+  f.edge:SetPoint("BOTTOMRIGHT", f.mp, "BOTTOMRIGHT", 2, -2)
+  f.edge:Hide()
+  f.range = f:CreateFontString(nil, "OVERLAY", FONT)
+  f.range:SetPoint("TOPRIGHT", f.mp, "BOTTOMRIGHT", 0, -3)
+  if f.range.SetFont and STANDARD_TEXT_FONT then f.range:SetFont(STANDARD_TEXT_FONT, 12, "OUTLINE") end
+end
+
+---------------------------------------------------------------------------
 -- Cast bar
 ---------------------------------------------------------------------------
 local cast
@@ -189,6 +262,7 @@ ns.module("units", function()
   ns.outOfCombat("unit frames", function()
     update(makeUnit("player", -(W / 2 + 8)))
     local t = makeUnit("target", W / 2 + 8)
+    addRange(t)
     RegisterUnitWatch(t)
     update(t)
   end)
@@ -205,7 +279,10 @@ ns.module("units", function()
       "UNIT_LEVEL", "UNIT_FACTION" }) do
     ns.on(ev, refresh)
   end
-  ns.on("PLAYER_TARGET_CHANGED", function() refresh("target") end)
+  ns.on("PLAYER_TARGET_CHANGED", function() refresh("target"); ns.safe("range", paintRange) end)
+  if C_Timer and C_Timer.NewTicker then
+    C_Timer.NewTicker(0.2, function() ns.safe("range", paintRange) end)
+  end
   ns.on("PLAYER_ENTERING_WORLD", function() refresh() end)
   for _, ev in ipairs({ "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED",
       "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_DELAYED", "UNIT_SPELLCAST_CHANNEL_START",

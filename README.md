@@ -308,6 +308,9 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   drawer behind the Addons tab. A Reload button sits under it, then amber chips show what you can spend
   or fix: unspent talent points, Legacy points, keys with an old spell rank
   and full bags. Click one to open that window; it hides when done.
+- **Range**: the target frame gets a green edge while your longest-range
+  spell on the Glance keys reaches the target, red when it does not, and a
+  distance bracket from your spells' ranges ("20-30 yd").
 - **Party**: in a group, each party member gets a large class-coloured
   name above their nameplate, and friendly player nameplates are on.
   Your own nameplate settings come back when you leave the group.

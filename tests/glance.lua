@@ -388,6 +388,23 @@ local opened
 ToggleLegacySystemUI = function() opened = "legacy" end
 A.chips.legacy.scripts.OnClick()
 check("legacy chip opens the Legacy window", opened == "legacy")
+
+-- Range: Frostbolt (30 yd) on 1 reaches, Fire Blast (20 yd) on 2 does not.
+local RANGES = { [116] = 30, [2136] = 20 }
+C_Spell.GetSpellInfo = function(id) return { maxRange = RANGES[id] } end
+GetActionInfo = function(s) if s == 1 then return "spell", 116 elseif s == 2 then return "spell", 2136 end end
+local reach = { [1] = true, [2] = false }
+ns.api.IsActionInRange = function(s) return reach[s] end
+ns.units.paintRange()
+local tf = _G.GlanceTarget
+check("range in reach", tf.edge.shown and tf.range.text == "20-30 yd", tf.range.text)
+reach[1] = false
+ns.units.paintRange()
+check("range out of reach", tf.range.text == "> 30 yd", tf.range.text)
+reach = {}
+ns.units.paintRange()
+check("range unknown hides", not tf.edge.shown and tf.range.text == "")
+GetActionInfo = function() end
 local reloaded
 ReloadUI = function() reloaded = true end
 A.reload.scripts.OnClick()
