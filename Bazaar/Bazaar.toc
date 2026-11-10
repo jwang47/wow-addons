@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: Bazaar: AH Browser
+## Notes: Browse your last full AH scan anywhere: search, categories, levels and sortable prices. /bazaar
+## Author: jwang47
+## Version: 0.1.0
+## OptionalDeps: LootValue, Auctionator
+## SavedVariables: BazaarDB
+
+Core.lua
+UI.lua
