@@ -474,6 +474,20 @@ SlashCmdList.GLANCE("watch add Frostbolt")
 check("watch add", #W.ids == 2 and W.icons[2].id == 116)
 SlashCmdList.GLANCE("watch reset")
 check("watch reset", #W.ids == 2 and W.icons[1].id == 1953)
+
+-- Target cast bar: big, orange when interruptible, COUNTERSPELL when ready.
+UnitCanAttack = function() return true end
+UnitCastingInfo = function(u) if u == "target" then return "Fireball", "", 1, 1000, 3000, false, 7, false, 133 end end
+local TC = ns.units.tcast
+ns.units.castUpdate(TC)
+check("target cast shows", TC.shown and TC.text.text == "Fireball")
+check("counterspell call-out", TC.kick.text == "COUNTERSPELL" and TC.glow.shown)
+UnitCastingInfo = function(u) if u == "target" then return "Shield Wall", "", 1, 1000, 3000, false, 7, true, 134 end end
+ns.units.castUpdate(TC)
+check("no call-out when it cannot be interrupted", TC.kick.text == "" and not TC.glow.shown)
+UnitCastingInfo = function() end
+ns.units.castUpdate(TC)
+check("target cast hides", not TC.shown)
 ns.keybar.bookSpells = nil
 
 -- Party: names over party members, group CVars on and back.

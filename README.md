@@ -317,6 +317,10 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   none is on. Then a message in the middle of the screen reminds you, at
   login, when a buff runs out and every 10 minutes (not in combat or
   instances). `/glance xpremind off` stops the reminder. Click one to open that window; it hides when done.
+- **Enemy cast bar**: when your target casts, a large bar with the spell
+  name shows just above your unit frames. Orange when it can be
+  interrupted, grey when not; "COUNTERSPELL" and a gold edge while your
+  Counterspell is ready (from the watch row).
 - **Watch row**: your key spells (for a mage: Blink, Counterspell, Frost
   Nova, Ice Block, Cold Snap, Ice Barrier, Evocation) as large icons below
   the cast bar. Bright when ready, dark with a sweep on cooldown, a short

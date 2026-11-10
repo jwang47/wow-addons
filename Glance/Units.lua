@@ -236,56 +236,93 @@ end
 ---------------------------------------------------------------------------
 -- Cast bar
 ---------------------------------------------------------------------------
-local cast
+local cast, tcast
 -- Cast and channel times can be secret, so the bar runs on the game's own
 -- timer (SetTimerDuration with UnitCastingDuration) where the client has
 -- it, and on our own sums only where the times are plain numbers.
-local function castUpdate()
+local function counterspellReady()
+  local w = ns.units.watch
+  for i, id in ipairs(w and w.ids or {}) do
+    local n = C_Spell and C_Spell.GetSpellName and ns.plain(C_Spell.GetSpellName(id))
+    if n == "Counterspell" then return not w.icons[i].cooling end
+  end
+  return nil
+end
+
+local function castUpdate(c)
+  c = c or cast
+  local unit = c.unit
+  if unit == "target" and not (UnitExists("target") and UnitCanAttack and UnitCanAttack("player", "target")) then
+    c:Hide()
+    return
+  end
   local channel = false
-  local n = select("#", UnitCastingInfo("player"))
-  local name, _, _, startMS, endMS = UnitCastingInfo("player")
+  local n = select("#", UnitCastingInfo(unit))
+  local name, _, _, startMS, endMS, _, _, noKick = UnitCastingInfo(unit)
   if n == 0 then
-    n = select("#", UnitChannelInfo("player"))
-    name, _, _, startMS, endMS = UnitChannelInfo("player")
+    n = select("#", UnitChannelInfo(unit))
+    name, _, _, startMS, endMS, _, noKick = UnitChannelInfo(unit)
     channel = true
   end
-  if n == 0 then cast:Hide() return end
-  cast.text:SetText(name)
-  cast.channel = channel
-  cast.startMS, cast.endMS = ns.plain(startMS), ns.plain(endMS)
-  cast.timer = false
+  if n == 0 then c:Hide() return end
+  c.text:SetText(name)
+  c.channel = channel
+  c.startMS, c.endMS = ns.plain(startMS), ns.plain(endMS)
+  c.timer = false
   local durFn = channel and UnitChannelDuration or UnitCastingDuration
-  if cast.bar.SetTimerDuration and durFn and not (cast.startMS and cast.endMS) then
+  if c.bar.SetTimerDuration and durFn and not (c.startMS and c.endMS) then
     local ok = pcall(function()
-      local d = durFn("player")
+      local d = durFn(unit)
       local E = Enum or {}
       local interp = E.StatusBarInterpolation and E.StatusBarInterpolation.Immediate
       local dirs = E.StatusBarTimerDirection
       local dir = dirs and (channel and dirs.RemainingTime or dirs.ElapsedTime)
-      cast.bar:SetTimerDuration(d, interp, dir)
+      c.bar:SetTimerDuration(d, interp, dir)
     end)
-    cast.timer = ok
+    c.timer = ok
   end
-  if not cast.timer and cast.startMS and cast.endMS then
-    cast.bar:SetMinMaxValues(cast.startMS, cast.endMS)
+  if not c.timer and c.startMS and c.endMS then
+    c.bar:SetMinMaxValues(c.startMS, c.endMS)
   end
-  cast.time:SetText("")
-  cast:Show()
+  c.time:SetText("")
+  if c.kick then
+    -- Enemy casts: orange when you can interrupt, grey when you cannot;
+    -- "COUNTERSPELL" while yours is ready.
+    local locked = ns.plain(noKick)
+    c.locked = locked == true
+    if locked == true then
+      c.bar:SetStatusBarColor(0.55, 0.55, 0.55)
+      c.kick:SetText("")
+      c.glow:Hide()
+    else
+      c.bar:SetStatusBarColor(1, 0.45, 0.1)
+      local ready = counterspellReady()
+      c.kick:SetText(ready and "COUNTERSPELL" or "")
+      c.glow:SetShown(ready and true or false)
+    end
+  end
+  c:Show()
 end
+ns.units.castUpdate = castUpdate
 
-local function makeCast()
-  cast = CreateFrame("Frame", "GlanceCastBar", UIParent)
-  cast:SetSize(260, 14)
-  cast:SetPoint("TOP", UIParent, "CENTER", 0, -152)
-  cast.bar = bar(cast, 14)
-  cast.bar:SetAllPoints()
-  cast.bar:SetStatusBarColor(0.45, 0.7, 1)
-  cast.text = cast.bar:CreateFontString(nil, "OVERLAY", FONT)
-  cast.text:SetPoint("LEFT", 5, 0)
-  cast.time = cast.bar:CreateFontString(nil, "OVERLAY", FONT)
-  cast.time:SetPoint("RIGHT", -5, 0)
-  cast:Hide()
-  cast:SetScript("OnUpdate", function(self)
+local function makeCast(unit, frameName, y, w, h, fontSize)
+  local c = CreateFrame("Frame", frameName, UIParent)
+  c.unit = unit
+  c:SetSize(w, h)
+  c:SetPoint("TOP", UIParent, "CENTER", 0, y)
+  c.bar = bar(c, h)
+  c.bar:SetAllPoints()
+  c.bar:SetStatusBarColor(0.45, 0.7, 1)
+  c.text = c.bar:CreateFontString(nil, "OVERLAY", FONT)
+  c.text:SetPoint("LEFT", 5, 0)
+  c.time = c.bar:CreateFontString(nil, "OVERLAY", FONT)
+  c.time:SetPoint("RIGHT", -5, 0)
+  if fontSize and c.text.SetFont and STANDARD_TEXT_FONT then
+    c.text:SetFont(STANDARD_TEXT_FONT, fontSize, "OUTLINE")
+    c.time:SetFont(STANDARD_TEXT_FONT, fontSize - 2, "OUTLINE")
+  end
+  c:Hide()
+  c:SetScript("OnUpdate", function(self)
     if self.timer or not (self.startMS and self.endMS) then return end
     ns.safe("cast bar", function()
       local now = GetTime() * 1000
@@ -297,7 +334,34 @@ local function makeCast()
       self.time:SetFormattedText("%.1f", math.max(0, (self.endMS - now) / 1000))
     end)
   end)
-  ns.units.cast = cast
+  return c
+end
+
+local function makeTargetCast()
+  -- Enemy cast bar: big, just above your unit frames, close to your
+  -- character, so a Counterspell window is hard to miss.
+  local c = makeCast("target", "GlanceTargetCastBar", -84, 300, 22, 14)
+  c.glow = c:CreateTexture(nil, "BACKGROUND")
+  c.glow:SetPoint("TOPLEFT", -3, 3)
+  c.glow:SetPoint("BOTTOMRIGHT", 3, -3)
+  c.glow:SetColorTexture(1, 0.85, 0.3, 0.9)
+  c.glow:Hide()
+  c.kick = c:CreateFontString(nil, "OVERLAY", FONT)
+  c.kick:SetPoint("BOTTOM", c, "TOP", 0, 3)
+  if c.kick.SetFont and STANDARD_TEXT_FONT then c.kick:SetFont(STANDARD_TEXT_FONT, 16, "THICKOUTLINE") end
+  c.kick:SetTextColor(1, 0.85, 0.3)
+  -- Counterspell can come off cooldown mid-cast: check it a few times a second.
+  local acc = 0
+  c:HookScript("OnUpdate", function(self, dt)
+    acc = acc + (dt or 0)
+    if acc < 0.15 or self.locked then return end
+    acc = 0
+    local ready = counterspellReady()
+    self.kick:SetText(ready and "COUNTERSPELL" or "")
+    self.glow:SetShown(ready and true or false)
+  end)
+  ns.units.tcast = c
+  return c
 end
 
 ns.module("units", function()
@@ -315,7 +379,9 @@ ns.module("units", function()
     RegisterUnitWatch(t)
     update(t)
   end)
-  makeCast()
+  cast = makeCast("player", "GlanceCastBar", -152, 260, 14)
+  ns.units.cast = cast
+  tcast = makeTargetCast()
   local function refresh(unit)
     if not unit or frames[unit] then
       for u, f in pairs(frames) do
@@ -328,15 +394,21 @@ ns.module("units", function()
       "UNIT_LEVEL", "UNIT_FACTION" }) do
     ns.on(ev, refresh)
   end
-  ns.on("PLAYER_TARGET_CHANGED", function() refresh("target"); ns.safe("range", paintRange) end)
+  ns.on("PLAYER_TARGET_CHANGED", function()
+    refresh("target"); ns.safe("range", paintRange); ns.safe("target cast", castUpdate, tcast)
+  end)
   if C_Timer and C_Timer.NewTicker then
     C_Timer.NewTicker(0.2, function() ns.safe("range", paintRange) end)
   end
   ns.on("PLAYER_ENTERING_WORLD", function() refresh() end)
   for _, ev in ipairs({ "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED",
       "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_DELAYED", "UNIT_SPELLCAST_CHANNEL_START",
-      "UNIT_SPELLCAST_CHANNEL_STOP", "UNIT_SPELLCAST_CHANNEL_UPDATE" }) do
-    ns.on(ev, function(unit) if unit == "player" then castUpdate() end end)
+      "UNIT_SPELLCAST_CHANNEL_STOP", "UNIT_SPELLCAST_CHANNEL_UPDATE",
+      "UNIT_SPELLCAST_INTERRUPTIBLE", "UNIT_SPELLCAST_NOT_INTERRUPTIBLE" }) do
+    ns.on(ev, function(unit)
+      if unit == "player" then castUpdate(cast)
+      elseif unit == "target" then castUpdate(tcast) end
+    end)
   end
 end)
 
