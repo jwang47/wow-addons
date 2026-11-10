@@ -17,6 +17,7 @@ jobs:
       - run: lua5.1 tests/questboard.lua
       - run: lua5.1 tests/buffcheck.lua
       - run: lua5.1 tests/glance.lua
+      - run: lua5.1 tests/niceties.lua
       - run: python3 -m unittest tests/test_release.py
   updater:
     # update.ps1 in Windows PowerShell 5.1, against a local test build.

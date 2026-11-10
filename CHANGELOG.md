@@ -5,6 +5,11 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## Niceties 0.1.0
+
+- New: a home for small nice-to-haves (`/nice`). The first one zooms the
+  camera out as far as the game allows (`/nice zoom` toggles it).
+
 ## Glance 0.1.0
 
 - New addon, a lighter HUD (`/glance`). Not in the releases yet: try it

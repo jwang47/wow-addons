@@ -296,6 +296,27 @@ the price to buy the made item on the AH instead.
   (new Forever items) get nothing. Item keys used: `questRewards`,
   `npcDrops`, `vendors`, `objectDrops`, `itemDrops`.
 
+## Niceties (in development)
+
+A home for small nice-to-haves. Each one is a file in `Niceties/` and can be
+turned off. It is not in the release yet (not in `tools/release.py`
+`ADDONS`); try it with `dev.ps1 Niceties`.
+
+`/nice` lists the features and their state. `/nice KEY` toggles one,
+`/nice KEY on|off` sets it. The state is in `NicetiesDB` (SavedVariables).
+
+| Key | What it does |
+| --- | --- |
+| `zoom` | Max camera distance (on by default). Sets the `cameraDistanceMaxZoomFactor` CVar to the highest value the client keeps, at each login and loading screen, so you can scroll the camera out much further. The Options slider stops at 2.0; the addon tries 4.0, 3.4, 2.6 and 2.0 and keeps the first one the client takes (or the value the client clamps it to). Off puts back the value you had before. Moving the Options slider changes it until the next login. |
+
+To add a feature: put it in the next free `SpareN.lua` (the `.toc` already
+lists five empty ones, so the game loads it after `/reload`; a new file
+that is not in the `.toc` needs a full restart) and call
+`ns.Add({ key, name, help, apply = function(on, data, why) end })`.
+`apply(true)` runs at each login and when it is turned on, `apply(false)`
+only when it is turned off. Rename the spare file and add a new spare in
+the release that ships it.
+
 ## QuestBoard
 
 A small floating list, under the minimap, of the quests that matter now.
