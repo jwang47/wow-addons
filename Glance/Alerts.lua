@@ -1,0 +1,355 @@
+-- Glance alerts: a Reload button, then small amber chips under the minimap for things you can
+-- spend or fix: unspent talent points, legacy points, keys with an old
+-- spell rank, full bags. A chip shows only while there is something to do;
+-- a click opens the matching window.
+local addonName, ns = ...
+local mm = ns.minimap
+local alerts = { chips = {} }
+ns.alerts = alerts
+
+local plain = function(v) return ns.plain(v) end
+
+-- Each check returns a count (0 or nil = nothing to do).
+local function unspentTalents()
+  if UnitCharacterPoints then
+    local n = plain(UnitCharacterPoints("player"))
+    if type(n) == "number" and n > 0 then return n end
+  end
+  if GetUnspentTalentPoints then
+    local ok, n = pcall(GetUnspentTalentPoints)
+    n = ok and plain(n)
+    if type(n) == "number" and n > 0 then return n end
+  end
+  if C_ClassTalents and C_ClassTalents.HasUnspentTalentPoints then
+    local ok, has = pcall(C_ClassTalents.HasUnspentTalentPoints)
+    if ok and plain(has) then return 1 end
+  end
+  return 0
+end
+
+-- Legacy points: the currency of the Legacy trees (Forever). Same call the
+-- game's Legacy window uses.
+local function legacyPoints()
+  local LC = Constants and Constants.LegacyConsts
+  if not (LC and C_Traits and C_Traits.GetConfigIDByTreeID and C_Traits.GetTreeCurrencyInfo) then return 0 end
+  if C_MajorFactions and C_MajorFactions.GetCurrentRenownLevel then
+    local lvl = plain(C_MajorFactions.GetCurrentRenownLevel(LC.LEGACY_REWARD_TRACK_FACTION_ID))
+    if type(lvl) == "number" and lvl <= 0 then return 0 end
+  end
+  local tree = LC.LEGACY_TREE_PROFESSIONS_ID
+  local config = C_Traits.GetConfigIDByTreeID(tree)
+  if not config then return 0 end
+  local info = C_Traits.GetTreeCurrencyInfo(config, tree, false)
+  local q = info and info[1] and plain(info[1].quantity)
+  return type(q) == "number" and q or 0
+end
+
+local function oldRanks()
+  local n = 0
+  for _, b in pairs(ns.keybar and ns.keybar.buttons or {}) do
+    for _, slot in ipairs({ b.plainSlot, b.shiftSlot }) do
+      if slot and ns.keybar.betterRank(slot) then n = n + 1 end
+    end
+  end
+  return n
+end
+
+local function freeBagSlots()
+  if not (C_Container and C_Container.GetContainerNumFreeSlots) then return nil end
+  local free = 0
+  for bag = 0, 4 do
+    local n = plain(C_Container.GetContainerNumFreeSlots(bag))
+    free = free + (type(n) == "number" and n or 0)
+  end
+  return free
+end
+
+-- XP buffs: any buff whose name, spell description or tooltip speaks of
+-- experience. Item and server buffs often say it only in the tooltip.
+-- A buff the auto-match misses can be marked by hand: click the chip, or
+-- /glance xpbuff <name>. Marks are by buff name and kept for every character
+-- (ns.db.xpBuffs: true = XP buff, false = never). Rested XP is in the tooltip.
+local XP_WORDS = { "experience", "%f[%a]xp%f[%A]", "%f[%a]exp%f[%A]" }
+local function speaksOfXP(text)
+  for _, w in ipairs(XP_WORDS) do if text:find(w) then return true end end
+  return false
+end
+
+local function auraText(aura)
+  local parts = {}
+  local id = ns.plain(aura.spellId)
+  if type(id) == "number" and C_Spell and C_Spell.GetSpellDescription then
+    local ok, d = pcall(C_Spell.GetSpellDescription, id)
+    d = ok and ns.plain(d)
+    if type(d) == "string" then table.insert(parts, d) end
+  end
+  local inst = ns.plain(aura.auraInstanceID)
+  if inst and C_TooltipInfo and C_TooltipInfo.GetUnitBuffByAuraInstanceID then
+    local ok, data = pcall(C_TooltipInfo.GetUnitBuffByAuraInstanceID, "player", inst)
+    if ok and type(data) == "table" and type(data.lines) == "table" then
+      for _, line in ipairs(data.lines) do
+        local t = ns.plain(line.leftText)
+        if type(t) == "string" then table.insert(parts, t) end
+      end
+    end
+  end
+  return table.concat(parts, " ")
+end
+
+local function isXPBuff(aura)
+  local name = ns.plain(aura.name)
+  if type(name) ~= "string" then return false end
+  local mark = ns.db.xpBuffs and ns.db.xpBuffs[name]
+  if mark ~= nil then return mark end
+  return speaksOfXP((name .. " " .. auraText(aura)):lower())
+end
+
+local function playerBuffs()
+  local list = {}
+  local get = C_UnitAuras and C_UnitAuras.GetBuffDataByIndex
+  if not get then return list end
+  for i = 1, 40 do
+    local ok, aura = pcall(get, "player", i)
+    if not ok or not aura then break end
+    table.insert(list, aura)
+  end
+  return list
+end
+alerts.playerBuffs = playerBuffs
+
+function alerts.markXP(name, on)
+  ns.db.xpBuffs = ns.db.xpBuffs or {}
+  ns.db.xpBuffs[name] = on
+  alerts.refresh()
+end
+
+local function timeLeft(aura)
+  local ok, left = pcall(function()
+    local e = ns.plain(aura.expirationTime)
+    if type(e) ~= "number" or e == 0 then return nil end
+    return e - GetTime()
+  end)
+  if not ok or not left or left <= 0 then return nil end
+  if left >= 3600 then return string.format("%dh%02dm", left / 3600, (left % 3600) / 60) end
+  if left >= 60 then return string.format("%dm", left / 60) end
+  return string.format("%ds", left)
+end
+
+function alerts.xpBuffs()
+  local found = {}
+  for _, aura in ipairs(playerBuffs()) do
+    if isXPBuff(aura) then table.insert(found, { name = ns.plain(aura.name), left = timeLeft(aura) }) end
+  end
+  return found
+end
+
+local function xpChip()
+  local buffs = alerts.xpBuffs()
+  local seen = ns.char.xpBuffsSeen or {}
+  for _, b in ipairs(buffs) do seen[b.name] = true end
+  ns.char.xpBuffsSeen = seen
+  local tip = {}
+  for _, b in ipairs(buffs) do table.insert(tip, b.name .. (b.left and ("  " .. b.left .. " left") or "")) end
+  local r, m = ns.plain(GetXPExhaustion and GetXPExhaustion() or 0), ns.plain(UnitXPMax and UnitXPMax("player"))
+  if type(r) == "number" and r > 0 and type(m) == "number" and m > 0 then
+    table.insert(tip, string.format("Rested: %d%% of a level", r / m * 100 + 0.5))
+  end
+  if #buffs > 0 then
+    local first = buffs[1]
+    return "XP " .. (first.left or "on") .. (#buffs > 1 and (" +" .. (#buffs - 1)) or ""), true, tip
+  end
+  table.insert(tip, 1, "No XP buff active.")
+  table.insert(tip, "Click to mark one of your buffs as an XP buff.")
+  return "No XP buff", false, tip
+end
+
+-- Reminder: a message in the middle of the screen when you have no XP buff,
+-- at login, when one runs out, and every 10 minutes while it stays off
+-- (out of combat, not in an instance). /glance xpremind off stops it.
+local REMIND_EVERY = 600
+function alerts.remindXP(force)
+  if ns.db.xpRemind == false then return end
+  local has = #alerts.xpBuffs() > 0
+  local now = GetTime and GetTime() or 0
+  local was = alerts.hadXP
+  alerts.hadXP = has
+  if has then return end
+  if InCombatLockdown() then return end
+  if IsInInstance and select(2, IsInInstance()) ~= "none" and select(2, IsInInstance()) ~= nil then return end
+  local due = force or was == true or not alerts.lastRemind or (now - alerts.lastRemind) >= REMIND_EVERY
+  if not due then return end
+  alerts.lastRemind = now
+  local msg = "No XP buff active"
+  if RaidNotice_AddMessage and RaidWarningFrame then
+    pcall(RaidNotice_AddMessage, RaidWarningFrame, msg, { r = 1, g = 0.8, b = 0.35 })
+  end
+  ns.print(msg .. ". (/glance xpremind off to stop these.)")
+  if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
+end
+
+-- Click on the XP chip: a checkbox menu of your buffs. Without the menu
+-- API, the buffs are listed in chat for /glance xpbuff <name>.
+local function xpMenu(owner)
+  local names = {}
+  for _, aura in ipairs(playerBuffs()) do
+    local n = ns.plain(aura.name)
+    if type(n) == "string" then table.insert(names, { name = n, on = isXPBuff(aura) }) end
+  end
+  if MenuUtil and MenuUtil.CreateContextMenu then
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+      root:CreateTitle("Which buffs give XP?")
+      if #names == 0 then root:CreateTitle("(no buffs)") end
+      for _, b in ipairs(names) do
+        root:CreateCheckbox(b.name, function() return b.on end, function()
+          b.on = not b.on
+          alerts.markXP(b.name, b.on)
+        end)
+      end
+    end)
+    return
+  end
+  ns.commands.xpbuff("")
+end
+alerts.xpMenu = xpMenu
+
+ns.commands.xpbuff = function(rest)
+  rest = rest or ""
+  if rest == "" then
+    ns.print("Your buffs (/glance xpbuff <name> marks or unmarks one as an XP buff):")
+    for _, aura in ipairs(playerBuffs()) do
+      local n = ns.plain(aura.name)
+      if type(n) == "string" then ns.print("  " .. n .. (isXPBuff(aura) and "  [XP]" or "")) end
+    end
+    return
+  end
+  local want = rest:lower()
+  for _, aura in ipairs(playerBuffs()) do
+    local n = ns.plain(aura.name)
+    if type(n) == "string" and n:lower() == want then
+      local on = not isXPBuff(aura)
+      alerts.markXP(n, on)
+      ns.print(n .. (on and " is now an XP buff." or " is no longer an XP buff."))
+      return
+    end
+  end
+  ns.print("No buff named \"" .. rest .. "\" on you now.")
+end
+
+ns.commands.xpremind = function(rest)
+  rest = (rest or ""):lower()
+  if rest == "off" then ns.db.xpRemind = false elseif rest == "on" then ns.db.xpRemind = true end
+  ns.print("XP buff reminder " .. (ns.db.xpRemind == false and "off" or "on") .. ".")
+end
+
+local function open(fn, ...) if type(fn) == "function" then pcall(fn, ...) end end
+
+alerts.list = {
+  { key = "talents", label = "Talents", count = unspentTalents, click = function()
+      if PlayerSpellsUtil and PlayerSpellsUtil.ToggleClassTalentOrSpecFrame then
+        open(PlayerSpellsUtil.ToggleClassTalentOrSpecFrame)
+      else open(ToggleTalentFrame) end
+    end },
+  { key = "legacy", label = "Legacy", count = legacyPoints, click = function() open(ToggleLegacySystemUI) end },
+  { key = "ranks", label = "Ranks", count = oldRanks, tip = "Keys with an old spell rank. Click: /glance ranks.",
+    click = function() open(ns.commands.ranks) end },
+  { key = "xp", label = "XP", title = "XP buffs", text = xpChip, click = function(chip) xpMenu(chip) end },
+  { key = "bags", label = "Bags", title = "Bags", text = function()
+      local free = freeBagSlots()
+      if not free then return nil end
+      return "Bags " .. free .. " free", (free <= 2) and false or "plain", { free .. " empty bag slots" }
+    end, click = function() open(ToggleAllBags) end },
+}
+
+function alerts.refresh()
+  if not mm.holder then return end
+  local prev = alerts.reload
+  for _, a in ipairs(alerts.list) do
+    local c = alerts.chips[a.key]
+    local ok, n, good, tip
+    local label
+    if a.text then
+      ok, label, good, tip = pcall(a.text)
+      if not ok then label = nil end
+      n = label and 1 or 0
+      c.tipLines = tip
+      if good == "plain" then
+        c.bg:SetColorTexture(0, 0, 0, 0.4)
+        c.text:SetTextColor(0.9, 0.9, 0.9)
+      elseif good then
+        c.bg:SetColorTexture(0.05, 0.25, 0.1, 0.7)
+        c.text:SetTextColor(0.5, 1, 0.6)
+      else
+        c.bg:SetColorTexture(0.35, 0.22, 0.04, 0.7)
+        c.text:SetTextColor(1, 0.8, 0.35)
+      end
+    else
+      ok, n = pcall(a.count)
+      n = ok and n or 0
+    end
+    if n and n > 0 then
+      c.text:SetText(label or (a.noNumber and a.label or (a.label .. " " .. n)))
+      c:SetWidth((c.text.GetStringWidth and c.text:GetStringWidth() or 50) + 12)
+      c:ClearAllPoints()
+      c:SetPoint("LEFT", prev, "RIGHT", 4, 0)
+      c:Show()
+      prev = c
+    else
+      c:Hide()
+    end
+  end
+end
+
+ns.module("alerts", function()
+  if not (mm.holder and mm.chip) then return end
+  -- Reload: always there, first on the row (handy after an addon update).
+  local r = mm.chip(mm.holder, "Reload")
+  r:SetWidth(50)
+  r:SetPoint("TOPLEFT", mm.tab, "BOTTOMLEFT", 0, -3)
+  r:SetScript("OnClick", function() if ReloadUI then ReloadUI() end end)
+  alerts.reload = r
+  for _, a in ipairs(alerts.list) do
+    local c = mm.chip(mm.holder, a.label)
+    c.bg:SetColorTexture(0.35, 0.22, 0.04, 0.7)
+    c.text:SetTextColor(1, 0.8, 0.35)
+    c:SetScript("OnClick", function()
+      if InCombatLockdown() then return end
+      a.click(c)
+      alerts.refresh()
+    end)
+    if a.text then
+      c:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:SetText(a.title or a.label, 1, 1, 1)
+        for _, line in ipairs(self.tipLines or {}) do GameTooltip:AddLine(line, 0.9, 0.9, 0.9) end
+        GameTooltip:Show()
+      end)
+      c:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    elseif a.tip then
+      c:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:SetText(a.tip, 1, 1, 1, 1, true)
+        GameTooltip:Show()
+      end)
+      c:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    c:Hide()
+    alerts.chips[a.key] = c
+  end
+  for _, ev in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_LEVEL_UP", "CHARACTER_POINTS_CHANGED",
+      "TRAIT_CONFIG_UPDATED", "TRAIT_TREE_CURRENCY_INFO_UPDATED", "SPELLS_CHANGED",
+      "ACTIONBAR_SLOT_CHANGED", "BAG_UPDATE_DELAYED", "PLAYER_REGEN_ENABLED" }) do
+    ns.on(ev, alerts.refresh)
+  end
+  ns.on("UNIT_AURA", function(unit)
+    if unit == "player" then alerts.refresh(); ns.safe("xp remind", alerts.remindXP) end
+  end)
+  if C_Timer and C_Timer.NewTicker then
+    C_Timer.NewTicker(5, alerts.refresh)
+    C_Timer.NewTicker(30, function() ns.safe("xp remind", alerts.remindXP) end)
+  end
+  -- At login, once the buffs have loaded.
+  if C_Timer and C_Timer.After then
+    C_Timer.After(10, function() ns.safe("xp remind", alerts.remindXP, true) end)
+  end
+  alerts.refresh()
+end)

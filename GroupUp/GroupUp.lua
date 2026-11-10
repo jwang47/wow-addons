@@ -13,7 +13,7 @@ local defaults = {
   shown = false,
   onInvite = true,       -- chat summary when someone invites you
   point = nil,           -- saved position { point, x, y }
-  byeText = "Thanks for the group!",  -- /gu bye: said in party chat
+  byeText = "thx for party",  -- /gu bye: said in party chat
   byeDelay = 5,          -- seconds between the thanks and leaving
   byeButton = true,      -- show the button while in a group
   byePoint = nil,        -- its saved position
@@ -371,6 +371,8 @@ events:SetScript("OnEvent", function(_, event, a, b)
     GroupUpDB = type(GroupUpDB) == "table" and GroupUpDB or {}
     for k, v in pairs(defaults) do if GroupUpDB[k] == nil then GroupUpDB[k] = (type(v) == "table") and {} or v end end
     ns.db = GroupUpDB
+    -- The first default text; a text you set with /gu bye text stays.
+    if ns.db.byeText == "Thanks for the group!" then ns.db.byeText = defaults.byeText end
     return
   end
   if not ns.db then return end

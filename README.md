@@ -1,6 +1,6 @@
-# wow-addons: LootValue, Omni, UpgradeFinder and QuestBoard
+# wow-addons: LootValue, Omni, UpgradeFinder, QuestBoard and Glance
 
-Four small World of Warcraft addons for the WoW Forever client (a
+Small World of Warcraft addons for the WoW Forever client (a
 Classic-based client, interface 16001). They should also work on other
 Classic clients with the same APIs, but we test them only on Forever.
 
@@ -15,6 +15,9 @@ Classic clients with the same APIs, but we test them only on Forever.
 - **QuestBoard**: a small board of the quests that matter now: what you
   are doing, what to hand in and the best quests to pick up nearby, with
   XP, rewards and distances (`/qb`). Questie adds places and pick-ups.
+- **Glance** (in testing, not in the releases yet): a lighter HUD with a
+  keyboard-shaped action bar, a square minimap and small floating unit
+  frames (`/glance`).
 
 Download page: https://jwang47.github.io/wow-addons/ (Windows installer).
 Releases: [GitHub releases](https://github.com/jwang47/wow-addons/releases)
@@ -324,7 +327,7 @@ How it works, and what to keep in mind:
   your solo and grouped XP per hour. `/gu invite off` stops that; `/gu
   sum` prints them at any time.
 - **Thanks & leave**: while you are in a group, a button above the party
-  frames says "Thanks for the group!" in party chat and leaves the group 5
+  frames says "thx for party" in party chat and leaves the group 5
   seconds later. Press it again in that time to stay. `/gu bye` does the
   same. `/gu bye text ...` sets the words (empty: leave without a word),
   `/gu bye delay N` the seconds (up to 60), `/gu button off` hides the
@@ -332,6 +335,27 @@ How it works, and what to keep in mind:
 - `/gu reset` moves the panel and the button back, `/gu clear` forgets the
   XP data of this character. Drag the panel to move it; right-click hides it.
 - The data is per character, in `GroupUpDB` (SavedVariables).
+
+## Niceties (in development)
+
+A home for small nice-to-haves. Each one is a file in `Niceties/` and can be
+turned off. It is not in the release yet (not in `tools/release.py`
+`ADDONS`); try it with `dev.ps1 Niceties`.
+
+`/nice` lists the features and their state. `/nice KEY` toggles one,
+`/nice KEY on|off` sets it. The state is in `NicetiesDB` (SavedVariables).
+
+| Key | What it does |
+| --- | --- |
+| `zoom` | Max camera distance (on by default). Sets the `cameraDistanceMaxZoomFactor` CVar to the highest value the client keeps, at each login and loading screen, so you can scroll the camera out much further. The Options slider stops at 2.0; the addon tries 4.0, 3.4, 2.6 and 2.0 and keeps the first one the client takes (or the value the client clamps it to). Off puts back the value you had before. Moving the Options slider changes it until the next login. |
+
+To add a feature: put it in the next free `SpareN.lua` (the `.toc` already
+lists five empty ones, so the game loads it after `/reload`; a new file
+that is not in the `.toc` needs a full restart) and call
+`ns.Add({ key, name, help, apply = function(on, data, why) end })`.
+`apply(true)` runs at each login and when it is turned on, `apply(false)`
+only when it is turned off. Rename the spare file and add a new spare in
+the release that ships it.
 
 ## QuestBoard
 
@@ -500,6 +524,107 @@ small grid (`/buffs`). It is not in the release yet.
 - It replaces the third-party Manners addon: turn Manners off in the
   AddOns list so that the two do not both prompt you.
 
+## Glance
+
+A lighter HUD (`/glance`), still in testing: it is not in the releases
+yet. Try it with `dev.ps1 Glance` (see "Dev mode"), then restart the game
+once. The design mockups are in [docs/glance.md](docs/glance.md).
+
+- **Keyboard bar** (bottom centre): one button per key of the left hand,
+  laid out like the keyboard: 1-6, Tab Q W E R T, A S D F G and
+  Z X (C, V and B stay with the game). At the first login Glance reads each key's binding. A key that
+  fires an action button (Blizzard's bars or Bartender4's) keeps that slot,
+  so your spells show on the keys they are already on. A free key gets an
+  empty slot. Movement keys (dashed, with an arrow) and keys with another
+  command (Tab: Target) keep their binding.
+  - Drag a spell from the spell book onto a key to put it on that key.
+    That is the whole binding: no Key Bindings window.
+  - Hold Shift: the bar shows the Shift layer, and a drop goes there. The
+    small icon in a key's corner is its spell on the other layer.
+  - Drag a spell from one key to another to move it; drop it on a key that
+    has a spell and the two swap. `/glance lock` makes drags need Alt, so a
+    stray drag cannot move anything.
+  - `/glance edit`: drag the gold area around the keys to move the bar;
+    `/glance reset` puts it back. Nothing moves in combat (the game locks
+    action buttons then).
+  - `/glance take F` puts a key with another command on the bar;
+    `/glance free F` gives it back. `/glance take all` takes every key with
+    another command (F: Assist, Z: Sheathe and so on), except
+    Tab, the bag keys and the character pane (B and C, with their Shift
+    layers, keep their commands) and the
+    movement keys. `/glance import` reads your bindings
+    again.
+  - A key that holds an old spell rank (you know a higher one) shows a
+    small amber corner, and its tooltip says so. `/glance ranks` puts your
+    best known rank on every action slot, out of combat.
+  - Glance's keys win over Bartender4's for the same key. Hide the
+    Bartender bars you no longer need in Bartender's options.
+- **Unit frames**: small player and target bars under your character and a
+  cast bar below them. They replace Blizzard's player, target and cast
+  frames (`/glance blizzard on` keeps those).
+- **Edge pointers**: arrows on the minimap's rim for things off the map,
+  with the name and yards: party members (class colours), your map pin and
+  your corpse. Other addons add points with
+  `Glance.minimap.addPointerSource(fn)`; `fn()` returns
+  `{ { mapID, x, y, r, g, b, label }, ... }` in map coordinates.
+- **Edit mode**: the game's Edit Mode (Esc, Edit Mode) also unlocks Glance,
+  the same as `/glance edit`: drag the keyboard bar or the minimap to move
+  them, and the minimap's gold corner to size it. `/glance reset` puts both
+  back.
+- **Minimap**: square, top-right, mouse-wheel zoom, right-click for
+  tracking. Drag the gold corner at its bottom left (it shows when the
+  mouse is over the map) to resize it, hold Shift and turn the mouse wheel
+  over it, or type `/glance map 250` (120 to 400). The zone, coordinates and clock are under it, and the
+  LibDBIcon addon buttons (Questie, Details and the rest) are in one
+  drawer behind the Addons tab. A Reload button sits under it, then amber chips show what you can spend
+  or fix: unspent talent points, Legacy points, keys with an old spell rank
+  and your free bag slots (always shown, amber at 2 or fewer). A green XP chip shows your XP buff and its time left (hover
+  for every XP buff and your rested XP); it turns amber, "No XP buff", when
+  none is on. Then a message in the middle of the screen reminds you, at
+  login, when a buff runs out and every 10 minutes (not in combat or
+  instances). `/glance xpremind off` stops the reminder. Glance finds an XP
+  buff by "experience" or "XP" in its name, spell text or tooltip. If it
+  misses one, click the XP chip and tick the buff (or `/glance xpbuff NAME`);
+  the mark is kept for all your characters. Click one to open that window; it hides when done.
+- **Enemy cast bar**: when your target casts, a large bar with the spell
+  name shows just above your unit frames. Orange when it can be
+  interrupted, grey when not; "COUNTERSPELL" and a gold edge while your
+  Counterspell is ready (from the watch row). In combat, click the bar or
+  the call-out to cast your interrupt (Counterspell, Kick, Pummel or Earth
+  Shock) on your target. The click area stays there in combat while you
+  target a living enemy, even between casts, because the game does not let
+  addons show or hide a spell button in combat.
+- **Watch row**: your key spells (for a mage: Blink, Counterspell, Frost
+  Nova, Ice Block, Cold Snap, Ice Barrier, Evocation) as large icons below
+  the cast bar. Bright when ready, dark with a sweep on cooldown, a short
+  flash when one comes back. `/glance watch add NAME`, `remove NAME`,
+  `reset`. Only spells you know show. Click an icon to cast it.
+- **Range**: the target frame gets a green edge while your longest-range
+  spell reaches the target, red when it does not. Under it is the
+  distance: exact yards for a party or raid member ("23 yd"), and for
+  anyone else a bracket from your spellbook's ranges and, out of combat,
+  the interact distances ("20-28 yd"). The game gives addons no position
+  for other units, so an exact number is not possible there.
+- **Party**: in a group, each party member gets a large class-coloured
+  name above their nameplate, and friendly player nameplates are on.
+  Your own nameplate settings come back when you leave the group.
+  `/glance party off` turns it off.
+- **Old bars**: `/glance bars hide` hides Bartender4's bottom action bars
+  (1, 2 and 5-10; the right-edge bars 3 and 4 stay),
+  Blizzard's bottom bars, the gryphon art and the old XP bar, and draws a
+  thin XP line along the bottom edge. The bag bar, micro menu, pet and
+  stance bars stay. Move click-only items (food, potions) onto Glance keys
+  first. `/glance bars show` brings everything back.
+- **Chat**: Blizzard's chat in the same look: a faint panel, tabs that show
+  under the mouse, no side buttons, a plain edit box, and text that fades
+  after 30 quiet seconds (scroll or hover brings it back).
+- `/glance keybar off`, `/glance units off`, `/glance minimap off` and
+  `/glance chat off` turn a part off (the game reloads).
+
+The bar uses the game's secure action buttons and override bindings
+(`SetOverrideBindingClick`), so it only reads bindings; it never changes
+your saved Key Bindings.
+
 ## Forever client notes
 
 - A secure button (a click that casts) works only when it is registered
@@ -536,6 +661,30 @@ small grid (`/buffs`). It is not in the release yet.
 - The Auction House window is the modern `AuctionHouseFrame`. It is
   load-on-demand, so it can be nil when an `AUCTION_HOUSE_SHOW` handler
   runs first: look again a moment later.
+- Forever has the newer "secret values": `UnitHealth` always, and
+  `UnitPowerMax`, `UnitLevel`, cast times and cooldowns at times, come back
+  hidden. Pass them straight to a status bar or `SetText`; any compare or
+  sum on one is an error ("attempt to compare ... a secret number value").
+  Test with `issecretvalue(v)` first. A cast bar runs on
+  `StatusBar:SetTimerDuration(UnitCastingDuration("player"))`.
+- `Cooldown:SetCooldown` is a protected function. On a cooldown frame that
+  is a child of a secure button, addon code cannot set it (no sweep shows).
+  Put the cooldown on a plain frame laid over the button.
+- A secure button's modified attribute needs its button part:
+  `shift-action1` (or `shift-action*`). A bare `shift-action` is never read,
+  so Shift+key fired the unmodified action.
+- Health (and sometimes power) is secret, but `AbbreviateLargeNumbers` takes
+  secret values and the result can be joined into a string for `SetText`.
+  Wrap it in `pcall` and fall back to the bare value.
+- `UnitDistanceSquared` works only for party and raid members. For any
+  other unit, bracket the distance with `C_Spell.IsSpellInRange` over the
+  spellbook and `CheckInteractDistance` (out of combat).
+- Do not rely on modified attributes for a Shift+key binding. The game reads
+  Shift again when it runs the click (on key up, unless
+  `ActionButtonUseKeyDown` is on), so a Shift let go early fires the plain
+  action. Bind `SHIFT-<key>` to its own hidden secure button instead, and
+  set the override bindings with priority: Bartender4 keeps its own override
+  bindings on the number keys while its bars are hidden.
 
 ## Develop
 

@@ -224,7 +224,7 @@ for _, f in ipairs(pendingTimers) do f() end
 pendingTimers = {}
 check("button shows in a group", GroupUpByeButton and GroupUpByeButton.shown and GroupUpByeButton.text == "Thanks & leave")
 GroupUpByeButton.scripts.OnClick()
-check("thanks said in party chat", sent[1] and sent[1][1] == "Thanks for the group!" and sent[1][2] == "PARTY")
+check("thanks said in party chat", sent[1] and sent[1][1] == "thx for party" and sent[1][2] == "PARTY")
 check("not left yet", left == 0 and GroupUpByeButton.text == "Stay in group")
 GroupUpByeButton.scripts.OnClick()
 for _, f in ipairs(pendingTimers) do f() end

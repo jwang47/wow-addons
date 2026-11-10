@@ -1,0 +1,3 @@
+-- Empty on purpose. The .toc lists this file, so a new nice-to-have can
+-- go here and load with /reload. A new file not in the .toc needs a full
+-- game restart. Use the next free SpareN.lua, then rename it in a release.
