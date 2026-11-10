@@ -32,7 +32,7 @@ the same, and a test checks that every `.toc` version has a section here.
   (`/glance blizzard on` brings those back).
 - A square minimap in the top-right corner: mouse-wheel zoom, the zone,
   coordinates and clock under it, and the addon buttons in one drawer.
-  Drag the gold corner (it shows on mouse-over) or type `/glance map SIZE` to resize it.
+  Drag the gold corner, use Shift+mouse wheel or type `/glance map SIZE` to resize it.
 - `/glance bars hide`: hides the Bartender4 bottom bars (the right-edge
   bars 3 and 4 stay) and Blizzard's bottom bars, the
   gryphon art and the old XP bar (a thin XP line replaces it).

@@ -303,7 +303,8 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   frames (`/glance blizzard on` keeps those).
 - **Minimap**: square, top-right, mouse-wheel zoom, right-click for
   tracking. Drag the gold corner at its bottom left (it shows when the
-  mouse is over the map) to resize it, or type `/glance map 250` (120 to 400). The zone, coordinates and clock are under it, and the
+  mouse is over the map) to resize it, hold Shift and turn the mouse wheel
+  over it, or type `/glance map 250` (120 to 400). The zone, coordinates and clock are under it, and the
   LibDBIcon addon buttons (Questie, Details and the rest) are in one
   drawer behind the Addons tab. A Reload button sits under it, then amber chips show what you can spend
   or fix: unspent talent points, Legacy points, keys with an old spell rank

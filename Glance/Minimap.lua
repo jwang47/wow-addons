@@ -125,7 +125,7 @@ ns.module("minimap", function()
   -- is over the map; drag it to resize (no edit mode needed).
   local grip = CreateFrame("Button", "GlanceMinimapGrip", holder)
   mm.grip = grip
-  grip:SetSize(16, 16)
+  grip:SetSize(20, 20)
   -- Its own strata: the Minimap keeps a strata of its own after the
   -- reparent and would draw over a grip that only has a higher level.
   grip:SetFrameStrata("HIGH")
@@ -160,6 +160,11 @@ ns.module("minimap", function()
   Minimap:SetMaskTexture("Interface\\Buttons\\WHITE8X8")
   Minimap:EnableMouseWheel(true)
   Minimap:SetScript("OnMouseWheel", function(self, d)
+    -- Shift+wheel resizes the map; the wheel alone zooms.
+    if IsShiftKeyDown and IsShiftKeyDown() then
+      mm.setSize((ns.db.mapSize or SIZE) + (d > 0 and 20 or -20))
+      return
+    end
     local z = self:GetZoom() + (d > 0 and 1 or -1)
     if z >= 0 and z <= self:GetZoomLevels() - 1 then self:SetZoom(z) end
   end)

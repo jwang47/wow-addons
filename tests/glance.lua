@@ -459,6 +459,11 @@ Minimap.scripts.hookOnEnter()
 check("grip shows on map hover", _G.GlanceMinimapGrip.alpha == 0.9)
 Minimap.scripts.hookOnLeave()
 check("grip fades off the map", _G.GlanceMinimapGrip.alpha == 0.25)
+local size0 = ns.db.mapSize or 190
+P.shift = true
+Minimap.scripts.OnMouseWheel(Minimap, -1)
+P.shift = false
+check("shift+wheel resizes the map", ns.db.mapSize == size0 - 20, ns.db.mapSize)
 
 -- A combat login defers secure setup.
 for _, line in ipairs(chat) do check("no error", not line:match("failed"), line) end
