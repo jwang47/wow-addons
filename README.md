@@ -94,7 +94,37 @@ like) on the body. It is on by default; `/lv` shows the settings.
   Auto Loot option off (it can only choose when the game does not take
   everything first), and `off` puts your old setting back.
 
-Its functions are on the global `LootValue` table (`adviceLine`,
+### Clear your bags
+
+`/lv clear` opens a panel that acts on the tooltip advice for everything in
+your bags. It opens by itself at a merchant and at the Auction House when it
+has something for you (`/lv clear auto` turns that on and off).
+
+| List | What is in it | What you do |
+| --- | --- | --- |
+| Vendor | grey junk, and weapons and armor whose best option is the vendor | At a merchant, press **Sell** |
+| Disenchant | green and blue gear whose best option is to disenchant it (with Enchanting) | Press **Disenchant**, one click an item |
+| Auction House | unbound items the AH clearly pays more for (the tooltip rule) | At the AH, click a row: the item goes into Auctionator's Selling tab |
+
+- A ticked row ("+") will be sold or disenchanted. Gear whose item level is
+  at or above what you wear in that slot may be an upgrade, so it starts
+  unticked and says why ("item level 31, you wear 28"). Click a row to tick
+  or untick it. LootValue remembers that per item; `/lv clear reset` forgets.
+- It never lists quest items, epics, or locked slots. Cloth, potions,
+  recipes and other items that are not gear are never sold or disenchanted;
+  they can show in the Auction House list. Right-click an AH row to hide it.
+- One press of Sell sells every grey item and at most 12 others
+  (`BUYBACK`), so each item that is not junk is still on the merchant's
+  Buyback tab. Press again for the rest.
+- The game allows a cast only on a real click, so the Disenchant button
+  does one item a click. The panel hides when combat starts.
+- Leatrix Plus and other addons that sell grey junk work beside it: the
+  panel opens a moment after the merchant does and lists what is left.
+- The AH click uses Auctionator's own Selling-tab code (checked against
+  Auctionator 344). If a later Auctionator changes it, the click prints a
+  hint and you pick the item in the Selling tab yourself.
+
+Its functions are on the global `LootValue` table (`adviceLine`, `options`,
 `marketInfo`, `ahWins`, `money`, `scanText`). Another addon can set
 `LootValue.deferTo = "<its name>"` and draw the line itself; LootValue's own
 tooltip hook then stays quiet. (Jiahua's private MageMentor addon does this.)
