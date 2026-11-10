@@ -1,5 +1,5 @@
 ## Interface: 16001
-## Title: Glance
+## Title: Glance: Keyboard Action Bars
 ## Notes: A lighter HUD: a keyboard-shaped action bar, a square minimap and small floating unit frames. /glance
 ## Author: jwang47
 ## Version: 0.1.0
