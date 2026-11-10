@@ -48,7 +48,8 @@ local WRAP_MAX = 2               -- screen lines one text line may take
 ns.MIN_W, ns.MAX_W = 220, 560
 -- Spacing that shows the grouping: a quest's two lines sit close, quests
 -- have a small gap between them, groups a bigger one.
-local SUB_UP, ROW_GAP, GROUP_GAP = 3, 4, 10
+local SUB_UP, ROW_GAP, GROUP_GAP = 3, 8, 12
+local BAR_GAP = 4                -- space above a quest's progress bar
 local FONT, FONT_DIM = "GameFontHighlightSmall", "GameFontDisableSmall"
 -- Where the board shows each kind of quest (for /qb why).
 ns.WHERE = { active = "in the Doing tab (you are on it)", nearby = "in the Log tab, and in Nearby (close by)",
@@ -67,9 +68,17 @@ local function rgb(name) local c = D.COLORS[name] or D.COLORS.yellow return c[1]
 function ns.todo(e)
   local text = ns.todoWho(e)
   -- A hand-in shows what it gives, so you can judge the trip.
-  local tag = e.kind == "turnin" and D.rewardTag and D.rewardTag(e.chain) or D.chainTag and D.chainTag(e.chain)
+  local tag = e.kind == "turnin" and D.rewardTag and D.rewardTag(e.chain) or ns.chainNote(e)
   if tag then text = (text and (text .. "   ") or "") .. tag end
   return text
+end
+
+-- Where the chain leads, for the line under a quest. "XP only" is left
+-- out (the tooltip says it): only gear at the end is worth a line.
+function ns.chainNote(e)
+  local tag = D.chainTag and D.chainTag(e.chain)
+  if not tag or tag == "XP only" then return nil end
+  return (tag:gsub(", XP only$", ""))
 end
 
 -- The lines under an Active quest: each open objective (the first with
@@ -86,7 +95,7 @@ function ns.activeLines(e)
   end
   if #lines == 0 then local t = ns.todoBase(e) if t then table.insert(lines, t) end end
   if e.party and #e.party > 0 then table.insert(lines, "|cff99ccffParty: " .. D.partyText(e.party) .. "|r") end
-  local tag = D.chainTag and D.chainTag(e.chain)
+  local tag = ns.chainNote(e)
   if tag then table.insert(lines, tag) end
   while #lines > ns.ACTIVE_LINES do table.remove(lines) end
   return lines
@@ -614,8 +623,11 @@ end
 -- game). Measures with a hidden font string; without one, keeps the lines.
 function ns.wrapLines(lines, width)
   if not ns.probe and panel then
-    ns.probe = panel:CreateFontString(nil, "OVERLAY", FONT_DIM)
-    if ns.probe.Hide then ns.probe:Hide() end
+    -- Shown but clear: a hidden font string may not measure its text.
+    ns.probe = panel:CreateFontString(nil, "BACKGROUND", FONT_DIM)
+    ns.probe:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
+    if ns.probe.SetWordWrap then ns.probe:SetWordWrap(false) end
+    if ns.probe.SetAlpha then ns.probe:SetAlpha(0) end
   end
   local probe = ns.probe
   if not (probe and probe.GetStringWidth and width and width > 0) then return lines end
@@ -676,7 +688,7 @@ local function makeRow(i)
   r.bar = r:CreateTexture(nil, "ARTWORK")
   r.bar:SetColorTexture(0, 0, 0, 0.5)
   r.bar:SetHeight(2)
-  r.bar:SetPoint("BOTTOMLEFT", 26, 0)
+  r.bar:SetPoint("BOTTOMLEFT", TEXT_X, 0)
   r.bar:SetPoint("BOTTOMRIGHT", -16, 0)
   r.bar:Hide()
   r.fill = r:CreateTexture(nil, "OVERLAY")
@@ -1013,6 +1025,7 @@ function ns.render()
             end
           end
           local rh = n > 0 and (ROW_H + n * (ROW_H - SUB_UP)) or ROW_H
+          if r.bar:IsShown() then rh = rh + BAR_GAP end   -- room between the last line and the bar
           r:SetHeight(rh)
           local gap = todo and ROW_GAP or 1
           table.insert(items, { f = r, y = cy, h = rh, row = true, gap = gap })
