@@ -200,8 +200,10 @@ function A.hint(e)
   local k = e.kind
   if k == "item" then
     if auctionHouseOpen() and api("Auctionator.API.v1.MultiSearchExact") then return "Enter: search the AH   Shift+Enter: link" end
-    if e.questie and not e.owned then return "Enter: where it drops   Shift+Enter: link" end
+    if ns.sources.hasSources(e.id) then return "Enter: where to get it   Shift+Enter: link" end
     return "Enter: link in chat"
+  elseif k == "source" then
+    return e.mapID and "Enter: show on the map and pin it" or "Questie has no location; the quest giver's area is a good start"
   elseif k == "place" then return "Enter: open the map"
   elseif k == "dungeon" then return "Enter: list its loot and quests"
   elseif k == "person" then return "Enter: whisper   Shift+Enter: invite"
@@ -224,12 +226,16 @@ function A.run(e, alt)
       local search = api("Auctionator.API.v1.MultiSearchExact")
       if search then call(search, "Omni", { e.name }) return false end
     end
-    if not alt and e.questie and not e.owned then
-      local npc = firstNpc(questieQuery("item", e.id, "npcDrops"))
-      if npc then return showNpc(npc, e.name .. " (drops from " .. (questieQuery("npc", npc, "name") or "?") .. ")") end
+    if not alt and ns.sources.hasSources(e.id) then
+      ns.showSources(e)
+      return false
     end
     insertLink(itemLink(e.id))
     return true
+  elseif k == "source" then
+    if not e.mapID then say(e.name .. ": no location in Questie") return false end
+    if e.what == "npc" then questiePin(e.sid) end
+    return A.showPick(e.name, { mapID = e.mapID, x = e.x * 100, y = e.y * 100 })
   elseif k == "place" then
     return A.openMap(e.id)
   elseif k == "dungeon" then
@@ -342,6 +348,10 @@ function A.detail(e)
     local d = e.detail or ""
     if e.levels then d = (e.fits and "|cff40ff40" or "|cff9d9d9d") .. e.levels .. "|r  " .. d end
     return d
+  elseif k == "source" then
+    if e.unknown then return "" end
+    local where = e.yards and string.format("|cffffd100%d yd|r", math.floor(e.yards + 0.5)) or (e.zone or "")
+    return "|cff9d9d9d" .. e.verb .. "|r  " .. where
   elseif k == "dungeon" then
     return (e.fits and "|cff40ff40" or "|cff9d9d9d") .. e.low .. "-" .. e.high .. "|r  " .. e.short
       .. "  " .. e.bosses .. " bosses"

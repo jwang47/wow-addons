@@ -632,6 +632,122 @@ function S.dungeonLoot(q)
 end
 
 ---------------------------------------------------------------------------
+-- Where to get an item (Questie): the mobs that drop it, the objects that
+-- hold it and the vendors that sell it. Each source keeps its nearest spawn:
+-- on your map with the distance in yards, else the zone of its first spawn.
+---------------------------------------------------------------------------
+S.SOURCES_PER_GROUP = 20
+S.SOURCE_KINDS = {
+  { "npcDrops", "npc", "Dropped by", "drops" },
+  { "objectDrops", "object", "Found in", "object" },
+  { "vendors", "npc", "Sold by", "sells" },
+}
+
+local function zoneDB()
+  local _, loader = S.questieDB()
+  if not loader then return nil end
+  local ok, zdb = pcall(loader.ImportModule, loader, "ZoneDB")
+  if ok and type(zdb) == "table" and type(zdb.GetUiMapIdByAreaId) == "function" then return zdb end
+end
+
+-- The questie query for npc or object rows.
+local function query(qdb, what, id, key)
+  return call(what == "object" and qdb.QueryObjectSingle or qdb.QueryNPCSingle, id, key)
+end
+
+-- Has Questie any source or quest for the item? (Cheap: a few field reads.)
+function S.hasSources(id)
+  local qdb = S.questieDB()
+  if not qdb then return false end
+  for _, k in ipairs(S.SOURCE_KINDS) do
+    if #ids(call(qdb.QueryItemSingle, id, k[1])) > 0 then return true end
+  end
+  return #ids(call(qdb.QueryItemSingle, id, "relatedQuests")) > 0
+end
+
+-- Groups of source entries for an item, nearest first.
+function S.itemSources(id)
+  local qdb = S.questieDB()
+  if not qdb then return {} end
+  local zdb = zoneDB()
+  local here, px, py = S.playerPos()
+  local w, h = call(api("C_Map.GetMapWorldSize"), here)
+  local mapOf, groups = {}, {}
+  local function uiMap(area)
+    if mapOf[area] == nil then mapOf[area] = zdb and call(zdb.GetUiMapIdByAreaId, zdb, area) or false end
+    return mapOf[area]
+  end
+  for _, k in ipairs(S.SOURCE_KINDS) do
+    local field, what, title, verb = k[1], k[2], k[3], k[4]
+    local list, unknown = {}, 0
+    for _, sid in ipairs(ids(call(qdb.QueryItemSingle, id, field))) do
+      local name = query(qdb, what, sid, "name")
+      if type(name) ~= "string" or name == "" then
+        unknown = unknown + 1 -- listed on the item, but Questie has no row for it
+      else
+        local e = entry("source", what .. ":" .. sid, name, { what = what, sid = sid, verb = verb })
+        e.key = "src:" .. field .. ":" .. sid
+        local spawns = query(qdb, what, sid, "spawns")
+        local best
+        if type(spawns) == "table" then
+          for area, points in pairs(spawns) do
+            local mapID = uiMap(area)
+            if mapID and type(points) == "table" then
+              for _, p in ipairs(points) do
+                if type(p) == "table" and type(p[1]) == "number" and type(p[2]) == "number" then
+                  local x, y = p[1] / 100, p[2] / 100
+                  local d
+                  if mapID == here and px and py and p[1] >= 0 then
+                    d = ((x - px) * (w or 1)) ^ 2 + ((y - py) * (h or 1)) ^ 2
+                  end
+                  -- Nearest on your map; else any spawn on your map; else the first.
+                  local better = not best or (d and (not best.d or d < best.d))
+                    or (not best.d and not d and mapID == here and best.mapID ~= here)
+                  if better then best = { mapID = mapID, x = x, y = y, d = d } end
+                end
+              end
+            end
+          end
+        end
+        if best then
+          e.mapID, e.x, e.y = best.mapID, best.x, best.y
+          if best.d and w and w > 0 then e.yards = math.sqrt(best.d) end
+          if best.mapID == here then e.onMap = true end
+          local info = call(api("C_Map.GetMapInfo"), best.mapID)
+          e.zone = info and info.name
+        end
+        table.insert(list, e)
+      end
+    end
+    table.sort(list, function(a, b)
+      if (a.onMap and 1 or 0) ~= (b.onMap and 1 or 0) then return a.onMap == true end
+      if a.yards and b.yards and a.yards ~= b.yards then return a.yards < b.yards end
+      if (a.zone or "~") ~= (b.zone or "~") then return (a.zone or "~") < (b.zone or "~") end
+      return a.name < b.name
+    end)
+    if #list > 0 or unknown > 0 then
+      local g = { kind = "source", title = title, entries = {}, more = math.max(0, #list - S.SOURCES_PER_GROUP) }
+      for i = 1, math.min(#list, S.SOURCES_PER_GROUP) do g.entries[i] = list[i] end
+      if unknown > 0 then
+        local noun = what == "object" and "object" or "NPC"
+        local e = entry("source", "unknown:" .. field, string.format("%d %s%s Questie has no location for", unknown, noun,
+          unknown > 1 and "s" or ""), { what = what, verb = verb, unknown = true })
+        table.insert(g.entries, e)
+      end
+      table.insert(groups, g)
+    end
+  end
+  -- The quests that need it: their giver is often near where it is found.
+  local quests = {}
+  for _, qid in ipairs(ids(call(qdb.QueryItemSingle, id, "relatedQuests"))) do
+    local name = call(qdb.QueryQuestSingle, qid, "name")
+    if type(name) == "string" and name ~= "" then table.insert(quests, entry("quest", qid, name, { questie = true })) end
+  end
+  if #quests > 0 then table.insert(groups, { kind = "quest", title = "For quests", entries = quests }) end
+  return groups
+end
+
+---------------------------------------------------------------------------
 -- Nearby: Questie NPCs with a spawn on the map you stand on, matched by name
 -- and title ("tailor" finds "Artisan Tailor"), nearest first. The map index
 -- (uiMapID -> NPCs with their nearest spawn point there) is built once, a

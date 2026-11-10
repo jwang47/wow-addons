@@ -181,12 +181,16 @@ local QUEST = { [65] = { name = "The Defias Brotherhood", startedBy = { { 234 } 
   [6563] = { name = "The Essence of Aku'Mai", startedBy = { { 12736 } }, questLevel = 22, zoneOrSort = 719 },
   [6921] = { name = "Amongst the Ruins", questLevel = 27, zoneOrSort = 10020 } }
 local ITEM = { [3307] = { name = "Gnoll Paw", npcDrops = { 235 } }, [4306] = { name = "Silk Cloth" },
-  [7000] = { name = "Heartwood Girdle", questRewards = { 6563 } } }
+  [7000] = { name = "Heartwood Girdle", questRewards = { 6563 } },
+  [2589] = { name = "Linen Cloth", objectDrops = { 50 }, vendors = { 234 } },
+  [280132] = { name = "Perfect Razormaw Egg", objectDrops = { 671892, 671931 }, relatedQuests = { 65 } } }
+local OBJECT = { [50] = { name = "Old Crate", spawns = { [10] = { { 40, 60 } } } } }
 local AREA = { [40] = 1436, [10] = 1431, [1581] = 9002 }
 local QuestieDB = {
   QueryNPCSingle = function(id, key) return NPC[id] and NPC[id][key] end,
   QueryQuestSingle = function(id, key) return QUEST[id] and QUEST[id][key] end,
   QueryItemSingle = function(id, key) return ITEM[id] and ITEM[id][key] end,
+  QueryObjectSingle = function(id, key) return OBJECT[id] and OBJECT[id][key] end,
 }
 -- Questie's manual icons: ShowNPC adds frames, ResetManualFrames clears a type.
 QuestieMapMock = { frames = {} }
@@ -580,7 +584,41 @@ g = ns.search("gnoll")
 check("quest item in Items", names(g, "item") == "Gnoll Paw")
 ns.open("gnoll paw")
 OmniSearchBox.scripts.OnEnterPressed(OmniSearchBox)
-check("quest item shows where it drops", chat[#chat]:find("drops from Salma") ~= nil)
+check("Enter on an item lists where to get it", OmniSearchBox:GetText() == "from: Gnoll Paw" and OmniFrame:IsShown())
+g = ns.search("from: gnoll paw")
+check("sources: dropped by, nearest spawn on your map", g[1] and g[1].title == "Dropped by" and names(g, "source") == "Salma Saldean")
+check("source row: verb and zone (no position)", strip(ns.actions.detail(g[1].entries[1])) == "drops  Westfall")
+C_Map.GetPlayerMapPosition = function(m) return { GetXY = function() return 0.56, 0.25 end } end
+C_Map.GetMapWorldSize = function(m) return 1000, 500 end
+g = ns.search("from: gnoll paw")
+check("source row: verb and yards on your map", strip(ns.actions.detail(g[1].entries[1])) == "drops  31 yd")
+C_Map.GetMapWorldSize, C_Map.GetPlayerMapPosition = nil, nil
+ns.refresh()
+OmniSearchBox.scripts.OnEnterPressed(OmniSearchBox)
+check("Enter on a source pins its nearest spawn", chat[#chat]:find("^.*Salma Saldean: .*%(56, 31%), map pin set") ~= nil)
+check("an item without sources has none", #ns.search("from: silk cloth") == 0)
+check("and says Questie has no source", ns.emptyText == "Questie has no drop, object or vendor for Silk Cloth")
+check("a unique start of a name is enough", #ns.search("from: gnoll p") == 1)
+check("unknown item name says so", #ns.search("from: perfect egg") == 0 and ns.emptyText:find('^No item called "perfect egg"') ~= nil)
+do
+  local function titles(groups)
+    local t = {}
+    for _, grp in ipairs(groups) do table.insert(t, grp.title) end
+    return table.concat(t, ",")
+  end
+  ns.fromID, ns.fromName = 2589, "linen cloth"
+  local src = ns.search("from: linen cloth")
+  check("objects and vendors too", titles(src) == "Found in,Sold by")
+  check("vendor row says sells", strip(ns.actions.detail(src[2].entries[1])):find("^sells") ~= nil)
+  check("object off your map shows its zone", src[1].entries[1].zone ~= nil and not src[1].entries[1].onMap)
+  -- Objects Questie lists on the item but has no row for (Forever quests):
+  -- say so, and show the quest that needs the item.
+  ns.fromID, ns.fromName = 280132, "perfect razormaw egg"
+  src = ns.search("from: perfect razormaw egg")
+  check("unknown objects get one row that says so", titles(src) == "Found in,For quests"
+    and src[1].entries[1].name == "2 objects Questie has no location for")
+  check("the quest that needs it", src[2].entries[1].kind == "quest" and src[2].entries[1].name == "The Defias Brotherhood")
+end
 g = ns.search("silk cloth")
 check("Questie copy of an owned item is not listed twice", names(g, "item") == "Silk Cloth")
 
@@ -664,7 +702,7 @@ OmniDB.chars["Ded-Forever"].mail[3307] = 0
 ns.open("gnoll paw")
 chat = {}
 OmniSearchBox.scripts.OnEnterPressed(OmniSearchBox)
-check("cached quest item still shows its drops", chat[#chat] and chat[#chat]:find("drops from Salma") ~= nil)
+check("cached quest item still shows its drops", OmniSearchBox:GetText() == "from: Gnoll Paw")
 
 -- Every group is reachable with the arrow keys, and the view scrolls.
 do
