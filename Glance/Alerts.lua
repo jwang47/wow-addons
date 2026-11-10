@@ -64,6 +64,68 @@ local function freeBagSlots()
   return free
 end
 
+-- XP buffs: any buff whose name or description speaks of experience.
+-- A buff seen once is remembered, so its chip turns amber ("XP buff off")
+-- when it runs out. Rested XP is listed in the tooltip.
+local function isXPBuff(aura)
+  local name = ns.plain(aura.name)
+  if type(name) ~= "string" then return false end
+  local text = name:lower()
+  local id = ns.plain(aura.spellId)
+  if type(id) == "number" and C_Spell and C_Spell.GetSpellDescription then
+    local ok, d = pcall(C_Spell.GetSpellDescription, id)
+    d = ok and ns.plain(d)
+    if type(d) == "string" then text = text .. " " .. d:lower() end
+  end
+  return text:find("experience") ~= nil or text:find("%f[%a]xp%f[%A]") ~= nil
+end
+
+local function timeLeft(aura)
+  local ok, left = pcall(function()
+    local e = ns.plain(aura.expirationTime)
+    if type(e) ~= "number" or e == 0 then return nil end
+    return e - GetTime()
+  end)
+  if not ok or not left or left <= 0 then return nil end
+  if left >= 3600 then return string.format("%dh%02dm", left / 3600, (left % 3600) / 60) end
+  if left >= 60 then return string.format("%dm", left / 60) end
+  return string.format("%ds", left)
+end
+
+function alerts.xpBuffs()
+  local found = {}
+  local get = C_UnitAuras and C_UnitAuras.GetBuffDataByIndex
+  if not get then return found end
+  for i = 1, 40 do
+    local ok, aura = pcall(get, "player", i)
+    if not ok or not aura then break end
+    if isXPBuff(aura) then table.insert(found, { name = ns.plain(aura.name), left = timeLeft(aura) }) end
+  end
+  return found
+end
+
+local function xpChip()
+  local buffs = alerts.xpBuffs()
+  local seen = ns.char.xpBuffsSeen or {}
+  for _, b in ipairs(buffs) do seen[b.name] = true end
+  ns.char.xpBuffsSeen = seen
+  local tip = {}
+  for _, b in ipairs(buffs) do table.insert(tip, b.name .. (b.left and ("  " .. b.left .. " left") or "")) end
+  local r, m = ns.plain(GetXPExhaustion and GetXPExhaustion() or 0), ns.plain(UnitXPMax and UnitXPMax("player"))
+  if type(r) == "number" and r > 0 and type(m) == "number" and m > 0 then
+    table.insert(tip, string.format("Rested: %d%% of a level", r / m * 100 + 0.5))
+  end
+  if #buffs > 0 then
+    local first = buffs[1]
+    return "XP " .. (first.left or "on") .. (#buffs > 1 and (" +" .. (#buffs - 1)) or ""), true, tip
+  end
+  if next(seen) then
+    table.insert(tip, 1, "No XP buff active.")
+    return "XP buff off", false, tip
+  end
+  return nil
+end
+
 local function open(fn, ...) if type(fn) == "function" then pcall(fn, ...) end end
 
 alerts.list = {
@@ -75,6 +137,7 @@ alerts.list = {
   { key = "legacy", label = "Legacy", count = legacyPoints, click = function() open(ToggleLegacySystemUI) end },
   { key = "ranks", label = "Ranks", count = oldRanks, tip = "Keys with an old spell rank. Click: /glance ranks.",
     click = function() open(ns.commands.ranks) end },
+  { key = "xp", label = "XP", text = xpChip, click = function() end },
   { key = "bags", label = "Bags full", count = function()
       local free = freeBagSlots()
       return (free and free <= 2) and 1 or 0
@@ -86,10 +149,26 @@ function alerts.refresh()
   local prev = alerts.reload
   for _, a in ipairs(alerts.list) do
     local c = alerts.chips[a.key]
-    local ok, n = pcall(a.count)
-    n = ok and n or 0
+    local ok, n, good, tip
+    local label
+    if a.text then
+      ok, label, good, tip = pcall(a.text)
+      if not ok then label = nil end
+      n = label and 1 or 0
+      c.tipLines = tip
+      if good then
+        c.bg:SetColorTexture(0.05, 0.25, 0.1, 0.7)
+        c.text:SetTextColor(0.5, 1, 0.6)
+      else
+        c.bg:SetColorTexture(0.35, 0.22, 0.04, 0.7)
+        c.text:SetTextColor(1, 0.8, 0.35)
+      end
+    else
+      ok, n = pcall(a.count)
+      n = ok and n or 0
+    end
     if n and n > 0 then
-      c.text:SetText(a.noNumber and a.label or (a.label .. " " .. n))
+      c.text:SetText(label or (a.noNumber and a.label or (a.label .. " " .. n)))
       c:SetWidth((c.text.GetStringWidth and c.text:GetStringWidth() or 50) + 12)
       c:ClearAllPoints()
       c:SetPoint("LEFT", prev, "RIGHT", 4, 0)
@@ -118,7 +197,15 @@ ns.module("alerts", function()
       a.click()
       alerts.refresh()
     end)
-    if a.tip then
+    if a.text then
+      c:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:SetText("XP buffs", 1, 1, 1)
+        for _, line in ipairs(self.tipLines or {}) do GameTooltip:AddLine(line, 0.9, 0.9, 0.9) end
+        GameTooltip:Show()
+      end)
+      c:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    elseif a.tip then
       c:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
         GameTooltip:SetText(a.tip, 1, 1, 1, 1, true)
@@ -134,6 +221,7 @@ ns.module("alerts", function()
       "ACTIONBAR_SLOT_CHANGED", "BAG_UPDATE_DELAYED", "PLAYER_REGEN_ENABLED" }) do
     ns.on(ev, alerts.refresh)
   end
+  ns.on("UNIT_AURA", function(unit) if unit == "player" then alerts.refresh() end end)
   if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(5, alerts.refresh) end
   alerts.refresh()
 end)

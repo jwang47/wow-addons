@@ -312,7 +312,9 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   LibDBIcon addon buttons (Questie, Details and the rest) are in one
   drawer behind the Addons tab. A Reload button sits under it, then amber chips show what you can spend
   or fix: unspent talent points, Legacy points, keys with an old spell rank
-  and full bags. Click one to open that window; it hides when done.
+  and full bags. A green XP chip shows your XP buff and its time left (hover
+  for every XP buff and your rested XP); it turns amber, "XP buff off",
+  when a buff you had runs out. Click one to open that window; it hides when done.
 - **Watch row**: your key spells (for a mage: Blink, Counterspell, Frost
   Nova, Ice Block, Cold Snap, Ice Barrier, Evocation) as large icons below
   the cast bar. Bright when ready, dark with a sweep on cooldown, a short

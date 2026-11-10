@@ -428,6 +428,19 @@ ReloadUI = function() reloaded = true end
 A.reload.scripts.OnClick()
 check("reload button", reloaded)
 
+-- XP buffs.
+GetTime = GetTime or function() return 1000 end
+local now = GetTime()
+local buffs = { { name = "Arcane Intellect", spellId = 1459 }, { name = "Rested Wisdom", spellId = 9001, expirationTime = now + 2520 } }
+C_UnitAuras = { GetBuffDataByIndex = function(_, i) return buffs[i] end }
+C_Spell.GetSpellDescription = function(id) return id == 9001 and "Experience gained increased by 50%." or "Intellect up." end
+A.refresh()
+check("xp buff chip", A.chips.xp.shown and A.chips.xp.text.text == "XP 42m", A.chips.xp.text.text)
+check("xp buff tooltip", A.chips.xp.tipLines[1] == "Rested Wisdom  42m left", A.chips.xp.tipLines and A.chips.xp.tipLines[1])
+buffs = { { name = "Arcane Intellect", spellId = 1459 } }
+A.refresh()
+check("xp buff off when it runs out", A.chips.xp.shown and A.chips.xp.text.text == "XP buff off", A.chips.xp.text.text)
+
 -- Watch row: key spells by name from the spellbook.
 local NAMES = { [1953] = "Blink", [2139] = "Counterspell", [116] = "Frostbolt" }
 C_Spell.GetSpellName = function(id) return NAMES[id] or (SPELLS[id] and SPELLS[id][1]) end
