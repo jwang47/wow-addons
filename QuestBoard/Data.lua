@@ -175,18 +175,22 @@ end
 ---------------------------------------------------------------------------
 -- Your quest log
 ---------------------------------------------------------------------------
--- Objectives left: { text, have, need } for each unfinished objective.
+-- Objectives left: { text, have, need } for each unfinished objective,
+-- then how many there are, the summed count, and how far along the quest
+-- is (0-1, each objective weighs the same).
 local function objectivesLeft(id)
   local list = call(api("C_QuestLog.GetQuestObjectives"), id)
-  local left, all, count = {}, 0, 0
+  local left, all, count, sum = {}, 0, 0, 0
   for _, o in ipairs(type(list) == "table" and list or {}) do
     all = all + 1
     count = count + (plain(o.numFulfilled) or 0) + (o.finished and 1 or 0)
+    local have, need = plain(o.numFulfilled) or 0, plain(o.numRequired) or 0
+    sum = sum + ((o.finished and 1) or (need > 0 and math.min(1, have / need)) or 0)
     if not o.finished then
       table.insert(left, { text = o.text, have = plain(o.numFulfilled), need = plain(o.numRequired) })
     end
   end
-  return left, all, count
+  return left, all, count, all > 0 and sum / all or nil
 end
 
 -- One entry per quest in the log, headers skipped.
@@ -208,11 +212,11 @@ function D.logQuests()
       if done == nil then
         done = (call(api("C_QuestLog.ReadyForTurnIn"), id) or call(api("C_QuestLog.IsComplete"), id)) and true or false
       end
-      local left, all, count = objectivesLeft(id)
+      local left, all, count, frac = objectivesLeft(id)
       -- A quest with objectives and none left is ready even if the flag lags.
       if all > 0 and #left == 0 then done = true end
       table.insert(list, { id = id, name = name, level = plain(level), header = zone, done = done,
-        left = left, objectives = all, count = count, index = i, kind = done and "turnin" or "log" })
+        left = left, objectives = all, count = count, frac = frac, index = i, kind = done and "turnin" or "log" })
     end
   end
   return list

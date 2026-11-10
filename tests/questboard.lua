@@ -597,6 +597,14 @@ for _, f in ipairs(frames) do
   end
 end
 check("pinned: a star on the quest you marked", starred and not others)
+-- Progress bars: Active quest 122 is 3/6 = half way, in gold.
+local barRow
+for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and f.entry.id == 122 then barRow = f end end
+check("progress: half way", barRow.entry.frac == 0.5)
+check("progress: the bar shows", barRow.bar.shown and barRow.fill.shown)
+local turnBar
+for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and f.entry.id == 127 then turnBar = f end end
+check("progress: no bar on a hand-in", not turnBar.bar.shown)
 -- On a job: Active plus hand-ins and pick-ups on the way; the rest on hover.
 local shownIDs = {}
 for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown then table.insert(shownIDs, f.entry.id) end end

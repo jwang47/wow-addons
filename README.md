@@ -316,6 +316,9 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   row for the XP per minute of the trip. Questie's distance is in world
   yards, so a finisher in the next zone counts the full run; one on
   another continent shows "far".
+- A quest in your log that is not done has a thin progress bar along the
+  bottom of its row (each objective weighs the same): gold in Active,
+  blue elsewhere.
 - A quest you Alt-clicked (pinned) has a gold star before its name.
   Alt-click an area to pin every quest in your log there at once (again
   to unpin them); the area gets the star when all of them are pinned.

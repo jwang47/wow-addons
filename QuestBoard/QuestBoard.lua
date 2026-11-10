@@ -445,6 +445,17 @@ local function makeRow(i)
   r.pin:SetPoint("LEFT", r.lvl, "RIGHT", 5, 0)
   r.pin:Hide()
   wheel(r)
+  -- Progress bar along the bottom of a quest you are on.
+  r.bar = r:CreateTexture(nil, "ARTWORK")
+  r.bar:SetColorTexture(0, 0, 0, 0.5)
+  r.bar:SetHeight(2)
+  r.bar:SetPoint("BOTTOMLEFT", 26, 0)
+  r.bar:SetPoint("BOTTOMRIGHT", -16, 0)
+  r.bar:Hide()
+  r.fill = r:CreateTexture(nil, "OVERLAY")
+  r.fill:SetHeight(2)
+  r.fill:SetPoint("BOTTOMLEFT", r.bar, "BOTTOMLEFT", 0, 0)
+  r.fill:Hide()
   r.hl = r:CreateTexture(nil, "BACKGROUND")
   r.hl:SetAllPoints()
   r.hl:SetColorTexture(1, 1, 1, 0.06)
@@ -497,6 +508,18 @@ end
 
 ns.scroll = 0            -- pixels scrolled down inside the groups
 ns.MIN_HEIGHT = 80
+
+-- The bar: for log quests not done yet; gold in Active, blue elsewhere.
+ns.BAR_W = W - 2 * PAD - 26 - 16
+function ns.setBar(r, e, kind)
+  if e.kind ~= "log" or e.done or not e.frac then r.bar:Hide() r.fill:Hide() return end
+  r.bar:Show()
+  if kind == "active" then r.fill:SetColorTexture(1, 0.82, 0.25, 0.9) else r.fill:SetColorTexture(0.45, 0.7, 1, 0.7) end
+  local w = math.floor(ns.BAR_W * math.max(0, math.min(1, e.frac)) + 0.5)
+  if w < 1 then r.fill:Hide() return end
+  r.fill:SetWidth(w)
+  r.fill:Show()
+end
 
 -- Lays out the groups from the last result. The title and the Next line
 -- stay at the top; the groups below scroll when the board is taller than
@@ -560,6 +583,7 @@ function ns.render()
           r.name:SetPoint("RIGHT", r.meta, "LEFT", -6, 0)
           if e.pinned then r.pin:Show() else r.pin:Hide() end
           r.meta:SetText(ns.meta(e))
+          ns.setBar(r, e, kind)
           local todo = (not ns.db.compact) and (e.kind ~= "pickup" and ns.todo(e) or e.kind == "pickup" and D.chainTag(e.chain))
           r.sub:SetText(todo or "")
           local rh = todo and ROW_H * 2 - 2 or ROW_H
