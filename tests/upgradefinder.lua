@@ -1044,8 +1044,8 @@ sb.scripts.OnClick(sb)
 check("shop: the button shops for the selected recipe", UpgradeFinderDB.shop and UpgradeFinderDB.shop.crafts[1] == "3x Bolt of Silk Cloth")
 nChat = #chat
 SlashCmdList.UPGRADEFINDER("shop debug")
-check("/uf shop debug says where the button is", tostring(chat[nChat + 1]):find("^UpgradeFinderShopButton: shown") ~= nil
-  and tostring(chat[#chat]):find("^last error") ~= nil)
+check("/uf shop debug says where the button is", tostring(chat[nChat + 1]):find("UpgradeFinderShopButton: shown", 1, true) ~= nil
+  and tostring(chat[#chat]):find("last error", 1, true) ~= nil)
 TradeSkillFrame, TradeSkillReagentLabel = nil, nil
 Cr.bankSeen(false)
 Auctionator.API.v1.CreateShoppingList, Auctionator.API.v1.ConvertToSearchString = nil, nil
