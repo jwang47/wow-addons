@@ -602,12 +602,16 @@ end
 C.shopText = shopText
 function C.shopButton()
   if shopButton or not rawget(_G, "TradeSkillFrame") then return shopButton end
-  local label = rawget(_G, "TradeSkillReagentLabel")
-  local parent = rawget(_G, "TradeSkillDetailScrollChildFrame") or rawget(_G, "TradeSkillFrame")
-  shopButton = CreateFrame("Button", "UpgradeFinderShopButton", parent, "UIPanelButtonTemplate")
-  shopButton:SetSize(64, 18)
-  if label then shopButton:SetPoint("LEFT", label, "RIGHT", 8, 0)
-  else shopButton:SetPoint("TOPRIGHT", rawget(_G, "TradeSkillFrame"), "TOPRIGHT", -40, -50) end
+  -- Parented to TradeSkillFrame itself, as Auctionator's crafting info is:
+  -- Forever's profession window does not show the old detail scroll child,
+  -- so a button inside it never appeared. The frame level keeps it above
+  -- the detail pane's art.
+  local frame, label = rawget(_G, "TradeSkillFrame"), rawget(_G, "TradeSkillReagentLabel")
+  shopButton = CreateFrame("Button", "UpgradeFinderShopButton", frame, "UIPanelButtonTemplate")
+  shopButton:SetSize(72, 20)
+  if shopButton.SetFrameLevel and frame.GetFrameLevel then shopButton:SetFrameLevel((frame:GetFrameLevel() or 0) + 20) end
+  if label then shopButton:SetPoint("LEFT", label, "RIGHT", 10, 0)
+  else shopButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -40, -50) end
   if shopButton.SetNormalFontObject and rawget(_G, "GameFontNormalSmall") then
     shopButton:SetNormalFontObject(rawget(_G, "GameFontNormalSmall"))
   end
