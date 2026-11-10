@@ -388,6 +388,10 @@ local opened
 ToggleLegacySystemUI = function() opened = "legacy" end
 A.chips.legacy.scripts.OnClick()
 check("legacy chip opens the Legacy window", opened == "legacy")
+local reloaded
+ReloadUI = function() reloaded = true end
+A.reload.scripts.OnClick()
+check("reload button", reloaded)
 
 -- Party: names over party members, group CVars on and back.
 local cvars = { nameplateShowFriendlyPlayers = "0", nameplateShowFriendlyClassColor = "0", UnitNameFriendlyPlayerName = "0" }

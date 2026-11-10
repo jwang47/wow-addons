@@ -1,4 +1,4 @@
--- Glance alerts: small amber chips under the minimap for things you can
+-- Glance alerts: a Reload button, then small amber chips under the minimap for things you can
 -- spend or fix: unspent talent points, legacy points, keys with an old
 -- spell rank, full bags. A chip shows only while there is something to do;
 -- a click opens the matching window.
@@ -83,7 +83,7 @@ alerts.list = {
 
 function alerts.refresh()
   if not mm.holder then return end
-  local prev
+  local prev = alerts.reload
   for _, a in ipairs(alerts.list) do
     local c = alerts.chips[a.key]
     local ok, n = pcall(a.count)
@@ -92,8 +92,7 @@ function alerts.refresh()
       c.text:SetText(a.noNumber and a.label or (a.label .. " " .. n))
       c:SetWidth((c.text.GetStringWidth and c.text:GetStringWidth() or 50) + 12)
       c:ClearAllPoints()
-      if prev then c:SetPoint("LEFT", prev, "RIGHT", 4, 0)
-      else c:SetPoint("TOPLEFT", mm.tab, "BOTTOMLEFT", 0, -3) end
+      c:SetPoint("LEFT", prev, "RIGHT", 4, 0)
       c:Show()
       prev = c
     else
@@ -104,6 +103,12 @@ end
 
 ns.module("alerts", function()
   if not (mm.holder and mm.chip) then return end
+  -- Reload: always there, first on the row (handy after an addon update).
+  local r = mm.chip(mm.holder, "Reload")
+  r:SetWidth(50)
+  r:SetPoint("TOPLEFT", mm.tab, "BOTTOMLEFT", 0, -3)
+  r:SetScript("OnClick", function() if ReloadUI then ReloadUI() end end)
+  alerts.reload = r
   for _, a in ipairs(alerts.list) do
     local c = mm.chip(mm.holder, a.label)
     c.bg:SetColorTexture(0.35, 0.22, 0.04, 0.7)
