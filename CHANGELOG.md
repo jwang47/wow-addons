@@ -19,14 +19,14 @@ the same, and a test checks that every `.toc` version has a section here.
   auctions. `/lv sales reset` clears the counts.
 - What sells on the whole AH, from full scans: "AH market: ~34 sold in
   2d, 120 listed, ~9s each". LootValue reads each full scan (its own Scan
-  button under the AH window, or Auctionator's Full Scan) and keeps every
+  button above the AH window, or Auctionator's Full Scan) and keeps every
   auction. An auction that is gone in the next scan while it still had
   more time left than passed counts as sold; a seller who posts the same
   stack again at another price counts as a repost, not a sale.
 - The scan does not freeze the game: it reads the rows a few milliseconds
   a frame. Stay at the AH until the status says "read" (a second or two),
   then walk away; the compare goes on in the background. The status and
-  the percentage show under the AH window on every tab. `/lv scan` prints
+  the percentage show above the AH window on every tab. `/lv scan` prints
   it, `/lv scan now` starts a full scan.
 - With 10+ listed and none sold across your scans, the AH advice counts
   the market as slow ("none sold in 8h").

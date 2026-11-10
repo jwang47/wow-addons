@@ -438,6 +438,7 @@ check("scan: AH closed while reading drops the scan", LootValueDB.snap == before
 -- A market with 10+ listed and no sales is slow.
 LootValueDB.market[9003] = { string.format("%d,%d,0,0,40,0,0,0", T, 8 * 3600) }
 check("scan: none sold makes the market slow", has(LV.marketInfo("|Hitem:9003:0|h[Thing]|h").note, "none sold in 8h"))
+check("scan: thousands", SC.number(164749) == "164,749" and SC.number(100) == "100" and SC.number(1000000) == "1,000,000")
 AL.slash("scan")
 check("/lv scan prints the status", has(chat[#chat], "last full scan"))
 

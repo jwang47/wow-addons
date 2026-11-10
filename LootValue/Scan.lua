@@ -17,7 +17,7 @@
 -- that the AH closes before it is read is dropped, so a part list never
 -- looks like sales.
 --
--- Status and progress show under the AH window on every tab. /lv scan
+-- Status and progress show above the AH window on every tab. /lv scan
 -- prints it; /lv scan now starts a full scan.
 local LV = LootValue
 local S = {}
@@ -139,6 +139,13 @@ local function setState(state, extra)
   if S.paint then S.paint() end
 end
 
+-- 164749 -> "164,749".
+function S.number(n)
+  local s = tostring(math.floor(n))
+  local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+  return (out:gsub("^,", ""))
+end
+
 local function pct(a, b) return b and b > 0 and math.floor(a * 100 / b) or 0 end
 
 function S.statusText()
@@ -154,7 +161,7 @@ function S.statusText()
   local parts = {}
   if st == "failed" then table.insert(parts, job.why) end
   if d.snap and d.snap.t then
-    table.insert(parts, string.format("last full scan %s (%d auctions)", LV.ago(d.snap.t), d.snap.n or 0))
+    table.insert(parts, string.format("last full scan %s (%s auctions)", LV.ago(d.snap.t), S.number(d.snap.n or 0)))
   else
     table.insert(parts, "no full scan yet")
   end
@@ -263,7 +270,7 @@ end
 
 local function finish(snap, prev, soldAuctions)
   db().snap = snap
-  local text = string.format("full scan read: %d auctions of %d items.", snap.n, snap.itemCount)
+  local text = string.format("full scan read: %s auctions of %s items.", S.number(snap.n), S.number(snap.itemCount))
   if prev then
     text = text .. string.format(" Since the full scan %s: about %d auctions sold.", LV.ago(prev.t), soldAuctions)
   else
@@ -448,7 +455,7 @@ function S.slowNote(link)
 end
 
 ---------------------------------------------------------------------------
--- Status under the AH window, on every tab.
+-- Status above the AH window, on every tab.
 ---------------------------------------------------------------------------
 
 local panel
@@ -465,11 +472,11 @@ function S.addPanel(tries)
     end
     return
   end
-  -- Below the window, on the right (the tabs hang on the left), so it
-  -- stays the same on every tab.
+  -- Just above the window, on the right, so it stays the same on every
+  -- tab. Not below it: the tabs (and Auctionator's) hang there.
   panel = CreateFrame("Frame", nil, ah)
-  panel:SetSize(420, 24)
-  panel:SetPoint("TOPRIGHT", ah, "BOTTOMRIGHT", name == "AuctionFrame" and -10 or 0, name == "AuctionFrame" and 8 or -2)
+  panel:SetSize(460, 24)
+  panel:SetPoint("BOTTOMRIGHT", ah, "TOPRIGHT", name == "AuctionFrame" and -10 or 0, 2)
   panel:SetFrameLevel((ah.GetFrameLevel and ah:GetFrameLevel() or 0) + 10)
   local button = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   button:SetSize(60, 20)
