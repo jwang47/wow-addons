@@ -203,6 +203,7 @@ function A.hint(e)
     if e.questie and not e.owned then return "Enter: where it drops   Shift+Enter: link" end
     return "Enter: link in chat"
   elseif k == "place" then return "Enter: open the map"
+  elseif k == "dungeon" then return "Enter: list its loot and quests"
   elseif k == "person" then return "Enter: whisper   Shift+Enter: invite"
   elseif k == "spell" then return "Enter: put on the cursor   Shift+Enter: link"
   elseif k == "command" then return "Enter: run"
@@ -231,6 +232,9 @@ function A.run(e, alt)
     return true
   elseif k == "place" then
     return A.openMap(e.id)
+  elseif k == "dungeon" then
+    ns.setText("loot: " .. e.short)
+    return false
   elseif k == "person" then
     if alt then
       local invite = api("C_PartyInfo.InviteUnit") or rawget(_G, "InviteUnit")
@@ -338,6 +342,9 @@ function A.detail(e)
     local d = e.detail or ""
     if e.levels then d = (e.fits and "|cff40ff40" or "|cff9d9d9d") .. e.levels .. "|r  " .. d end
     return d
+  elseif k == "dungeon" then
+    return (e.fits and "|cff40ff40" or "|cff9d9d9d") .. e.low .. "-" .. e.high .. "|r  " .. e.short
+      .. "  " .. e.bosses .. " bosses"
   elseif k == "npc" then
     local sub = questieQuery("npc", e.id, "subName")
     return type(sub) == "string" and sub or ""

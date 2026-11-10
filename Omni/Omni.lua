@@ -36,7 +36,7 @@ function ns.rebuild()
   -- Order matters: the first source to give a key wins (owned items before
   -- Questie's copy of the same item; S.items keeps its Questie flag).
   lists = { safe("commands", S.commands), safe("quest log", S.questLog), safe("spells", S.spells),
-    safe("items", S.items, qitems), safe("places", S.places), safe("people", S.people), qitems or {},
+    safe("items", S.items, qitems), safe("places", S.places), safe("dungeons", S.dungeons), safe("people", S.people), qitems or {},
     safe("nearby", S.nearby), npcs or {}, quests or {} }
   return lists
 end
@@ -52,7 +52,14 @@ function ns.trimRecent(recent)
 end
 
 function ns.search(text)
+  local only, q = M.parse(text)
+  if only == "loot" then return (S.dungeonLoot(q)) end
   return (M.search(lists, text, ns.db().recent))
+end
+
+-- Puts text in the box (the next refresh searches it).
+function ns.setText(text)
+  if box then box:SetText(text) end
 end
 
 
@@ -291,10 +298,31 @@ local function step(my)
   end
 end
 
+-- "loot: bfd" lists a dungeon's drops. Item names the client has not
+-- loaded yet show as "item 1234"; look again shortly (a few times).
+ns.LOOT_RETRIES = 5
+local lootTries = {}
+local function showLoot(text, q)
+  job = nil
+  local groups, loading = S.dungeonLoot(q)
+  show(groups)
+  local n = (lootTries[text] or 0) + 1
+  lootTries[text] = n
+  if loading and n <= ns.LOOT_RETRIES then
+    call(api("C_Timer.After"), 0.4, function()
+      if frame and frame:IsShown() and box:GetText() == text then showLoot(text, q) end
+    end)
+  end
+end
+
 function ns.startSearch(text)
+  local only, q = M.parse(text)
+  if only == "loot" then
+    lootTries = {}
+    return showLoot(text, q)
+  end
   local my = { text = text, ms = 0, frames = 0 }
   job = my
-  local only, q = M.parse(text)
   local narrow = narrowFor(text)
   local function remember(matched)
     last = { lists = lists, only = only, q = q, matched = matched }

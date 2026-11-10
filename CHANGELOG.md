@@ -5,6 +5,14 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## Omni 0.1.2
+
+- Search dungeons by name or short name ("bfd", "sm gy"). The row shows
+  the levels, the short name and the boss count.
+- Enter on a dungeon (or `loot: bfd`) lists each boss's drops, then the
+  dungeon's quests and their reward items (with Questie). Hover an item
+  for its tooltip; Enter links it.
+
 ## Omni 0.1.1
 
 - Nearby is always the first group in the results.

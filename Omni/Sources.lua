@@ -439,7 +439,7 @@ end
 -- of thousands, so the index is built a slice per frame on the first open.
 ---------------------------------------------------------------------------
 S.QUESTIE_SLICE = 2000
-local questie = { state = "idle", npc = {}, quest = {}, item = {} }
+local questie = { state = "idle", npc = {}, quest = {}, item = {}, byZone = {}, rewards = {} }
 S.questieState = questie
 
 function S.questieDB()
@@ -495,6 +495,20 @@ function S.buildQuestie(onDone)
         if type(name) == "string" and name ~= "" then
           local e = entry(kind, id, name, { questie = true })
           table.insert(questie[kind], e)
+          -- Dungeon quests (zoneOrSort is the area ID) and quest rewards
+          -- (Questie keeps them on the item: the quests that give it).
+          if kind == "quest" then
+            local zone = call(query, id, "zoneOrSort")
+            if type(zone) == "number" and zone > 0 then
+              questie.byZone[zone] = questie.byZone[zone] or {}
+              table.insert(questie.byZone[zone], e)
+            end
+          elseif kind == "item" then
+            for _, q in ipairs(ids(call(query, id, "questRewards"))) do
+              questie.rewards[q] = questie.rewards[q] or {}
+              table.insert(questie.rewards[q], id)
+            end
+          end
         end
         i, budget = i + 1, budget - 1
       end
@@ -518,6 +532,98 @@ function S.buildQuestie(onDone)
 end
 
 function S.questieLists() return questie.npc, questie.quest, questie.item end
+
+-- AreaTable IDs of the dungeons (Questie's zoneOrSort), by short name. The
+-- wings of one instance share an ID.
+S.DUNGEON_AREAS = { RFC = 2437, WC = 718, DM = 1581, SFK = 209, BFD = 719, Stocks = 717, Gnomer = 721,
+  RFK = 491, ["SM GY"] = 796, ["SM Lib"] = 796, ["SM Arm"] = 796, ["SM Cath"] = 796, RFD = 722,
+  Ulda = 1337, ZF = 1176, Mara = 2100, ST = 1477, BRD = 1584, LBRS = 1583, UBRS = 1583,
+  ["DM East"] = 2557, ["DM West"] = 2557, ["DM North"] = 2557, Scholo = 2057, Strat = 2017 }
+
+-- Quests set in a dungeon: { entry, level, rewards = { itemID... } }, by level.
+function S.questsByZone(short)
+  local list = {}
+  local area = S.DUNGEON_AREAS[short]
+  local qdb = S.questieDB()
+  for _, e in ipairs(area and questie.byZone[area] or {}) do
+    local level = qdb and call(qdb.QueryQuestSingle, e.id, "questLevel")
+    local rewards = {}
+    for _, id in ipairs(questie.rewards[e.id] or {}) do table.insert(rewards, id) end
+    table.sort(rewards)
+    table.insert(list, { entry = e, level = type(level) == "number" and level or nil, rewards = rewards })
+  end
+  table.sort(list, function(a, b)
+    if (a.level or 0) ~= (b.level or 0) then return (a.level or 0) < (b.level or 0) end
+    return a.entry.name < b.entry.name
+  end)
+  return list
+end
+
+---------------------------------------------------------------------------
+-- Dungeons: ns.DUNGEONS (Dungeons.lua), found by name or short name ("bfd").
+-- Enter opens "loot: <short>", which lists each boss's drops as items.
+---------------------------------------------------------------------------
+function S.dungeons()
+  local list = {}
+  local level = call(UnitLevel, "player") or 0
+  for i, d in ipairs(ns.DUNGEONS or {}) do
+    local bosses = 0
+    for j = 5, #d do if not d[j][1]:find("^Trash") then bosses = bosses + 1 end end
+    local e = entry("dungeon", i, d[1], { short = d[2], low = d[3], high = d[4], bosses = bosses,
+      lname = norm(d[1] .. " " .. d[2]) })
+    e.fits = level >= d[3] and level <= d[4]
+    e.boost = e.fits and 1 or 0
+    table.insert(list, e)
+  end
+  return list
+end
+
+-- The dungeon a "loot:" query names: the short name or the name exactly,
+-- else the first whose name or short name starts with the query.
+function S.findDungeon(q)
+  q = norm(q)
+  if q == "" then return nil end
+  local all = ns.DUNGEONS or {}
+  for _, d in ipairs(all) do
+    if norm(d[2]) == q or norm(d[1]) == q then return d end
+  end
+  for _, d in ipairs(all) do
+    local n, sh = norm(d[1]), norm(d[2])
+    if n:sub(1, #q) == q or sh:sub(1, #q) == q or n:find(" " .. q, 1, true) then return d end
+  end
+end
+
+-- Groups for "loot: bfd": one per boss with its drops as item entries, then
+-- the dungeon's quests and their rewards when Questie has them. Returns
+-- groups and whether any item name is still loading.
+function S.dungeonLoot(q)
+  local d = S.findDungeon(q)
+  if not d then return {}, false end
+  local groups, loading = {}, false
+  local function item(id, where)
+    local name = itemName(id)
+    if not name then
+      loading = true
+      call(api("C_Item.RequestLoadItemDataByID"), id)
+    end
+    return entry("item", id, name or ("item " .. id), { drop = where })
+  end
+  for j = 5, #d do
+    local boss = d[j]
+    local g = { kind = "loot", title = boss[1], entries = {} }
+    for k = 2, #boss do table.insert(g.entries, item(boss[k], boss[1])) end
+    if #g.entries > 0 then table.insert(groups, g) end
+  end
+  -- Quests set in the dungeon (from the Questie index): the quest itself
+  -- (Enter shows where it starts), then its reward items.
+  for _, quest in ipairs(S.questsByZone(d[2])) do
+    local g = { kind = "loot", title = "Quest: " .. quest.entry.name .. (quest.level and (" (" .. quest.level .. ")") or ""),
+      entries = { quest.entry } }
+    for _, id in ipairs(quest.rewards) do table.insert(g.entries, item(id, quest.entry.name)) end
+    table.insert(groups, g)
+  end
+  return groups, loading, d
+end
 
 ---------------------------------------------------------------------------
 -- Nearby: Questie NPCs with a spawn on the map you stand on, matched by name
