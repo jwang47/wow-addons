@@ -171,6 +171,9 @@ local sash = { "Rotmender's Sash", "Waist", "+6 Stamina", "+6 Intellect", "(2) S
 local ss = S.parse(sash)
 check("set bonuses are not the item's stats", ss.int == 6 and ss.sp == nil)
 local frost = S.parse({ "Equip: Increases damage done by Frost spells and effects by up to 10." })
+local amulet = S.parse({ "+4 Stamina", "Equip: Increases damage and healing done by magical spells and effects by up to 5.",
+  "Equip: Increases damage done to Undead by magical spells and effects by up to 12." })
+check("parse: damage vs Undead is not spell damage", amulet.sp == 5 and amulet.slay == 12)
 check("one-school bonus is its own stat", frost.frost == 10 and frost.sp == nil)
 check("frost damage counts for a mage, not a priest",
   S.value(frost, S.weightsFor("MAGE")) == 10 and S.value(frost, S.weightsFor("PRIEST")) == 0)
