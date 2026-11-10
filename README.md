@@ -312,7 +312,7 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   LibDBIcon addon buttons (Questie, Details and the rest) are in one
   drawer behind the Addons tab. A Reload button sits under it, then amber chips show what you can spend
   or fix: unspent talent points, Legacy points, keys with an old spell rank
-  and full bags. A green XP chip shows your XP buff and its time left (hover
+  and your free bag slots (always shown, amber at 2 or fewer). A green XP chip shows your XP buff and its time left (hover
   for every XP buff and your rested XP); it turns amber, "No XP buff", when
   none is on. Then a message in the middle of the screen reminds you, at
   login, when a buff runs out and every 10 minutes (not in combat or

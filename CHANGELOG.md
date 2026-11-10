@@ -22,7 +22,7 @@ the same, and a test checks that every `.toc` version has a section here.
 - An XP buff chip: time left, rested XP on hover, and a reminder in the
   middle of the screen when no XP buff is on (`/glance xpremind off`).
 - Alerts under the minimap: unspent talents, Legacy points, old ranks and
-  full bags, each a chip that opens the window.
+  free bag slots, each a chip that opens the window.
 - Old spell ranks: an amber corner on the key, and `/glance ranks` swaps
   in your best rank.
 - A keyboard bar: one button per key of the left hand (1-6, Tab Q W E R T,

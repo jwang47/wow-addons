@@ -164,11 +164,12 @@ alerts.list = {
   { key = "legacy", label = "Legacy", count = legacyPoints, click = function() open(ToggleLegacySystemUI) end },
   { key = "ranks", label = "Ranks", count = oldRanks, tip = "Keys with an old spell rank. Click: /glance ranks.",
     click = function() open(ns.commands.ranks) end },
-  { key = "xp", label = "XP", text = xpChip, click = function() end },
-  { key = "bags", label = "Bags full", count = function()
+  { key = "xp", label = "XP", title = "XP buffs", text = xpChip, click = function() end },
+  { key = "bags", label = "Bags", title = "Bags", text = function()
       local free = freeBagSlots()
-      return (free and free <= 2) and 1 or 0
-    end, click = function() open(ToggleAllBags) end, noNumber = true },
+      if not free then return nil end
+      return "Bags " .. free .. " free", (free <= 2) and false or "plain", { free .. " empty bag slots" }
+    end, click = function() open(ToggleAllBags) end },
 }
 
 function alerts.refresh()
@@ -183,7 +184,10 @@ function alerts.refresh()
       if not ok then label = nil end
       n = label and 1 or 0
       c.tipLines = tip
-      if good then
+      if good == "plain" then
+        c.bg:SetColorTexture(0, 0, 0, 0.4)
+        c.text:SetTextColor(0.9, 0.9, 0.9)
+      elseif good then
         c.bg:SetColorTexture(0.05, 0.25, 0.1, 0.7)
         c.text:SetTextColor(0.5, 1, 0.6)
       else
@@ -227,7 +231,7 @@ ns.module("alerts", function()
     if a.text then
       c:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
-        GameTooltip:SetText("XP buffs", 1, 1, 1)
+        GameTooltip:SetText(a.title or a.label, 1, 1, 1)
         for _, line in ipairs(self.tipLines or {}) do GameTooltip:AddLine(line, 0.9, 0.9, 0.9) end
         GameTooltip:Show()
       end)

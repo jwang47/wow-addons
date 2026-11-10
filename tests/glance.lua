@@ -376,6 +376,9 @@ local A = ns.alerts
 UnitCharacterPoints = function() return 0 end
 A.refresh()
 check("no alerts when nothing to do", not A.chips.talents.shown and not A.chips.legacy.shown)
+C_Container = { GetContainerNumFreeSlots = function() return 3 end }
+A.refresh()
+check("bag slots always shown", A.chips.bags.shown and A.chips.bags.text.text == "Bags 15 free", A.chips.bags.text.text)
 UnitCharacterPoints = function() return 2 end
 Constants = { LegacyConsts = { LEGACY_REWARD_TRACK_FACTION_ID = 2802, LEGACY_TREE_PROFESSIONS_ID = 1187 } }
 C_MajorFactions = { GetCurrentRenownLevel = function() return 3 end }
@@ -386,7 +389,7 @@ GetActionInfo = function() end
 A.refresh()
 check("talent alert", A.chips.talents.shown and A.chips.talents.text.text == "Talents 2")
 check("legacy alert", A.chips.legacy.shown and A.chips.legacy.text.text == "Legacy 5")
-check("bags full alert", A.chips.bags.shown)
+check("bags full alert", A.chips.bags.shown and A.chips.bags.text.text == "Bags 0 free")
 check("no rank alert after /glance ranks", not A.chips.ranks.shown)
 local opened
 ToggleLegacySystemUI = function() opened = "legacy" end
