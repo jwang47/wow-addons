@@ -468,14 +468,20 @@ small grid (`/buffs`). It is not in the release yet.
   the client hides the aura). Warriors and rogues get no Int cell.
 - Click a row to cast your buff on that person (on your own row: your
   armor when your buff is already on).
-- **Scrolls**: when your bags hold a stat scroll you can use (Intellect,
-  Stamina, Spirit, Protection, Strength, Agility), your row gets a Scroll
-  column. Red with a number: that many scrolls whose buff is not on you.
-  A class buff that does not stack with the scroll counts as on
-  (Fortitude for Stamina, Arcane Intellect for Intellect, Divine Spirit
-  for Spirit), and a mage never needs an Intellect scroll. Next reads the
-  best rank, after your armor. The scroll buff names (Stamina, Intellect,
-  Armor and so on) are from Classic; check them in game on Forever.
+- **Scrolls**: when your bags hold a stat scroll (Intellect, Stamina,
+  Spirit, Protection, Strength, Agility) or a Forever weapon imbue scroll
+  (Scroll of Imbue Frost and the others), your row gets a Scroll column.
+  Red with a number: that many scrolls you can use whose buff is not on
+  you. Green: all on. Dark `-`: none of them is of use now. The tooltip
+  lists each scroll that is not counted and why: no use to your class
+  (Agility for a mage), a class buff that is better and does not stack
+  (Arcane Intellect, Fortitude), an imbue for another weapon type (staff,
+  dagger or sword in your main hand), or a level too low.
+- An imbue counts as on when your main hand has any temporary enchant
+  (`GetWeaponEnchantInfo`), an oil too. Next reads the best scroll after
+  your armor; an imbue goes on the main hand (`/use 16`). The stat scroll
+  buff names (Stamina, Intellect, Armor and so on) are from Classic; check
+  them in game on Forever.
 - The **Next** line under the grid names the next person to buff and why,
   and a click casts on them. Bind a key to it in Key Bindings > BuffCheck.
   The order: a stranger who buffed you (return the favour), your group

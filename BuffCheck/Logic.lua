@@ -63,31 +63,79 @@ function M.scrollOf(name)
   return nil
 end
 
--- The best scroll of each stat in `items` (a list of item names), for a
--- member of `class`: stat -> { def, name, rank }.
-function M.bagScrolls(items, class)
-  local best = {}
+-- Forever's weapon imbue scrolls ("Scroll of Imbue Frost"): item id ->
+-- the weapon it fits (item subclass: 10 staff, 15 dagger, 7 sword) and the
+-- level it needs. An imbue is a temporary main-hand enchant for an hour,
+-- not an aura; it is read with GetWeaponEnchantInfo.
+local STAFF, DAGGER, SWORD = 10, 15, 7
+M.WEAPON_NAMES = { [STAFF] = "a staff", [DAGGER] = "a dagger", [SWORD] = "a sword" }
+M.IMBUES = {
+  [277500] = { STAFF, 46 }, [277501] = { STAFF, 46 }, [277502] = { STAFF, 46 }, [277503] = { STAFF, 46 },
+  [277494] = { STAFF, 25 }, [277495] = { STAFF, 25 }, [277496] = { STAFF, 25 }, [277497] = { STAFF, 25 },
+  [277498] = { DAGGER, 25 },
+  [277485] = { STAFF, 16 }, [277486] = { STAFF, 16 }, [277487] = { STAFF, 16 },
+  [277488] = { DAGGER, 16 }, [277489] = { SWORD, 16 },
+  [274947] = { STAFF, 5 }, [275067] = { DAGGER, 5 },
+}
+M.IMBUE_DEF = { stat = "Imbue", imbue = true }
+
+-- The best scroll of each kind in your bags, and the ones left out with
+-- the reason. `items` is a list of item names, `p` holds:
+--   class, level, ids (name -> item id), weapon (main-hand subclass),
+--   canGive (your class buff key: "int" for a mage, "fort" for a priest).
+-- Returns best (stat -> { def, name, rank }) and skipped ({ name, why }).
+function M.bagScrolls(items, p)
+  if type(p) == "string" then p = { class = p } end
+  p = p or {}
+  local class, best, skipped = p.class, {}, {}
+  local function keep(def, name, rank)
+    local b = best[def.stat]
+    if not b or rank > b.rank then best[def.stat] = { def = def, name = name, rank = rank } end
+  end
   for _, name in ipairs(items or {}) do
-    local def, rank = M.scrollOf(name)
-    if def and not (def.mana and M.NO_MANA[class]) and not (def.classes and not def.classes[class]) then
-      local b = best[def.stat]
-      if not b or rank > b.rank then best[def.stat] = { def = def, name = name, rank = rank } end
+    local id = p.ids and p.ids[name]
+    local imb = id and M.IMBUES[id]
+    if not imb and name:find("^Scroll of Imbue ") then imb = { nil, 1 } end
+    if imb then
+      if imb[1] and p.weapon ~= imb[1] then
+        skipped[#skipped + 1] = { name = name, why = "needs " .. M.WEAPON_NAMES[imb[1]] .. " in your main hand" }
+      elseif p.level and imb[2] > p.level then
+        skipped[#skipped + 1] = { name = name, why = "needs level " .. imb[2] }
+      else
+        keep(M.IMBUE_DEF, name, imb[2])
+      end
+    else
+      local def, rank = M.scrollOf(name)
+      if def then
+        if def.mana and M.NO_MANA[class] or def.classes and not def.classes[class] then
+          skipped[#skipped + 1] = { name = name, why = "no use to your class" }
+        elseif p.canGive == "int" and def.stat == "Intellect" then
+          skipped[#skipped + 1] = { name = name, why = "your Arcane Intellect is better" }
+        elseif p.canGive == "fort" and def.stat == "Stamina" then
+          skipped[#skipped + 1] = { name = name, why = "your Fortitude is better" }
+        else
+          keep(def, name, rank)
+        end
+      end
     end
   end
-  return best
+  return best, skipped
 end
 
--- The scrolls worth reading now: in your bags, and neither their buff nor
--- a class buff that covers it is on you. `canGive` is the key of your own
--- class buff ("int" for a mage: you cast Arcane Intellect, not a scroll).
--- Returns the list (sorted by stat), or nil when the auras are hidden.
-function M.scrollsDue(best, auras, canGive)
+-- The scrolls worth reading now: in `best`, and neither their buff nor a
+-- class buff that covers it is on you. `imbueOn` says if your main hand
+-- has a temporary enchant (nil: unknown). Returns the list, or nil when
+-- the auras are hidden.
+function M.scrollsDue(best, auras, imbueOn)
   if not auras then return nil end
   local due, unknown = {}, false
+  local b = best.Imbue
+  if b then
+    if imbueOn == nil then unknown = true elseif not imbueOn then due[#due + 1] = b end
+  end
   for _, def in ipairs(M.SCROLLS) do
-    local b = best[def.stat]
-    local mineCovers = canGive == "int" and def.stat == "Intellect" or canGive == "fort" and def.stat == "Stamina"
-    if b and not mineCovers then
+    b = best[def.stat]
+    if b then
       local on = auras[def.buff] ~= nil
       for _, n in ipairs(def.covers or {}) do if auras[n] then on = true end end
       if not on then
@@ -223,7 +271,7 @@ end
 function M.macro(spell, unit, name, hadTarget, item)
   if item then
     if item:find("[\n;%[%]]") then return "" end
-    return "/use " .. item
+    return "/use " .. item .. (item:find("^Scroll of Imbue ") and "\n/use 16" or "")
   end
   if not spell then return "" end
   if unit then return "/cast [@" .. unit .. "] " .. spell end

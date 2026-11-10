@@ -142,8 +142,9 @@ the same, and a test checks that every `.toc` version has a section here.
   that person. The Next line (and its key binding) buffs whoever needs it
   next, returns the favour to a stranger who buffed you, and offers your
   buff to players near you.
-- Stat scrolls in your bags: a Scroll column shows the scrolls whose buff
-  is not on you, and Next reads them.
+- Scrolls in your bags (stat scrolls and Forever weapon imbues): a Scroll
+  column shows the ones you can use whose buff is not on you, and Next
+  reads them. Its tooltip says why a scroll is not counted.
 
 ## Omni 0.1.1
 

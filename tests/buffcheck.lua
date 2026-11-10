@@ -283,9 +283,47 @@ local any = false
 for _, def in ipairs(st.cols) do if def.scroll then any = true end end
 check("no scrolls: no column", not any)
 local M2 = ns.logic
-check("warrior: no Intellect scroll", next(M2.bagScrolls({ "Scroll of Intellect" }, "WARRIOR")) == nil)
+check("warrior: no Intellect scroll", next((M2.bagScrolls({ "Scroll of Intellect" }, "WARRIOR"))) == nil)
 check("warrior: Strength scroll", M2.bagScrolls({ "Scroll of Strength II" }, "WARRIOR").Strength.rank == 2)
 check("priest reads an Intellect scroll", M2.scrollsDue(M2.bagScrolls({ "Scroll of Intellect" }, "PRIEST"), {}, "fort")[1] ~= nil)
+
+-- Bags seen in game (a level 18 mage): two staff imbues,
+-- Agility and Intellect. Agility is no use to a mage and Arcane Intellect
+-- beats the Intellect scroll, so only the imbues can count.
+BAG = { "Scroll of Imbue Frost", "Scroll of Imbue Striking", "Scroll of Agility", "Scroll of Intellect", "Goaz Scrolls" }
+local BAG_IDS = { 277485, 277486, 3012, 955, 209848 }
+C_Container.GetContainerItemInfo = function(bag, slot)
+  if bag == 0 and BAG[slot] then return { itemID = BAG_IDS[slot], itemName = BAG[slot], stackCount = 1 } end
+end
+local HAND = { id = nil, enchant = false }
+function UnitLevel() return 18 end
+function GetInventoryItemID(_, slot) return slot == 16 and HAND.id or nil end
+C_Item = { GetItemInfoInstant = function(id)
+  local sub = ({ [1] = 10, [2] = 15 })[id]
+  if sub then return id, "Weapon", "", "", 0, 2, sub end
+end }
+function GetWeaponEnchantInfo() return HAND.enchant end
+HAND.id = 2   -- a dagger
+ev.scripts.OnEvent(ev, "BAG_UPDATE_DELAYED")
+ns.refresh()
+scrollCol = nil
+for c, def in ipairs(st.cols) do if def.scroll then scrollCol = c end end
+check("no usable scroll: grey, not green", scrollCol and st.rows[1].cells[scrollCol].state == "none")
+local why = {}
+for _, sk in ipairs(st.scrollsSkipped) do why[sk.name] = sk.why end
+check("imbue needs a staff", why["Scroll of Imbue Frost"] == "needs a staff in your main hand")
+check("Agility is no use to a mage", why["Scroll of Agility"] == "no use to your class")
+check("Arcane Intellect beats the Intellect scroll", why["Scroll of Intellect"] == "your Arcane Intellect is better")
+check("Goaz Scrolls is not a scroll", why["Goaz Scrolls"] == nil)
+HAND.id = 1   -- a staff
+ns.refresh()
+check("staff: imbue due", st.rows[1].cells[scrollCol].state == "off" and st.scrollsDue[1].def.imbue)
+check("imbue macro applies it to the main hand", BuffCheckNext.attrs.macrotext:find("^/use Scroll of Imbue %a+\n/use 16$") ~= nil)
+HAND.enchant = true
+ns.refresh()
+check("staff with an imbue: on", st.rows[1].cells[scrollCol].state == "on")
+check("a level 25 imbue waits", ns.logic.bagScrolls({ "Scroll of Imbue Flame" },
+  { class = "MAGE", ids = { ["Scroll of Imbue Flame"] = 277497 }, level = 18, weapon = 10 }).Imbue == nil)
 
 if failures > 0 then
   print(failures .. " failed")

@@ -22,6 +22,7 @@ local MAX_ROWS, MAX_CELLS = 5, 6
 local COLOURS = {
   on = { 0.20, 0.62, 0.30 }, low = { 0.86, 0.68, 0.16 },
   off = { 0.78, 0.18, 0.16 }, unknown = { 0.32, 0.32, 0.32 },
+  none = { 0.18, 0.18, 0.20 },
 }
 
 local function say(msg)
@@ -137,6 +138,27 @@ function ns.bagItems()
     end
   end
   return names, ids
+end
+
+-- The item subclass of your main-hand weapon (10 staff, 15 dagger, 7
+-- sword), or nil.
+function ns.mainHandType()
+  local id = plain(call(G("GetInventoryItemID"), "player", 16))
+  if not id then return nil end
+  local ci = G("C_Item")
+  local getInstant = (ci and ci.GetItemInfoInstant) or G("GetItemInfoInstant")
+  local _, _, _, _, _, classID, subclassID = call(getInstant, id)
+  if plain(classID) ~= 2 then return nil end
+  return plain(subclassID)
+end
+
+-- Whether your main hand has a temporary enchant (an imbue or an oil):
+-- true, false, or nil when the client does not say.
+function ns.mainHandEnchanted()
+  local has = call(G("GetWeaponEnchantInfo"))
+  has = plain(has)
+  if has == nil then return nil end
+  return has and true or false
 end
 
 local function itemIcon(name)
@@ -338,7 +360,7 @@ function ns.build()
   nextBtn:SetScript("OnLeave", function() local t = G("GameTooltip") if t then t:Hide() end end)
 end
 
-local LABELS = { on = "", off = "x", unknown = "?" }
+local LABELS = { on = "", off = "x", unknown = "?", none = "-" }
 
 -- Cells for one row: { state, left, name } per column.
 local function paintRow(r, row, cols)
@@ -368,12 +390,15 @@ function ns.rowTooltip(r)
     local info = row.cells[c]
     if info then
       local text = ({ on = "on", low = "ends in " .. M.short(info.left), off = "missing",
-                      unknown = "unknown (too far, or hidden)" })[info.state]
+                      unknown = "unknown (too far, or hidden)", none = "none you can use" })[info.state]
       if info.state == "on" and info.left then text = "on, " .. M.short(info.left) .. " left" end
       if def.scroll and info.state == "off" then text = info.count .. " to read" end
       t:AddDoubleLine(def.title or def.label, text, 1, 1, 1, unpack(COLOURS[info.state] or { 1, 1, 1 }))
       if def.scroll then
         for _, sc in ipairs(st.scrollsDue or {}) do t:AddLine("  " .. sc.name, 1, 0.82, 0) end
+        for _, sc in ipairs(st.scrollsSkipped or {}) do
+          t:AddLine("  Not counted: " .. sc.name .. " (" .. sc.why .. ")", 0.6, 0.6, 0.6, true)
+        end
       end
     end
   end
@@ -423,10 +448,11 @@ function ns.refresh()
     st.bagNames, st.bagIds = ns.bagItems()
     st.bagDirty = false
   end
-  local best = M.bagScrolls(st.bagNames, myClass)
-  local due = rows[1] and M.scrollsDue(best, rows[1].auras, mine and mine.key)
-  st.scrollsDue = due
-  if next(best) then
+  local best, skipped = M.bagScrolls(st.bagNames, { class = myClass, ids = st.bagIds,
+    level = plain(call(G("UnitLevel"), "player")), weapon = ns.mainHandType(), canGive = mine and mine.key })
+  local due = rows[1] and M.scrollsDue(best, rows[1].auras, ns.mainHandEnchanted())
+  st.scrollsDue, st.scrollsSkipped = due, skipped
+  if next(best) or #skipped > 0 then
     cols[#cols + 1] = { key = "scroll", label = "Scroll", title = "Scrolls in your bags", scroll = true }
   end
   while #cols > MAX_CELLS do table.remove(cols, 1) end
@@ -437,7 +463,7 @@ function ns.refresh()
     for c, def in ipairs(cols) do
       if def.scroll then
         if row.unit == "player" then
-          local stt = due == nil and "unknown" or #due > 0 and "off" or "on"
+          local stt = not next(best) and "none" or due == nil and "unknown" or #due > 0 and "off" or "on"
           row.cells[c] = { state = stt, count = due and #due or 0 }
         end
       elseif def.self then
