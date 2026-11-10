@@ -36,6 +36,8 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.2.0
 
+- Fix: a Lua error ("Items.lua:60: table index is nil") when a pinned
+  quest that starts from an item was on the board.
 - New layout: four tabs for what you are doing, in place of nine groups.
   Doing (picked by itself while a quest is Active): the quests you are on,
   the stops on the way, your party, and one line that counts the rest of

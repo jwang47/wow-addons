@@ -340,7 +340,7 @@ end
 function D.placeItemStart(e, quest)
   local itemID = quest.Starts and quest.Starts.Item and quest.Starts.Item[1]
   local best, item = D.itemSource(itemID)
-  if item then e.item = item.name end
+  if item then e.startItem = item.name end
   if best then
     e.dropFrom, e.dropHow = best.name, best.how
     place(e, best.spawn, best.zone, best.name, best.dist)

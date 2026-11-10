@@ -113,7 +113,7 @@ function ns.todoBase(e)
     return (e.target and ("Hand in to " .. e.target) or "Hand it in") .. (where and (" in " .. where) or "")
   end
   if e.fromItem then
-    local what = e.item and ((e.dropHow == "vendor" and "Buy " or "Loot ") .. e.item) or "Starts from an item"
+    local what = e.startItem and ((e.dropHow == "vendor" and "Buy " or "Loot ") .. e.startItem) or "Starts from an item"
     local from = e.dropFrom and (" from " .. e.dropFrom) or (e.kind == "pickup" or e.kind == "party") and " (drop unknown)" or ""
     return what .. from .. (e.finisher and (", hand in to " .. e.finisher) or "")
   end
@@ -308,7 +308,7 @@ local function tooltip(r)
   end
   if e.fromItem then
     local how = e.dropHow == "vendor" and ", sold by " or e.dropHow == "object" and ", found in " or ", drops from "
-    tip:AddLine("Starts from an item" .. (e.item and (": " .. e.item) or "") .. (e.dropFrom and (how .. e.dropFrom) or ""), 0.8, 0.8, 0.8)
+    tip:AddLine("Starts from an item" .. (e.startItem and (": " .. e.startItem) or "") .. (e.dropFrom and (how .. e.dropFrom) or ""), 0.8, 0.8, 0.8)
     if e.toFinisher then tip:AddLine("Questie does not know where it drops; the distance is to " .. e.finisher, 0.8, 0.5, 0.5) end
     if e.finisher then tip:AddLine("Hand in to " .. e.finisher, 0.8, 0.8, 0.8) end
   end
