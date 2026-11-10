@@ -572,6 +572,21 @@ if mods.ZoneDB then
 end
 C_Map.GetMapInfo = nil
 
+-- Pace: your own seconds per kill make the time left.
+D.pace, D.anyPace, D.lastGain, D.seen = {}, nil, {}, {}
+local pq = { id = 900, count = 1, left = { { have = 1, need = 6 } } }
+D.noteProgress(pq, 100)
+check("pace: before any kill, the default", D.workSecs(pq) == D.OBJECTIVE_SECS)
+pq.count = 2 D.noteProgress(pq, 110)
+pq.count = 4 pq.left[1].have = 4 D.noteProgress(pq, 150)
+check("pace: from your kills", D.pace[900] and D.pace[900] == 20)
+check("pace: time left is kills left times pace", math.abs(D.workSecs(pq) - 2 * D.pace[900]) < 1e-9)
+check("pace: other quests use your pace too", D.workSecs({ id = 901, left = { { have = 0, need = 3 } } }) == 3 * D.anyPace)
+pq.count = 5 D.noteProgress(pq, 150 + D.PACE_GAP_SECS + 1)
+check("pace: a long break does not count", D.pace[900] == 20)
+check("pace: Active row shows time left", strip(ns.meta({ kind = "log", id = 900, left = pq.left, dist = 70 }, "active")):find("^~<1 min") ~= nil)
+D.pace, D.anyPace, D.lastGain, D.seen = {}, nil, {}, {}
+
 -- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
 local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },
   { name = "c", xp = 2000 }, { name = "d", dist = 5000, xp = 1500 }, { name = "e", dist = 800, xp = 50 } }, "near")

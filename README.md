@@ -316,6 +316,11 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   row for the XP per minute of the trip. Questie's distance is in world
   yards, so a finisher in the next zone counts the full run; one on
   another continent shows "far".
+- Time left: once you kill or loot for a quest, the board learns your pace
+  (seconds per kill or loot, on that quest and over all quests; a break
+  over 5 minutes is not counted). An Active row and the Next line show
+  about how long the rest takes ("~4 min"): the run there plus the kills
+  left at your pace. XP per minute uses the same estimate.
 - A quest in your log that is not done has a thin progress bar along the
   bottom of its row (each objective weighs the same): gold in Active,
   blue elsewhere.

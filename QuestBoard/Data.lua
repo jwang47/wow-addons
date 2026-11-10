@@ -299,9 +299,28 @@ function D.placeItemStart(e, quest)
   end
 end
 
+-- Kills or loots still to do: need - have for each open objective (1 for
+-- one with no count).
+function D.unitsLeft(e)
+  local n = 0
+  for _, o in ipairs(e.left or {}) do
+    if o.need and o.have and o.need > 0 then n = n + math.max(0, o.need - o.have) else n = n + 1 end
+  end
+  return n
+end
+
+-- Time for the work left on a quest. Once you have made progress, it uses
+-- your own pace (seconds per kill or loot, on this quest, else on any
+-- quest); before that, OBJECTIVE_SECS per open objective.
+function D.workSecs(e)
+  local pace = D.pace[e.id] or D.anyPace
+  if pace then return D.unitsLeft(e) * pace end
+  return math.max(1, #(e.left or {})) * D.OBJECTIVE_SECS
+end
+
 function D.logSecs(e)
   if e.done then return D.travelSecs(e.dist) + D.PICKUP_SECS end
-  return D.travelSecs(e.dist) + math.max(1, #e.left) * D.OBJECTIVE_SECS + D.RETURN_SECS
+  return D.travelSecs(e.dist) + D.workSecs(e) + D.RETURN_SECS
 end
 
 ---------------------------------------------------------------------------
@@ -569,6 +588,12 @@ end
 -- ACTIVE_SECS (you killed or looted for it), or that you marked yourself. The first look at a quest only
 -- records its count, so nothing is active right after login.
 D.seen, D.activeAt, D.heldAt = {}, {}, {}
+-- Your pace: seconds per kill or loot, per quest and over all quests. A gap
+-- longer than PACE_GAP_SECS (you went off to do something else) is not
+-- counted.
+D.pace, D.anyPace, D.lastGain = {}, nil, {}
+D.PACE_GAP_SECS = 300
+local function blend(old, new) return old and (old * 0.6 + new * 0.4) or new end
 
 -- Whether a log quest is active now (recent: its count just went up).
 -- Only progress (or your own mark, pinned) makes a quest active; being
@@ -585,7 +610,16 @@ end
 function D.noteProgress(e, clock)
   local before = D.seen[e.id]
   D.seen[e.id] = e.count
-  if before and e.count and e.count > before then D.activeAt[e.id] = clock end
+  if before and e.count and e.count > before then
+    D.activeAt[e.id] = clock
+    local last = D.lastGain[e.id]
+    if last and clock - last <= D.PACE_GAP_SECS and clock > last then
+      local per = (clock - last) / (e.count - before)
+      D.pace[e.id] = blend(D.pace[e.id], per)
+      D.anyPace = blend(D.anyPace, per)
+    end
+    D.lastGain[e.id] = clock
+  end
   local at = D.activeAt[e.id]
   if at and clock - at <= D.ACTIVE_SECS then
     e.activeAt = at

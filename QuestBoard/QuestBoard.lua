@@ -104,17 +104,22 @@ function ns.nextStep(st)
   if not e then return nil end
   local todo = ns.todoWho(e)
   if e.kind == "turnin" then todo = "Hand in " .. e.name .. (e.target and (" to " .. e.target) or "") end
-  return todo and (todo .. (e.dist and ("  " .. D.yards(e.dist)) or "")), e
+  -- For a quest you are on: about how long the rest takes, at your pace.
+  local left = e == st.active[1] and e.left and #e.left > 0 and ("  ~" .. D.mins(D.travelSecs(e.dist) + D.workSecs(e)) .. " left") or ""
+  return todo and (todo .. (e.dist and ("  " .. D.yards(e.dist)) or "") .. left), e
 end
 
 -- Right-hand text of a row: progress, XP and run time (hand-ins), XP/min
 -- (pick-ups), distance. The
 -- progress is in the "what to do" line unless the board is compact.
-function ns.meta(e)
+function ns.meta(e, kind)
   local parts = {}
   if e.kind == "log" and ns.db and ns.db.compact then
     local p = D.progress(e)
     if p ~= "" then table.insert(parts, p) end
+  end
+  if e.kind == "log" and not e.done and kind == "active" and e.left and #e.left > 0 then
+    table.insert(parts, "~" .. D.mins(D.travelSecs(e.dist) + D.workSecs(e)))
   end
   if e.kind == "turnin" and e.xp then table.insert(parts, D.short(e.xp) .. " xp") end
   -- A hand-in: the run there, so you can weigh the trip against the XP.
@@ -582,7 +587,7 @@ function ns.render()
           r.name:SetPoint("LEFT", r.lvl, "RIGHT", e.pinned and 18 or 6, 0)
           r.name:SetPoint("RIGHT", r.meta, "LEFT", -6, 0)
           if e.pinned then r.pin:Show() else r.pin:Hide() end
-          r.meta:SetText(ns.meta(e))
+          r.meta:SetText(ns.meta(e, kind))
           ns.setBar(r, e, kind)
           local todo = (not ns.db.compact) and (e.kind ~= "pickup" and ns.todo(e) or e.kind == "pickup" and D.chainTag(e.chain))
           r.sub:SetText(todo or "")
