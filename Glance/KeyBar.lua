@@ -67,6 +67,8 @@ end
 -- The highest rank of each spell in the spellbook.
 function ns.keybar.scanRanks()
   best, rankCache = {}, {}
+  local book = {}
+  ns.keybar.bookSpells = book
   local SB = C_SpellBook
   if not (SB and SB.GetNumSpellBookSkillLines and SB.GetSpellBookItemInfo) then return end
   local bank = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player or 0
@@ -76,6 +78,7 @@ function ns.keybar.scanRanks()
       for i = li.itemIndexOffset + 1, li.itemIndexOffset + li.numSpellBookItems do
         local info = SB.GetSpellBookItemInfo(i, bank)
         if info and info.spellID and not info.isPassive then
+          table.insert(book, info.spellID)
           local r = rankOf(info.spellID) or tonumber((info.subName or ""):match("(%d+)") or "")
           local cur = best[info.name]
           if r and (not cur or r > cur.rank) then best[info.name] = { id = info.spellID, rank = r } end

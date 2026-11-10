@@ -9,8 +9,8 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - New addon, a lighter HUD (`/glance`). Not in the releases yet: try it
   with `dev.ps1 Glance`.
-- Range on the target frame: a green or red edge and a yard bracket from
-  your spells' ranges.
+- Range on the target frame: a green or red edge, exact yards for party
+  members and a yard bracket for anyone else.
 - Party members are easy to find: a large class-coloured name above each
   one's nameplate while you are in a group (`/glance party off`).
 - A Reload button under the minimap.

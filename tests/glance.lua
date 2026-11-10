@@ -404,6 +404,20 @@ check("range out of reach", tf.range.text == "> 30 yd", tf.range.text)
 reach = {}
 ns.units.paintRange()
 check("range unknown hides", not tf.edge.shown and tf.range.text == "")
+-- Spellbook spells and interact distances refine it.
+ns.keybar.bookSpells = { 116, 2136 }
+local spellIn = { [116] = true, [2136] = false }
+C_Spell.IsSpellInRange = function(id) return spellIn[id] end
+local interact = { [3] = false, [2] = false, [4] = true }
+CheckInteractDistance = function(_, i) return interact[i] end
+ns.units.paintRange()
+check("bracket from book and interact", tf.range.text == "20-28 yd", tf.range.text)
+-- A party member: exact.
+UnitDistanceSquared = function() return 529, true end
+ns.units.paintRange()
+check("exact yards for party", tf.range.text == "23 yd", tf.range.text)
+UnitDistanceSquared = nil
+ns.keybar.bookSpells = nil
 GetActionInfo = function() end
 local reloaded
 ReloadUI = function() reloaded = true end

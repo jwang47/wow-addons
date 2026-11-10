@@ -125,34 +125,77 @@ local function spellRange(id)
   if GetSpellInfo then return ns.plain(select(6, GetSpellInfo(id))) end
 end
 
--- Returns reach (true/false/nil for unknown) and the bracket text.
+-- Returns reach (true/false/nil for unknown) and the distance text.
+-- A party or raid member: the exact distance (UnitDistanceSquared). Anyone
+-- else: the game gives addons no position, so the distance is bracketed by
+-- every spellbook spell that has a range, plus the interact distances
+-- (about 10, 11 and 28 yd) out of combat.
+local INTERACT = { [3] = 10, [2] = 11, [4] = 28 }
+
+local function exactYards(unit)
+  if not UnitDistanceSquared then return nil end
+  local ok, d2, checked = pcall(UnitDistanceSquared, unit)
+  d2, checked = ok and ns.plain(d2), ok and ns.plain(checked)
+  if checked and type(d2) == "number" and d2 >= 0 then return math.sqrt(d2) end
+end
+
 function ns.units.range()
-  if not (UnitExists("target") and GetActionInfo) then return nil end
-  if UnitIsUnit("target", "player") then return nil end
-  local api, seen = ns.api, {}
+  if not UnitExists("target") or UnitIsUnit("target", "player") then return nil end
   local inMin, outMax, longest, longestIn
-  for _, b in pairs(ns.keybar and ns.keybar.buttons or {}) do
-    for _, slot in ipairs({ b.plainSlot, b.shiftSlot }) do
-      if slot and not seen[slot] then
-        seen[slot] = true
-        local kind, id = GetActionInfo(slot)
-        kind, id = ns.plain(kind), ns.plain(id)
-        local r = (kind == "spell" and type(id) == "number") and spellRange(id) or nil
-        local hit
-        if type(r) == "number" and r > 0 then hit = ns.plain(api.IsActionInRange(slot)) end
-        if hit ~= nil then
-          hit = hit and true or false
-          if hit then inMin = math.min(inMin or r, r) else outMax = math.max(outMax or r, r) end
-          if not longest or r > longest then longest, longestIn = r, hit end
+  local function note(r, hit)
+    if type(r) ~= "number" or r <= 0 or hit == nil then return end
+    if hit then inMin = math.min(inMin or r, r) else outMax = math.max(outMax or r, r) end
+    if not longest or r > longest then longest, longestIn = r, hit end
+  end
+  local seen = {}
+  -- Spells: the spellbook if we have it, else the Glance keys.
+  local book = ns.keybar and ns.keybar.bookSpells
+  if book and #book > 0 and C_Spell and C_Spell.IsSpellInRange then
+    for _, id in ipairs(book) do
+      if not seen[id] then
+        seen[id] = true
+        local r = spellRange(id)
+        if type(r) == "number" and r > 0 then
+          local ok, hit = pcall(C_Spell.IsSpellInRange, id, "target")
+          if ok then hit = ns.plain(hit) else hit = nil end
+          if hit ~= nil then note(r, hit and true or false) end
+        end
+      end
+    end
+  elseif GetActionInfo then
+    for _, b in pairs(ns.keybar and ns.keybar.buttons or {}) do
+      for _, slot in ipairs({ b.plainSlot, b.shiftSlot }) do
+        if slot and not seen[slot] then
+          seen[slot] = true
+          local kind, id = GetActionInfo(slot)
+          kind, id = ns.plain(kind), ns.plain(id)
+          local r = (kind == "spell" and type(id) == "number") and spellRange(id) or nil
+          if type(r) == "number" and r > 0 then
+            local hit = ns.plain(ns.api.IsActionInRange(slot))
+            if hit ~= nil then note(r, hit and true or false) end
+          end
         end
       end
     end
   end
-  if not longest then return nil end
+  local exact = exactYards("target")
+  if not longest and not exact then return nil end
+  -- Interact distances refine the bracket (not in combat: blocked there).
+  if CheckInteractDistance and not InCombatLockdown() then
+    for idx, yd in pairs(INTERACT) do
+      local ok, hit = pcall(CheckInteractDistance, "target", idx)
+      if ok then hit = ns.plain(hit) else hit = nil end
+      if hit ~= nil then
+        if hit then inMin = math.min(inMin or yd, yd) else outMax = math.max(outMax or yd, yd) end
+      end
+    end
+  end
   local text
-  if inMin and outMax and outMax < inMin then text = outMax .. "-" .. inMin .. " yd"
+  if exact then text = string.format("%d yd", exact + 0.5)
+  elseif inMin and outMax and outMax < inMin then text = outMax .. "-" .. inMin .. " yd"
   elseif inMin then text = "< " .. inMin .. " yd"
-  else text = "> " .. outMax .. " yd" end
+  elseif outMax then text = "> " .. outMax .. " yd" end
+  if longest == nil then return nil, text end
   return longestIn and true or false, text
 end
 
@@ -160,6 +203,12 @@ local function paintRange()
   local f = frames.target
   if not (f and f.range) then return end
   local reach, text = ns.units.range()
+  if reach == nil and text then
+    f.range:SetText(text)
+    f.range:SetTextColor(0.9, 0.9, 0.9)
+    f.edge:Hide()
+    return
+  end
   if reach == nil then
     f.range:SetText("")
     f.edge:Hide()

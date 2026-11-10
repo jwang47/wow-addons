@@ -309,8 +309,11 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   or fix: unspent talent points, Legacy points, keys with an old spell rank
   and full bags. Click one to open that window; it hides when done.
 - **Range**: the target frame gets a green edge while your longest-range
-  spell on the Glance keys reaches the target, red when it does not, and a
-  distance bracket from your spells' ranges ("20-30 yd").
+  spell reaches the target, red when it does not. Under it is the
+  distance: exact yards for a party or raid member ("23 yd"), and for
+  anyone else a bracket from your spellbook's ranges and, out of combat,
+  the interact distances ("20-28 yd"). The game gives addons no position
+  for other units, so an exact number is not possible there.
 - **Party**: in a group, each party member gets a large class-coloured
   name above their nameplate, and friendly player nameplates are on.
   Your own nameplate settings come back when you leave the group.
@@ -369,6 +372,9 @@ your saved Key Bindings.
 - Health (and sometimes power) is secret, but `AbbreviateLargeNumbers` takes
   secret values and the result can be joined into a string for `SetText`.
   Wrap it in `pcall` and fall back to the bare value.
+- `UnitDistanceSquared` works only for party and raid members. For any
+  other unit, bracket the distance with `C_Spell.IsSpellInRange` over the
+  spellbook and `CheckInteractDistance` (out of combat).
 - Do not rely on modified attributes for a Shift+key binding. The game reads
   Shift again when it runs the click (on key up, unless
   `ActionButtonUseKeyDown` is on), so a Shift let go early fires the plain
