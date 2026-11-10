@@ -18,7 +18,7 @@ local defaults = {
 }
 
 local NAME_W, CELL_W, ROW_H, PAD = 96, 34, 18, 6
-local MAX_ROWS, MAX_CELLS = 5, 5
+local MAX_ROWS, MAX_CELLS = 5, 6
 local COLOURS = {
   on = { 0.20, 0.62, 0.30 }, low = { 0.86, 0.68, 0.16 },
   off = { 0.78, 0.18, 0.16 }, unknown = { 0.32, 0.32, 0.32 },
@@ -108,6 +108,41 @@ function ns.readAurasNow(unit)
     out[name] = { expires = plain(expires) or 0, duration = plain(duration) or 0 }
   end
   return out
+end
+
+-- The item names in your bags (bags 0-4), and name -> item id. Scanned
+-- again after BAG_UPDATE_DELAYED.
+function ns.bagItems()
+  local cc = G("C_Container")
+  local ci = G("C_Item")
+  local names, ids = {}, {}
+  if not (cc and cc.GetContainerNumSlots and cc.GetContainerItemInfo) then return names, ids end
+  for bag = 0, 4 do
+    local n = plain(call(cc.GetContainerNumSlots, bag)) or 0
+    for slot = 1, n do
+      local info = call(cc.GetContainerItemInfo, bag, slot)
+      if type(plain(info)) == "table" then
+        local id = plain(info.itemID)
+        local name = plain(info.itemName)
+        if type(name) ~= "string" and id and ci then name = plain(call(ci.GetItemNameByID, id)) end
+        if type(name) ~= "string" then
+          local link = plain(info.hyperlink)
+          name = type(link) == "string" and link:match("%[(.-)%]") or nil
+        end
+        if type(name) == "string" and not ids[name] then
+          names[#names + 1] = name
+          ids[name] = id
+        end
+      end
+    end
+  end
+  return names, ids
+end
+
+local function itemIcon(name)
+  local id = st.bagIds and st.bagIds[name]
+  local ci = G("C_Item")
+  return id and ci and call(ci.GetItemIconByID, id) or nil
 end
 
 local function known(spell)
@@ -316,7 +351,9 @@ local function paintRow(r, row, cols)
       cell.tex:Hide() cell.txt:SetText("")
     else
       setColour(cell.tex, info.state)
-      cell.txt:SetText(info.state == "low" and M.short(info.left) or (LABELS[info.state] or ""))
+      local text = info.state == "low" and M.short(info.left) or (LABELS[info.state] or "")
+      if info.count and info.count > 0 then text = tostring(info.count) end
+      cell.txt:SetText(text)
     end
   end
 end
@@ -333,7 +370,11 @@ function ns.rowTooltip(r)
       local text = ({ on = "on", low = "ends in " .. M.short(info.left), off = "missing",
                       unknown = "unknown (too far, or hidden)" })[info.state]
       if info.state == "on" and info.left then text = "on, " .. M.short(info.left) .. " left" end
+      if def.scroll and info.state == "off" then text = info.count .. " to read" end
       t:AddDoubleLine(def.title or def.label, text, 1, 1, 1, unpack(COLOURS[info.state] or { 1, 1, 1 }))
+      if def.scroll then
+        for _, sc in ipairs(st.scrollsDue or {}) do t:AddLine("  " .. sc.name, 1, 0.82, 0) end
+      end
     end
   end
   if row.castText and row.castText ~= "" then t:AddLine("Click: cast " .. row.castSpell, 0.6, 0.8, 1) end
@@ -377,13 +418,29 @@ function ns.refresh()
     selfCol = { key = "self", label = "Armor", title = table.concat(M.SELF[myClass], " / "), self = true }
     cols[#cols + 1] = selfCol
   end
+  -- Scrolls: a column when your bags hold a scroll you can use.
+  if st.bagDirty or not st.bagNames then
+    st.bagNames, st.bagIds = ns.bagItems()
+    st.bagDirty = false
+  end
+  local best = M.bagScrolls(st.bagNames, myClass)
+  local due = rows[1] and M.scrollsDue(best, rows[1].auras, mine and mine.key)
+  st.scrollsDue = due
+  if next(best) then
+    cols[#cols + 1] = { key = "scroll", label = "Scroll", title = "Scrolls in your bags", scroll = true }
+  end
   while #cols > MAX_CELLS do table.remove(cols, 1) end
   st.cols = cols
 
   for _, row in ipairs(rows) do
     row.cells = {}
     for c, def in ipairs(cols) do
-      if def.self then
+      if def.scroll then
+        if row.unit == "player" then
+          local stt = due == nil and "unknown" or #due > 0 and "off" or "on"
+          row.cells[c] = { state = stt, count = due and #due or 0 }
+        end
+      elseif def.self then
         if row.unit == "player" then
           local has = M.hasSelfBuff(myClass, row.auras)
           local stt = has == true and "on" or has == false and "off" or "unknown"
@@ -421,7 +478,7 @@ function ns.refresh()
   local pick = nil
   if not mounted() and not combat then
     pick = M.nextBuff({ rows = rows, mine = mine, selfSpell = selfSpell, class = myClass,
-      owed = st.owed, nearby = nearby, skip = st.skip, now = t })
+      owed = st.owed, nearby = nearby, skip = st.skip, now = t, scrolls = due })
   end
   st.next = pick
 
@@ -440,16 +497,16 @@ function ns.refresh()
     end
   end
   if pick then
-    nextBtn.icon:SetTexture(spellIcon(pick.spell))
+    nextBtn.icon:SetTexture(pick.item and itemIcon(pick.item) or spellIcon(pick.spell))
     nextBtn.icon:Show()
-    nextBtn.label:SetText("Next: " .. pick.spell .. " > " .. (pick.name or "?") .. "  |cffa0a0a0(" .. pick.reason .. ")|r")
+    nextBtn.label:SetText("Next: " .. (pick.item or pick.spell) .. " > " .. (pick.name or "?") .. "  |cffa0a0a0(" .. pick.reason .. ")|r")
   else
     nextBtn.icon:Hide()
     nextBtn.label:SetText("|cffa0a0a0" .. (combat and "In combat" or mounted() and "Mounted" or "Everyone is buffed") .. "|r")
   end
   if not combat then
     local hadTarget = call(G("UnitExists"), "target") == true
-    setMacro(nextBtn, pick and M.macro(pick.spell, pick.unit, pick.name, hadTarget) or "")
+    setMacro(nextBtn, pick and M.macro(pick.spell, pick.unit, pick.name, hadTarget, pick.item) or "")
     nextBtn:ClearAllPoints()
     nextBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD, -(PAD + ROW_H * (#rows + 1) + 2))
     nextBtn:SetWidth(width - 2 * PAD)
@@ -527,7 +584,8 @@ local ev = CreateFrame("Frame")
 ns.ev = ev
 local EVENTS = { "ADDON_LOADED", "PLAYER_LOGIN", "UNIT_AURA", "GROUP_ROSTER_UPDATE",
   "PLAYER_TARGET_CHANGED", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
-  "UNIT_SPELLCAST_SUCCEEDED", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED" }
+  "UNIT_SPELLCAST_SUCCEEDED", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED",
+  "BAG_UPDATE_DELAYED" }
 for _, e in ipairs(EVENTS) do ev:RegisterEvent(e) end
 
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3)
@@ -551,6 +609,8 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3)
       if n == name then ns.db.lastSelf = name end
     end
     st.dirty = true
+  elseif event == "BAG_UPDATE_DELAYED" then
+    st.bagDirty, st.dirty = true, true
   elseif event == "PLAYER_REGEN_DISABLED" then
     -- The Next macro would be stale for the whole fight: empty it now,
     -- while the client still lets us.

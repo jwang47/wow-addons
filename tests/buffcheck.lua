@@ -248,6 +248,45 @@ check("last armor saved", ns.db.lastSelf == "Frost Armor")
 SlashCmdList.BUFFCHECK("nearby off")
 check("slash nearby off", ns.db.nearby == false)
 
+-- Scrolls in your bags.
+local BAG = { "Scroll of Stamina II", "Scroll of Stamina III", "Scroll of Intellect", "Scroll of Strength",
+              "Scroll of Recall", "Linen Cloth" }
+C_Container = {
+  GetContainerNumSlots = function(bag) return bag == 0 and #BAG or 0 end,
+  GetContainerItemInfo = function(bag, slot)
+    if bag == 0 and BAG[slot] then return { itemID = 100 + slot, itemName = BAG[slot], stackCount = 1 } end
+  end,
+}
+W.units.party1.class = "WARRIOR"
+W.units.player.auras = { ["Arcane Intellect"] = T + 1500, ["Frost Armor"] = T + 3000 }
+ev.scripts.OnEvent(ev, "BAG_UPDATE_DELAYED")
+ns.refresh()
+local scrollCol
+for c, def in ipairs(st.cols) do if def.scroll then scrollCol = c end end
+check("a Scroll column", scrollCol ~= nil)
+check("one scroll to read (Stamina III; a mage casts Int, Strength is not for a mage)",
+  st.scrollsDue and #st.scrollsDue == 1 and st.scrollsDue[1].name == "Scroll of Stamina III")
+check("scroll cell: missing, count 1", st.rows[1].cells[scrollCol].state == "off" and st.rows[1].cells[scrollCol].count == 1)
+check("next: read the scroll", st.next and st.next.reason == "scroll" and st.next.item == "Scroll of Stamina III")
+check("scroll macro", BuffCheckNext.attrs.macrotext == "/use Scroll of Stamina III")
+W.units.player.auras["Power Word: Fortitude"] = T + 1500
+ns.refresh()
+check("Fortitude covers the Stamina scroll", st.rows[1].cells[scrollCol].state == "on" and #st.scrollsDue == 0)
+W.units.player.auras["Power Word: Fortitude"] = nil
+W.units.player.auras["Stamina"] = T + 1500
+ns.refresh()
+check("the scroll buff is on", st.rows[1].cells[scrollCol].state == "on")
+BAG = { "Linen Cloth" }
+ev.scripts.OnEvent(ev, "BAG_UPDATE_DELAYED")
+ns.refresh()
+local any = false
+for _, def in ipairs(st.cols) do if def.scroll then any = true end end
+check("no scrolls: no column", not any)
+local M2 = ns.logic
+check("warrior: no Intellect scroll", next(M2.bagScrolls({ "Scroll of Intellect" }, "WARRIOR")) == nil)
+check("warrior: Strength scroll", M2.bagScrolls({ "Scroll of Strength II" }, "WARRIOR").Strength.rank == 2)
+check("priest reads an Intellect scroll", M2.scrollsDue(M2.bagScrolls({ "Scroll of Intellect" }, "PRIEST"), {}, "fort")[1] ~= nil)
+
 if failures > 0 then
   print(failures .. " failed")
   os.exit(1)

@@ -34,6 +34,71 @@ M.SELF = {
   WARLOCK = { "Demon Armor", "Demon Skin" },
 }
 
+-- Stat scrolls in your bags. `buff` is the aura a scroll gives; `covers`
+-- are class buffs that do not stack with it (the scroll is then wasted).
+-- `classes` limits a scroll to the classes that use the stat.
+local MELEE = { WARRIOR = true, ROGUE = true, PALADIN = true, SHAMAN = true, DRUID = true, HUNTER = true }
+M.SCROLLS = {
+  { stat = "Intellect", buff = "Intellect", covers = { "Arcane Intellect", "Arcane Brilliance" }, mana = true },
+  { stat = "Stamina", buff = "Stamina", covers = { "Power Word: Fortitude", "Prayer of Fortitude" } },
+  { stat = "Spirit", buff = "Spirit", covers = { "Divine Spirit", "Prayer of Spirit" }, mana = true },
+  { stat = "Protection", buff = "Armor" },
+  { stat = "Strength", buff = "Strength", classes = { WARRIOR = true, ROGUE = true, PALADIN = true, SHAMAN = true, DRUID = true } },
+  { stat = "Agility", buff = "Agility", classes = MELEE },
+}
+local ROMAN = { I = 1, II = 2, III = 3, IV = 4, V = 5, VI = 6, VII = 7, VIII = 8 }
+
+-- The scroll def and rank for an item name ("Scroll of Stamina III"), or nil.
+function M.scrollOf(name)
+  if type(name) ~= "string" then return nil end
+  local stat, rest = name:match("^Scroll of (%a+)(.*)$")
+  if not stat then return nil end
+  for _, def in ipairs(M.SCROLLS) do
+    if def.stat == stat then
+      local roman = rest:match("^ (%u+)$")
+      if rest ~= "" and not (roman and ROMAN[roman]) then return nil end
+      return def, roman and ROMAN[roman] or 1
+    end
+  end
+  return nil
+end
+
+-- The best scroll of each stat in `items` (a list of item names), for a
+-- member of `class`: stat -> { def, name, rank }.
+function M.bagScrolls(items, class)
+  local best = {}
+  for _, name in ipairs(items or {}) do
+    local def, rank = M.scrollOf(name)
+    if def and not (def.mana and M.NO_MANA[class]) and not (def.classes and not def.classes[class]) then
+      local b = best[def.stat]
+      if not b or rank > b.rank then best[def.stat] = { def = def, name = name, rank = rank } end
+    end
+  end
+  return best
+end
+
+-- The scrolls worth reading now: in your bags, and neither their buff nor
+-- a class buff that covers it is on you. `canGive` is the key of your own
+-- class buff ("int" for a mage: you cast Arcane Intellect, not a scroll).
+-- Returns the list (sorted by stat), or nil when the auras are hidden.
+function M.scrollsDue(best, auras, canGive)
+  if not auras then return nil end
+  local due, unknown = {}, false
+  for _, def in ipairs(M.SCROLLS) do
+    local b = best[def.stat]
+    local mineCovers = canGive == "int" and def.stat == "Intellect" or canGive == "fort" and def.stat == "Stamina"
+    if b and not mineCovers then
+      local on = auras[def.buff] ~= nil
+      for _, n in ipairs(def.covers or {}) do if auras[n] then on = true end end
+      if not on then
+        if auras.partial then unknown = true else due[#due + 1] = b end
+      end
+    end
+  end
+  if unknown and #due == 0 then return nil end
+  return due
+end
+
 -- Classes with no mana in Classic.
 M.NO_MANA = { WARRIOR = true, ROGUE = true }
 
@@ -155,7 +220,11 @@ end
 -- The macro for one cast. `who` is a unit token for you and your group
 -- (no target change), or a full name for anybody else: target them, cast,
 -- and give your target back (or clear it when you had none).
-function M.macro(spell, unit, name, hadTarget)
+function M.macro(spell, unit, name, hadTarget, item)
+  if item then
+    if item:find("[\n;%[%]]") then return "" end
+    return "/use " .. item
+  end
   if not spell then return "" end
   if unit then return "/cast [@" .. unit .. "] " .. spell end
   if not name or name:find("[\n;%[%]]") then return "" end
@@ -169,9 +238,10 @@ end
 --   mine: your buff def (or nil), selfSpell: your self buff to cast (or nil)
 --   owed: list of { name, at, class?, auras? } (newest first; never a unit:
 --         /cast [@nameplateN] does not work, so strangers are targeted by name)
+--   scrolls: M.scrollsDue's list (scrolls to read)
 --   nearby: list of { name, unit, class, auras }
 --   skip: key -> until, now
--- Returns { key, spell, unit?, name, reason } or nil.
+-- Returns { key, spell or item, unit?, name, reason } or nil.
 function M.nextBuff(c)
   local now, skip = c.now or 0, c.skip or {}
   local function free(key) return not skip[key] or skip[key] <= now end
@@ -211,7 +281,15 @@ function M.nextBuff(c)
     return { key = "self", spell = c.selfSpell, unit = "player", name = you.name, reason = "you" }
   end
 
-  -- 4. Players near you without your buff.
+  -- 4. A scroll in your bags whose buff is not on you.
+  for _, sc in ipairs(c.scrolls or {}) do
+    local key = "scroll:" .. sc.def.stat
+    if free(key) then
+      return { key = key, item = sc.name, unit = "player", name = you and you.name, reason = "scroll" }
+    end
+  end
+
+  -- 5. Players near you without your buff.
   if mine then
     for _, n in ipairs(c.nearby or {}) do
       local key = "near:" .. n.name

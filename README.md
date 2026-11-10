@@ -468,10 +468,18 @@ small grid (`/buffs`). It is not in the release yet.
   the client hides the aura). Warriors and rogues get no Int cell.
 - Click a row to cast your buff on that person (on your own row: your
   armor when your buff is already on).
+- **Scrolls**: when your bags hold a stat scroll you can use (Intellect,
+  Stamina, Spirit, Protection, Strength, Agility), your row gets a Scroll
+  column. Red with a number: that many scrolls whose buff is not on you.
+  A class buff that does not stack with the scroll counts as on
+  (Fortitude for Stamina, Arcane Intellect for Intellect, Divine Spirit
+  for Spirit), and a mage never needs an Intellect scroll. Next reads the
+  best rank, after your armor. The scroll buff names (Stamina, Intellect,
+  Armor and so on) are from Classic; check them in game on Forever.
 - The **Next** line under the grid names the next person to buff and why,
   and a click casts on them. Bind a key to it in Key Bindings > BuffCheck.
   The order: a stranger who buffed you (return the favour), your group
-  (missing, then under 1 minute left), your armor, then players within
+  (missing, then under 1 minute left), your armor, your scrolls, then players within
   about 10 yards without your buff. It gives your target back after a
   cast on a stranger. Right-click skips that person for 10 minutes.
 - Next is empty while you are mounted. It does not offer nearby players
