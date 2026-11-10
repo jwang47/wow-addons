@@ -655,14 +655,14 @@ local function query(qdb, what, id, key)
   return call(what == "object" and qdb.QueryObjectSingle or qdb.QueryNPCSingle, id, key)
 end
 
--- Has Questie any source for the item? (Cheap: three field reads.)
+-- Has Questie any source or quest for the item? (Cheap: a few field reads.)
 function S.hasSources(id)
   local qdb = S.questieDB()
   if not qdb then return false end
   for _, k in ipairs(S.SOURCE_KINDS) do
     if #ids(call(qdb.QueryItemSingle, id, k[1])) > 0 then return true end
   end
-  return false
+  return #ids(call(qdb.QueryItemSingle, id, "relatedQuests")) > 0
 end
 
 -- Groups of source entries for an item, nearest first.
@@ -679,10 +679,12 @@ function S.itemSources(id)
   end
   for _, k in ipairs(S.SOURCE_KINDS) do
     local field, what, title, verb = k[1], k[2], k[3], k[4]
-    local list = {}
+    local list, unknown = {}, 0
     for _, sid in ipairs(ids(call(qdb.QueryItemSingle, id, field))) do
       local name = query(qdb, what, sid, "name")
-      if type(name) == "string" and name ~= "" then
+      if type(name) ~= "string" or name == "" then
+        unknown = unknown + 1 -- listed on the item, but Questie has no row for it
+      else
         local e = entry("source", what .. ":" .. sid, name, { what = what, sid = sid, verb = verb })
         e.key = "src:" .. field .. ":" .. sid
         local spawns = query(qdb, what, sid, "spawns")
@@ -723,12 +725,25 @@ function S.itemSources(id)
       if (a.zone or "~") ~= (b.zone or "~") then return (a.zone or "~") < (b.zone or "~") end
       return a.name < b.name
     end)
-    if #list > 0 then
+    if #list > 0 or unknown > 0 then
       local g = { kind = "source", title = title, entries = {}, more = math.max(0, #list - S.SOURCES_PER_GROUP) }
       for i = 1, math.min(#list, S.SOURCES_PER_GROUP) do g.entries[i] = list[i] end
+      if unknown > 0 then
+        local noun = what == "object" and "object" or "NPC"
+        local e = entry("source", "unknown:" .. field, string.format("%d %s%s Questie has no location for", unknown, noun,
+          unknown > 1 and "s" or ""), { what = what, verb = verb, unknown = true })
+        table.insert(g.entries, e)
+      end
       table.insert(groups, g)
     end
   end
+  -- The quests that need it: their giver is often near where it is found.
+  local quests = {}
+  for _, qid in ipairs(ids(call(qdb.QueryItemSingle, id, "relatedQuests"))) do
+    local name = call(qdb.QueryQuestSingle, qid, "name")
+    if type(name) == "string" and name ~= "" then table.insert(quests, entry("quest", qid, name, { questie = true })) end
+  end
+  if #quests > 0 then table.insert(groups, { kind = "quest", title = "For quests", entries = quests }) end
   return groups
 end
 

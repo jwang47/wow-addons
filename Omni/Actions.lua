@@ -203,7 +203,7 @@ function A.hint(e)
     if ns.sources.hasSources(e.id) then return "Enter: where to get it   Shift+Enter: link" end
     return "Enter: link in chat"
   elseif k == "source" then
-    return e.mapID and "Enter: show on the map and pin it" or ""
+    return e.mapID and "Enter: show on the map and pin it" or "Questie has no location; the quest giver's area is a good start"
   elseif k == "place" then return "Enter: open the map"
   elseif k == "dungeon" then return "Enter: list its loot and quests"
   elseif k == "person" then return "Enter: whisper   Shift+Enter: invite"
@@ -349,6 +349,7 @@ function A.detail(e)
     if e.levels then d = (e.fits and "|cff40ff40" or "|cff9d9d9d") .. e.levels .. "|r  " .. d end
     return d
   elseif k == "source" then
+    if e.unknown then return "" end
     local where = e.yards and string.format("|cffffd100%d yd|r", math.floor(e.yards + 0.5)) or (e.zone or "")
     return "|cff9d9d9d" .. e.verb .. "|r  " .. where
   elseif k == "dungeon" then

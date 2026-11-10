@@ -16,6 +16,9 @@ the same, and a test checks that every `.toc` version has a section here.
   drop it, the objects that hold it and the vendors that sell it, nearest
   first, with yards on your map or the zone. Enter on one pins it on the
   map. Shift+Enter links the item.
+  When Questie lists a source but has no location for it (some Forever
+  quests), a row says so, and the quests that need the item follow. An
+  empty `from:` view says why (no such item, no source, Questie loading).
 
 ## Omni 0.1.1
 
