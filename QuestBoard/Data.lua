@@ -712,6 +712,8 @@ function D.collect(opts)
   D.tier(out.area, "rate")
   -- Chains: the reward index is read once (spread over frames), then each
   -- quest gets what its chain leads to.
+  -- Town: the nearest innkeeper and flight master of your side.
+  out.town = out.questie and D.townList(opts.yield and tick) or {}
   if out.questie and D.buildRewards and D.buildRewards(opts.yield and tick) then
     for _, kind in ipairs({ "active", "nearby", "turnin", "log", "party", "pickup" }) do
       for _, e in ipairs(out[kind]) do e.chain = D.chainInfo(e.id) end
@@ -786,4 +788,87 @@ function D.progress(e)
   local o = e.left and e.left[1]
   if o and o.have and o.need and o.need > 1 then return o.have .. "/" .. o.need end
   return ""
+end
+
+---------------------------------------------------------------------------
+-- Town: the nearest innkeeper and flight master friendly to your side, from
+-- Questie's NPC data (read once, a slice per frame). Addons cannot walk you
+-- there; the row gives the map pin, the arrow and the distance.
+---------------------------------------------------------------------------
+D.NPC_FLAGS = { inn = 65536, flight = 8192 }   -- UNIT_NPC_FLAG_INNKEEPER, _FLIGHTMASTER
+D.townBuild = { state = "idle", i = 1 }
+D.townNPCs = nil                -- { inn = { ids }, flight = { ids } } once read
+
+local function hasFlag(flags, bit)
+  flags = tonumber(flags) or 0
+  return math.floor(flags / bit) % 2 == 1
+end
+
+local function mySide()
+  local f = call(rawget(_G, "UnitFactionGroup"), "player")
+  return f == "Horde" and "H" or f == "Alliance" and "A" or nil
+end
+
+function D.buildTown(tick)
+  local b = D.townBuild
+  if b.state == "done" then return true end
+  local qdb = D.module("QuestieDB")
+  if not (qdb and type(qdb.QueryNPCSingle) == "function" and type(qdb.NPCPointers) == "table") then return false end
+  if not b.ids then
+    b.ids, b.found = {}, { inn = {}, flight = {} }
+    for id in pairs(qdb.NPCPointers) do if type(id) == "number" then table.insert(b.ids, id) end end
+    table.sort(b.ids)
+  end
+  local side = mySide()
+  while b.i <= #b.ids do
+    local id = b.ids[b.i]
+    local flags = call(qdb.QueryNPCSingle, id, "npcFlags")
+    if flags and (hasFlag(flags, D.NPC_FLAGS.inn) or hasFlag(flags, D.NPC_FLAGS.flight)) then
+      local friend = call(qdb.QueryNPCSingle, id, "friendlyToFaction")
+      if not side or not friend or friend == "AH" or friend == side then
+        if hasFlag(flags, D.NPC_FLAGS.inn) then table.insert(b.found.inn, id) end
+        if hasFlag(flags, D.NPC_FLAGS.flight) then table.insert(b.found.flight, id) end
+      end
+    end
+    b.i = b.i + 1
+    if tick and b.i % 200 == 0 then tick() end
+  end
+  D.townNPCs, b.state, b.ids = b.found, "done", nil
+  return true
+end
+
+local function nearestOf(ids)
+  local qdb, du = D.module("QuestieDB"), D.module("DistanceUtils")
+  if not (qdb and du) then return nil end
+  local best
+  for _, id in ipairs(ids or {}) do
+    local spawns = call(qdb.QueryNPCSingle, id, "spawns")
+    if type(spawns) == "table" then
+      local spawn, zone, dist = call(du.GetNearestSpawn, spawns)
+      dist = plain(dist)
+      if spawn and dist and dist < D.FAR and (not best or dist < best.dist) then
+        best = { id = id, spawn = spawn, zone = zone, dist = dist }
+      end
+    end
+  end
+  return best
+end
+
+-- Rows for the Town group: the nearest inn and flight master.
+function D.townList(tick)
+  if not D.buildTown(tick) then return {} end
+  local qdb, out = D.module("QuestieDB"), {}
+  for _, what in ipairs({ "inn", "flight" }) do
+    local n = nearestOf(D.townNPCs[what])
+    if n then
+      local name = call(qdb.QueryNPCSingle, n.id, "name") or ("NPC " .. n.id)
+      local e = { kind = "town", id = -n.id, npc = n.id, name = name, role = what, color = "white", left = {} }
+      e.spawn, e.zone, e.target, e.dist = n.spawn, n.zone, name, n.dist
+      e.angle = D.bearing(n.spawn, n.zone)
+      e.wx, e.wy, e.inst = D.world(n.spawn, n.zone)
+      table.insert(out, e)
+    end
+  end
+  D.sort(out, "near")
+  return out
 end

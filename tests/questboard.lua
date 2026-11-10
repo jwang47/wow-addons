@@ -614,6 +614,35 @@ local two = { { v = 1 }, { v = 2 } }
 D.tier(two, "v")
 check("xp colours: too few to rank", not two[1].tier and not two[2].tier)
 
+-- Town: nearest innkeeper and flight master of your side.
+local NPCS = {
+  [1] = { name = "Innkeeper A", npcFlags = 65536 + 1, friendlyToFaction = "A", d = 800 },
+  [2] = { name = "Innkeeper H", npcFlags = 65536, friendlyToFaction = "H", d = 100 },
+  [3] = { name = "Gryphon Master", npcFlags = 8192, friendlyToFaction = "A", d = 1500 },
+  [4] = { name = "Innkeeper Far", npcFlags = 65536, friendlyToFaction = "AH", d = 3000 },
+  [5] = { name = "Vendor", npcFlags = 128, friendlyToFaction = "A", d = 10 },
+}
+UnitFactionGroup = function() return "Alliance" end
+local realQNS, realNearest = mods.QuestieDB.QueryNPCSingle, mods.DistanceUtils.GetNearestSpawn
+mods.QuestieDB.NPCPointers = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, [5] = 1 }
+mods.QuestieDB.QueryNPCSingle = function(id, key)
+  local n = NPCS[id]
+  if not n then return realQNS and realQNS(id, key) end
+  if key == "spawns" then return { d = n.d } end
+  return n[key]
+end
+mods.DistanceUtils.GetNearestSpawn = function(sp) return { 50, 50 }, 1519, sp.d end
+D.townBuild, D.townNPCs = { state = "idle", i = 1 }, nil
+D.resetModules()
+local town = D.townList()
+check("town: nearest inn of your side, then the flight master", #town == 2 and town[1].name == "Innkeeper A" and town[1].dist == 800
+  and town[2].name == "Gryphon Master" and town[2].role == "flight")
+check("town: what the row says", ns.todoBase({ kind = "town", role = "inn" }) == "Innkeeper")
+mods.QuestieDB.NPCPointers, mods.QuestieDB.QueryNPCSingle, mods.DistanceUtils.GetNearestSpawn = nil, realQNS, realNearest
+D.townBuild, D.townNPCs = { state = "idle", i = 1 }, nil
+UnitFactionGroup = nil
+D.resetModules()
+
 -- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
 local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },
   { name = "c", xp = 2000 }, { name = "d", dist = 5000, xp = 1500 }, { name = "e", dist = 800, xp = 50 } }, "near")

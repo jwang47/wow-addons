@@ -277,6 +277,7 @@ A small floating list, under the minimap, of the quests that matter now.
 | Turn in | quests in your log that are complete | nearest quest giver |
 | In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
 | Party has | quests your party members have that you do not (Questie's party data, `QuestieComms.remoteQuestLogs`), with who and their progress ("Ann 2/8") | nearest giver |
+| Town | the nearest innkeeper and flight master friendly to your side (Questie's NPC data, `npcFlags`); click or `/qb town` pins it on the map. Addons cannot walk you there | nearest |
 | Pick up | quests Questie shows as available ("!") that give XP and are at most 3 levels over you (`/qb range N`) | best estimated XP per minute (right-click the group: nearest) |
 
 - A quest in your log that a party member also has says so under it ("with

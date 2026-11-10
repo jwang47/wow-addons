@@ -12,6 +12,8 @@ the same, and a test checks that every `.toc` version has a section here.
 - Clearer grouping: a quest's two lines sit closer, quests have a small gap
   between them, and each group name is gold with a thin rule under it and
   more space above it.
+- Town group: the nearest innkeeper and flight master of your side, with
+  distance and arrow. Click (or `/qb town`) pins it on the map.
 
 ## QuestBoard 0.1.0
 

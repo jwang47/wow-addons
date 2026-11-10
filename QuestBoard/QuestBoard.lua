@@ -14,7 +14,7 @@ local defaults = {
   sortLog = "near",      -- near | xp
   sortPickup = "xp",     -- near | xp
   maxAbove = 3,          -- pick-ups at most this many levels over you
-  rows = { active = 4, nearby = 4, area = 3, turnin = 6, log = 8, party = 5, pickup = 8 },
+  rows = { active = 4, nearby = 4, area = 3, turnin = 6, log = 8, party = 5, pickup = 8, town = 2 },
   collapsed = {},
   combatAlpha = 0.35,
   hideTrackers = false,  -- hide the game's quest tracker (and Questie's)
@@ -40,8 +40,8 @@ local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6
 -- have a small gap between them, groups a bigger one.
 local SUB_UP, ROW_GAP, GROUP_GAP = 3, 4, 10
 local FONT, FONT_DIM = "GameFontHighlightSmall", "GameFontDisableSmall"
-local HEADS = { active = "Active", nearby = "Nearby", area = "Areas", turnin = "Turn in", log = "In your log", party = "Party has", pickup = "Pick up" }
-local ORDER = { "active", "nearby", "area", "turnin", "log", "party", "pickup" }
+local HEADS = { active = "Active", nearby = "Nearby", area = "Areas", turnin = "Turn in", log = "In your log", party = "Party has", pickup = "Pick up", town = "Town" }
+local ORDER = { "active", "nearby", "area", "turnin", "log", "party", "pickup", "town" }
 
 local panel, rows, heads = nil, {}, {}
 ns.rows = rows
@@ -71,6 +71,10 @@ end
 
 function ns.todoBase(e)
   if e.kind == "area" then return D.areaText(e) end
+  if e.kind == "town" then
+    local where = D.zoneName(e.zone)
+    return (e.role == "inn" and "Innkeeper" or "Flight master") .. (where and (", " .. where) or "")
+  end
   if e.kind == "turnin" then
     -- Far away (another continent or an instance): say where.
     local where = e.far and D.zoneName(e.zone)
@@ -150,6 +154,15 @@ local function tooltip(r)
   local e, tip = r.entry, rawget(_G, "GameTooltip")
   if not (e and tip) then return end
   tip:SetOwner(r, "ANCHOR_LEFT")
+  if e.kind == "town" then
+    tip:AddLine(e.name .. "  (" .. D.yards(e.dist) .. " " .. D.compass(e.angle) .. ")", 1, 1, 1)
+    tip:AddLine(ns.todoBase(e), 0.8, 0.8, 0.8)
+    tip:AddLine("Nearest " .. (e.role == "inn" and "innkeeper" or "flight master") .. " friendly to you (Questie's NPC data)", 0.6, 0.6, 0.6)
+    tip:AddLine(" ")
+    tip:AddLine("Click: pin it on the map and follow the arrow", 0.5, 0.5, 0.5)
+    tip:Show()
+    return
+  end
   if e.kind == "area" then
     tip:AddLine(e.name .. "  (" .. D.yards(e.dist) .. ")", 1, 1, 1)
     tip:AddLine(D.areaText(e), 0.8, 0.8, 0.8)
@@ -287,6 +300,7 @@ function ns.sayOnce(key, msg)
 end
 
 function ns.link(e)
+  if e.kind == "town" or e.kind == "area" then return end
   local link = call(rawget(_G, "GetQuestLink"), e.id) or e.name
   if not call(rawget(_G, "ChatEdit_InsertLink"), link) then call(rawget(_G, "ChatFrame_OpenChat"), link) end
 end
@@ -374,7 +388,7 @@ function ns.click(e, button)
   if rawget(_G, "IsShiftKeyDown") and IsShiftKeyDown() then return ns.link(e) end
   if button == "RightButton" then
     if e.kind == "pickup" or e.kind == "party" then return ns.showGiver(e) end
-    if e.kind == "area" then return ns.pin(e) end
+    if e.kind == "area" or e.kind == "town" then return ns.pin(e) end
     return ns.openLog(e)
   end
   if e.npc then ns.markNPC(e.npc) end
@@ -517,7 +531,7 @@ ns.TURNIN_TOP_YARDS = 600
 function ns.order(st)
   local t = st and st.turnin and st.turnin[1]
   if st and #(st.active or {}) == 0 and t and t.dist and t.dist <= ns.TURNIN_TOP_YARDS then
-    return { "turnin", "nearby", "area", "active", "log", "party", "pickup" }
+    return { "turnin", "nearby", "area", "active", "log", "party", "pickup", "town" }
   end
   return ORDER
 end
@@ -578,7 +592,7 @@ function ns.render()
       local collapsed = ns.db.collapsed[kind]
       h.text:SetText((collapsed and "+ " or "") .. HEADS[kind] .. "  " .. #list)
       local sortKey = kind == "pickup" and "sortPickup" or kind == "log" and "sortLog"
-      h.right:SetText(kind == "active" and "doing now" or kind == "nearby" and "within 300 yd" or kind == "area" and "best XP"
+      h.right:SetText(kind == "active" and "doing now" or kind == "nearby" and "within 300 yd" or kind == "area" and "best XP" or kind == "town" and "click: map pin"
         or sortKey and (ns.db[sortKey] == "xp" and "best XP" or "nearest") or "nearest")
       table.insert(items, { f = h, y = cy, h = HEAD_H, gap = 2 })
       cy = cy + HEAD_H + 2
@@ -588,7 +602,7 @@ function ns.render()
           local r = rows[used] or makeRow(used)
           local e = list[i]
           r.entry = e
-          r.lvl:SetText(e.kind == "area" and #e.stops or e.level or "?")
+          r.lvl:SetText(e.kind == "area" and #e.stops or e.kind == "town" and (e.role == "inn" and "Inn" or "Fly") or e.level or "?")
           r.lvl:SetTextColor(rgb(e.color))
           r.name:SetText(e.name)
           if e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55) else r.name:SetTextColor(0.92, 0.92, 0.92) end
@@ -987,6 +1001,7 @@ local help = {
   "/qb range N - pick-ups at most N levels over you (now %d)",
   "/qb rows N - rows per group (now %d)",
   "/qb height N - at most N pixels tall, scroll for the rest (off: no limit; or drag the grip)",
+  "/qb town - pin the nearest innkeeper or flight master on the map (/qb inn: innkeeper only)",
   "/qb reset - put the board back under the minimap",
   "/qb tracker off - hide the game's quest tracker (on brings it back)",
   "/qb far on - show enemy nameplates from as far as the game allows (off puts it back)",
@@ -1036,6 +1051,13 @@ SlashCmdList.QUESTBOARD = function(text)
   elseif cmd == "height" and (n or rest == "off") then
     ns.setMaxHeight(n)
     say(n and ("max height " .. ns.db.maxHeight .. ", scroll for the rest") or "no max height")
+    return
+  elseif cmd == "town" or cmd == "inn" then
+    local st = ns.state()
+    local e
+    for _, t in ipairs(st and st.town or {}) do if cmd == "town" or t.role == "inn" then e = e or t end end
+    if e then ns.click(e, "LeftButton") say(e.name .. ", " .. D.yards(e.dist) .. ": pinned on the map")
+    else say("no town known yet (needs Questie; try again in a few seconds)") end
     return
   elseif cmd == "reset" then
     ns.db.point = nil
