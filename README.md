@@ -655,7 +655,8 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
 - **Old bars**: `/glance bars hide` hides Bartender4's bottom action bars
   (1, 2 and 5-10; the right-edge bars 3 and 4 stay),
   Blizzard's bottom bars, the gryphon art and the old XP bar, and draws a
-  thin XP line along the bottom edge. The bag bar, micro menu, pet and
+  thin XP bar along the bottom edge, with your XP, the percentage and rested XP in it
+  ("12,345 / 20,000 (61.7%)  Rested 15%"). The bag bar, micro menu, pet and
   stance bars stay. Move click-only items (food, potions) onto Glance keys
   first. `/glance bars show` brings everything back.
 - **Chat**: Blizzard's chat in the same look: a faint panel, tabs that show

@@ -91,7 +91,8 @@ the same, and a test checks that every `.toc` version has a section here.
   Drag the gold corner, use Shift+mouse wheel or type `/glance map SIZE` to resize it.
 - `/glance bars hide`: hides the Bartender4 bottom bars (the right-edge
   bars 3 and 4 stay) and Blizzard's bottom bars, the
-  gryphon art and the old XP bar (a thin XP line replaces it).
+  gryphon art and the old XP bar (a thin XP bar with the numbers and
+  the percentage in it replaces it).
 - Chat in the same look: faint panel, tabs only under the mouse, no side
   buttons, text fades after 30 quiet seconds.
 - Shift layer and cooldown sweeps work in the game (first test round).

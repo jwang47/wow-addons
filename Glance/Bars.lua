@@ -42,15 +42,29 @@ function bars.hide()
   end
 end
 
+local function big(n)
+  if BreakUpLargeNumbers then return BreakUpLargeNumbers(n) end
+  return tostring(n)
+end
+
+-- Text for the XP bar; "" when the game keeps the numbers secret.
+function bars.xpText(c, m, r)
+  if type(c) ~= "number" or type(m) ~= "number" or m <= 0 then return "" end
+  local t = string.format("%s / %s (%.1f%%)", big(c), big(m), c / m * 100)
+  if type(r) == "number" and r > 0 then t = t .. string.format("  Rested %d%%", r / m * 100 + 0.5) end
+  return t
+end
+
 ns.module("bars", function()
   if ns.db.hideBars then ns.outOfCombat("hide bars", bars.hide) end
 
-  -- XP: a 4 px line along the bottom edge, purple, with rested XP lighter.
+  -- XP: a 12 px bar along the bottom edge, purple, with rested XP lighter
+  -- and the numbers in it.
   local xp = CreateFrame("StatusBar", "GlanceXP", UIParent)
   bars.xp = xp
   xp:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
   xp:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 0, 0)
-  xp:SetHeight(4)
+  xp:SetHeight(12)
   xp:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
   xp:SetStatusBarColor(0.64, 0.35, 0.85)
   xp.bg = xp:CreateTexture(nil, "BACKGROUND")
@@ -60,12 +74,17 @@ ns.module("bars", function()
   xp.rest:SetPoint("TOPLEFT")
   xp.rest:SetPoint("BOTTOMLEFT")
   xp.rest:SetColorTexture(0.3, 0.5, 0.9, 0.6)
+  -- "12,345 / 20,000 (61.7%)" in the bar, plus rested XP when you have it.
+  xp.text = xp:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  xp.text:SetPoint("CENTER", 0, 0)
+  if xp.text.SetFont and STANDARD_TEXT_FONT then xp.text:SetFont(STANDARD_TEXT_FONT, 9, "OUTLINE") end
   xp:SetShown(ns.db.hideBars and true or false)
   local function update()
     local cur, max = UnitXP("player"), UnitXPMax("player")
     xp:SetMinMaxValues(0, max)
     xp:SetValue(cur)
     local c, m, r = ns.plain(cur), ns.plain(max), ns.plain(GetXPExhaustion and GetXPExhaustion() or 0)
+    xp.text:SetText(bars.xpText(c, m, r))
     if c and m and r and m > 0 and r > 0 then
       local w = (xp:GetWidth() or 0) * math.min(1, (c + r) / m)
       xp.rest:SetWidth(math.max(1, w))
