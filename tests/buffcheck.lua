@@ -210,6 +210,37 @@ check("hidden aura: unknown", st.rows[2].cells[1].state == "unknown")
 C_UnitAuras.GetAuraDataByIndex = oldIndex
 issecretvalue = nil
 
+-- In combat the client hides aura names. The last full read fills in the
+-- buffs that have not run out, and Next stays empty.
+W.units.player.auras = { ["Arcane Intellect"] = T + 1500, ["Frost Armor"] = T + 3000 }
+ns.refresh()
+function issecretvalue(v) return v == secretOne end
+C_UnitAuras.GetAuraDataByIndex = function(u, i)
+  if u == "player" then
+    if i <= 2 then return { name = secretOne, expirationTime = secretOne } end
+    return nil
+  end
+  return oldIndex(u, i)
+end
+W.combat = true
+ns.refresh()
+check("combat: Int remembered as on", st.rows[1].cells[1].state == "on")
+local armorCol
+for c, def in ipairs(st.cols) do if def.self then armorCol = c end end
+check("combat: armor remembered as on", st.rows[1].cells[armorCol].state == "on")
+check("combat: no next buff", st.next == nil and BuffCheckNext.label.text:find("In combat") ~= nil)
+T = T + 2000
+ns.refresh()
+check("combat: a remembered buff runs out", st.rows[1].cells[1].state == "unknown")
+check("combat: hidden armor is unknown, not missing", st.rows[1].cells[armorCol].state == "on")
+T = T + 1500
+ns.refresh()
+check("combat: armor unknown once its time is up", st.rows[1].cells[armorCol].state == "unknown")
+T = T - 3500
+W.combat = false
+C_UnitAuras.GetAuraDataByIndex = oldIndex
+issecretvalue = nil
+
 -- Last armor cast is remembered.
 ev.scripts.OnEvent(ev, "UNIT_SPELLCAST_SUCCEEDED", "player", "x", 7302)
 check("last armor saved", ns.db.lastSelf == "Frost Armor")

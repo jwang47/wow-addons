@@ -439,7 +439,7 @@ end
 -- of thousands, so the index is built a slice per frame on the first open.
 ---------------------------------------------------------------------------
 S.QUESTIE_SLICE = 2000
-local questie = { state = "idle", npc = {}, quest = {}, item = {} }
+local questie = { state = "idle", npc = {}, quest = {}, item = {}, byZone = {}, rewards = {} }
 S.questieState = questie
 
 function S.questieDB()
@@ -495,6 +495,20 @@ function S.buildQuestie(onDone)
         if type(name) == "string" and name ~= "" then
           local e = entry(kind, id, name, { questie = true })
           table.insert(questie[kind], e)
+          -- Dungeon quests (zoneOrSort is the area ID) and quest rewards
+          -- (Questie keeps them on the item: the quests that give it).
+          if kind == "quest" then
+            local zone = call(query, id, "zoneOrSort")
+            if type(zone) == "number" and zone > 0 then
+              questie.byZone[zone] = questie.byZone[zone] or {}
+              table.insert(questie.byZone[zone], e)
+            end
+          elseif kind == "item" then
+            for _, q in ipairs(ids(call(query, id, "questRewards"))) do
+              questie.rewards[q] = questie.rewards[q] or {}
+              table.insert(questie.rewards[q], id)
+            end
+          end
         end
         i, budget = i + 1, budget - 1
       end
@@ -518,6 +532,220 @@ function S.buildQuestie(onDone)
 end
 
 function S.questieLists() return questie.npc, questie.quest, questie.item end
+
+-- AreaTable IDs of the dungeons (Questie's zoneOrSort), by short name: the
+-- main ID, then the alternate IDs some quests use (QuestieDB's dungeons.lua;
+-- Gnomeregan's quests use 133, Uldaman's 1517). Wings share their IDs.
+local SM, BRS, DIRE = { 796, 6109, 6386, 10008, 10009, 10010 }, { 1583, 10003, 10004, 10005, 10006, 10007 }, { 2557 }
+S.DUNGEON_AREAS = { RFC = { 2437 }, WC = { 718 }, DM = { 1581, 10029 }, SFK = { 209, 10014, 10015, 10016, 10017, 10018, 10019 },
+  BFD = { 719, 10020, 10021 }, Stocks = { 717 }, Gnomer = { 721, 133, 10030, 10031, 10032 }, RFK = { 491, 1717 },
+  ["SM GY"] = SM, ["SM Lib"] = SM, ["SM Arm"] = SM, ["SM Cath"] = SM, RFD = { 722 }, Ulda = { 1337, 1517, 10033 },
+  ZF = { 1176, 978 }, Mara = { 2100, 10000 }, ST = { 1477, 1417 }, BRD = { 1584, 1585 }, LBRS = BRS, UBRS = BRS,
+  ["DM East"] = DIRE, ["DM West"] = DIRE, ["DM North"] = DIRE, Scholo = { 2057, 10011, 10012, 10013 }, Strat = { 2017 } }
+
+-- Quests set in a dungeon: { entry, level, rewards = { itemID... } }, by level.
+function S.questsByZone(short)
+  local list = {}
+  local quests = {}
+  for _, area in ipairs(S.DUNGEON_AREAS[short] or {}) do
+    for _, e in ipairs(questie.byZone[area] or {}) do table.insert(quests, e) end
+  end
+  local qdb = S.questieDB()
+  for _, e in ipairs(quests) do
+    local level = qdb and call(qdb.QueryQuestSingle, e.id, "questLevel")
+    local rewards = {}
+    for _, id in ipairs(questie.rewards[e.id] or {}) do table.insert(rewards, id) end
+    table.sort(rewards)
+    table.insert(list, { entry = e, level = type(level) == "number" and level or nil, rewards = rewards })
+  end
+  table.sort(list, function(a, b)
+    if (a.level or 0) ~= (b.level or 0) then return (a.level or 0) < (b.level or 0) end
+    return a.entry.name < b.entry.name
+  end)
+  return list
+end
+
+---------------------------------------------------------------------------
+-- Dungeons: ns.DUNGEONS (Dungeons.lua), found by name or short name ("bfd").
+-- Enter opens "loot: <short>", which lists each boss's drops as items.
+---------------------------------------------------------------------------
+function S.dungeons()
+  local list = {}
+  local level = call(UnitLevel, "player") or 0
+  for i, d in ipairs(ns.DUNGEONS or {}) do
+    local bosses = 0
+    for j = 5, #d do if not d[j][1]:find("^Trash") then bosses = bosses + 1 end end
+    local e = entry("dungeon", i, d[1], { short = d[2], low = d[3], high = d[4], bosses = bosses,
+      lname = norm(d[1] .. " " .. d[2]) })
+    e.fits = level >= d[3] and level <= d[4]
+    e.boost = e.fits and 1 or 0
+    table.insert(list, e)
+  end
+  return list
+end
+
+-- The dungeon a "loot:" query names: the short name or the name exactly,
+-- else the first whose name or short name starts with the query.
+function S.findDungeon(q)
+  q = norm(q)
+  if q == "" then return nil end
+  local all = ns.DUNGEONS or {}
+  for _, d in ipairs(all) do
+    if norm(d[2]) == q or norm(d[1]) == q then return d end
+  end
+  for _, d in ipairs(all) do
+    local n, sh = norm(d[1]), norm(d[2])
+    if n:sub(1, #q) == q or sh:sub(1, #q) == q or n:find(" " .. q, 1, true) then return d end
+  end
+end
+
+-- Groups for "loot: bfd": one per boss with its drops as item entries, then
+-- the dungeon's quests and their rewards when Questie has them. Returns
+-- groups and whether any item name is still loading.
+function S.dungeonLoot(q)
+  local d = S.findDungeon(q)
+  if not d then return {}, false end
+  local groups, loading = {}, false
+  local function item(id, where)
+    local name = itemName(id)
+    if not name then
+      loading = true
+      call(api("C_Item.RequestLoadItemDataByID"), id)
+    end
+    return entry("item", id, name or ("item " .. id), { drop = where })
+  end
+  for j = 5, #d do
+    local boss = d[j]
+    local g = { kind = "loot", title = boss[1], entries = {} }
+    for k = 2, #boss do table.insert(g.entries, item(boss[k], boss[1])) end
+    if #g.entries > 0 then table.insert(groups, g) end
+  end
+  -- Quests set in the dungeon (from the Questie index): the quest itself
+  -- (Enter shows where it starts), then its reward items.
+  for _, quest in ipairs(S.questsByZone(d[2])) do
+    local g = { kind = "loot", title = "Quest: " .. quest.entry.name .. (quest.level and (" (" .. quest.level .. ")") or ""),
+      entries = { quest.entry } }
+    for _, id in ipairs(quest.rewards) do table.insert(g.entries, item(id, quest.entry.name)) end
+    table.insert(groups, g)
+  end
+  return groups, loading, d
+end
+
+---------------------------------------------------------------------------
+-- Where to get an item (Questie): the mobs that drop it, the objects that
+-- hold it and the vendors that sell it. Each source keeps its nearest spawn:
+-- on your map with the distance in yards, else the zone of its first spawn.
+---------------------------------------------------------------------------
+S.SOURCES_PER_GROUP = 20
+S.SOURCE_KINDS = {
+  { "npcDrops", "npc", "Dropped by", "drops" },
+  { "objectDrops", "object", "Found in", "object" },
+  { "vendors", "npc", "Sold by", "sells" },
+}
+
+local function zoneDB()
+  local _, loader = S.questieDB()
+  if not loader then return nil end
+  local ok, zdb = pcall(loader.ImportModule, loader, "ZoneDB")
+  if ok and type(zdb) == "table" and type(zdb.GetUiMapIdByAreaId) == "function" then return zdb end
+end
+
+-- The questie query for npc or object rows.
+local function query(qdb, what, id, key)
+  return call(what == "object" and qdb.QueryObjectSingle or qdb.QueryNPCSingle, id, key)
+end
+
+-- Has Questie any source or quest for the item? (Cheap: a few field reads.)
+function S.hasSources(id)
+  local qdb = S.questieDB()
+  if not qdb then return false end
+  for _, k in ipairs(S.SOURCE_KINDS) do
+    if #ids(call(qdb.QueryItemSingle, id, k[1])) > 0 then return true end
+  end
+  return #ids(call(qdb.QueryItemSingle, id, "relatedQuests")) > 0
+end
+
+-- Groups of source entries for an item, nearest first.
+function S.itemSources(id)
+  local qdb = S.questieDB()
+  if not qdb then return {} end
+  local zdb = zoneDB()
+  local here, px, py = S.playerPos()
+  local w, h = call(api("C_Map.GetMapWorldSize"), here)
+  local mapOf, groups = {}, {}
+  local function uiMap(area)
+    if mapOf[area] == nil then mapOf[area] = zdb and call(zdb.GetUiMapIdByAreaId, zdb, area) or false end
+    return mapOf[area]
+  end
+  for _, k in ipairs(S.SOURCE_KINDS) do
+    local field, what, title, verb = k[1], k[2], k[3], k[4]
+    local list, unknown = {}, 0
+    for _, sid in ipairs(ids(call(qdb.QueryItemSingle, id, field))) do
+      local name = query(qdb, what, sid, "name")
+      if type(name) ~= "string" or name == "" then
+        unknown = unknown + 1 -- listed on the item, but Questie has no row for it
+      else
+        local e = entry("source", what .. ":" .. sid, name, { what = what, sid = sid, verb = verb })
+        e.key = "src:" .. field .. ":" .. sid
+        local spawns = query(qdb, what, sid, "spawns")
+        local best
+        if type(spawns) == "table" then
+          for area, points in pairs(spawns) do
+            local mapID = uiMap(area)
+            if mapID and type(points) == "table" then
+              for _, p in ipairs(points) do
+                if type(p) == "table" and type(p[1]) == "number" and type(p[2]) == "number" then
+                  local x, y = p[1] / 100, p[2] / 100
+                  local d
+                  if mapID == here and px and py and p[1] >= 0 then
+                    d = ((x - px) * (w or 1)) ^ 2 + ((y - py) * (h or 1)) ^ 2
+                  end
+                  -- Nearest on your map; else any spawn on your map; else the first.
+                  local better = not best or (d and (not best.d or d < best.d))
+                    or (not best.d and not d and mapID == here and best.mapID ~= here)
+                  if better then best = { mapID = mapID, x = x, y = y, d = d } end
+                end
+              end
+            end
+          end
+        end
+        if best then
+          e.mapID, e.x, e.y = best.mapID, best.x, best.y
+          if best.d and w and w > 0 then e.yards = math.sqrt(best.d) end
+          if best.mapID == here then e.onMap = true end
+          local info = call(api("C_Map.GetMapInfo"), best.mapID)
+          e.zone = info and info.name
+        end
+        table.insert(list, e)
+      end
+    end
+    table.sort(list, function(a, b)
+      if (a.onMap and 1 or 0) ~= (b.onMap and 1 or 0) then return a.onMap == true end
+      if a.yards and b.yards and a.yards ~= b.yards then return a.yards < b.yards end
+      if (a.zone or "~") ~= (b.zone or "~") then return (a.zone or "~") < (b.zone or "~") end
+      return a.name < b.name
+    end)
+    if #list > 0 or unknown > 0 then
+      local g = { kind = "source", title = title, entries = {}, more = math.max(0, #list - S.SOURCES_PER_GROUP) }
+      for i = 1, math.min(#list, S.SOURCES_PER_GROUP) do g.entries[i] = list[i] end
+      if unknown > 0 then
+        local noun = what == "object" and "object" or "NPC"
+        local e = entry("source", "unknown:" .. field, string.format("%d %s%s Questie has no location for", unknown, noun,
+          unknown > 1 and "s" or ""), { what = what, verb = verb, unknown = true })
+        table.insert(g.entries, e)
+      end
+      table.insert(groups, g)
+    end
+  end
+  -- The quests that need it: their giver is often near where it is found.
+  local quests = {}
+  for _, qid in ipairs(ids(call(qdb.QueryItemSingle, id, "relatedQuests"))) do
+    local name = call(qdb.QueryQuestSingle, qid, "name")
+    if type(name) == "string" and name ~= "" then table.insert(quests, entry("quest", qid, name, { questie = true })) end
+  end
+  if #quests > 0 then table.insert(groups, { kind = "quest", title = "For quests", entries = quests }) end
+  return groups
+end
 
 ---------------------------------------------------------------------------
 -- Nearby: Questie NPCs with a spawn on the map you stand on, matched by name

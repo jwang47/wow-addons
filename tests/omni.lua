@@ -177,13 +177,20 @@ local questieReady = false
 local NPC = { [234] = { name = "Gryan Stoutmantle", subName = "The People's Militia", spawns = { [40] = { { 56.3, 47.5 } } } },
   [235] = { name = "Salma Saldean", spawns = { [40] = { { 56.0, 31.2 } }, [10] = { { 1, 1 } } } },
   [639] = { name = "Edwin VanCleef", spawns = { [1581] = { { -1, -1 } } } } }
-local QUEST = { [65] = { name = "The Defias Brotherhood", startedBy = { { 234 } }, questLevel = 18 } }
-local ITEM = { [3307] = { name = "Gnoll Paw", npcDrops = { 235 } }, [4306] = { name = "Silk Cloth" } }
+local QUEST = { [65] = { name = "The Defias Brotherhood", startedBy = { { 234 } }, questLevel = 18 },
+  [6563] = { name = "The Essence of Aku'Mai", startedBy = { { 12736 } }, questLevel = 22, zoneOrSort = 719 },
+  [6921] = { name = "Amongst the Ruins", questLevel = 27, zoneOrSort = 10020 } }
+local ITEM = { [3307] = { name = "Gnoll Paw", npcDrops = { 235 } }, [4306] = { name = "Silk Cloth" },
+  [7000] = { name = "Heartwood Girdle", questRewards = { 6563 } },
+  [2589] = { name = "Linen Cloth", objectDrops = { 50 }, vendors = { 234 } },
+  [280132] = { name = "Perfect Razormaw Egg", objectDrops = { 671892, 671931 }, relatedQuests = { 65 } } }
+local OBJECT = { [50] = { name = "Old Crate", spawns = { [10] = { { 40, 60 } } } } }
 local AREA = { [40] = 1436, [10] = 1431, [1581] = 9002 }
 local QuestieDB = {
   QueryNPCSingle = function(id, key) return NPC[id] and NPC[id][key] end,
   QueryQuestSingle = function(id, key) return QUEST[id] and QUEST[id][key] end,
   QueryItemSingle = function(id, key) return ITEM[id] and ITEM[id][key] end,
+  QueryObjectSingle = function(id, key) return OBJECT[id] and OBJECT[id][key] end,
 }
 -- Questie's manual icons: ShowNPC adds frames, ResetManualFrames clears a type.
 QuestieMapMock = { frames = {} }
@@ -198,8 +205,8 @@ QuestieLoader = { ImportModule = function(_, name)
   if name == "QuestieDB" then
     if questieReady then
       QuestieDB.NPCPointers = { [234] = 1, [235] = 1, [639] = 1 }
-      QuestieDB.QuestPointers = { 65 }
-      QuestieDB.ItemPointers = { [3307] = 1, [4306] = 1 }
+      QuestieDB.QuestPointers = { 65, 6563, 6921 }
+      QuestieDB.ItemPointers = { [3307] = 1, [4306] = 1, [7000] = 1 }
     end
     return QuestieDB
   end
@@ -216,7 +223,12 @@ function SaveBindings(set) saved = set end
 
 -- Load the addon -----------------------------------------------------------
 local ns = {}
-for _, file in ipairs({ "Match.lua", "Sources.lua", "Actions.lua", "Omni.lua" }) do
+-- In the .toc's order, so a file missing from the .toc fails here too.
+local tocFiles = {}
+for line in io.lines(root .. "Omni/Omni.toc") do
+  if line:match("%.lua%s*$") then table.insert(tocFiles, (line:gsub("%s+$", ""))) end
+end
+for _, file in ipairs(tocFiles) do
   assert(loadfile(root .. "Omni/" .. file))("Omni", ns)
 end
 local events = ns.events
@@ -572,7 +584,41 @@ g = ns.search("gnoll")
 check("quest item in Items", names(g, "item") == "Gnoll Paw")
 ns.open("gnoll paw")
 OmniSearchBox.scripts.OnEnterPressed(OmniSearchBox)
-check("quest item shows where it drops", chat[#chat]:find("drops from Salma") ~= nil)
+check("Enter on an item lists where to get it", OmniSearchBox:GetText() == "from: Gnoll Paw" and OmniFrame:IsShown())
+g = ns.search("from: gnoll paw")
+check("sources: dropped by, nearest spawn on your map", g[1] and g[1].title == "Dropped by" and names(g, "source") == "Salma Saldean")
+check("source row: verb and zone (no position)", strip(ns.actions.detail(g[1].entries[1])) == "drops  Westfall")
+C_Map.GetPlayerMapPosition = function(m) return { GetXY = function() return 0.56, 0.25 end } end
+C_Map.GetMapWorldSize = function(m) return 1000, 500 end
+g = ns.search("from: gnoll paw")
+check("source row: verb and yards on your map", strip(ns.actions.detail(g[1].entries[1])) == "drops  31 yd")
+C_Map.GetMapWorldSize, C_Map.GetPlayerMapPosition = nil, nil
+ns.refresh()
+OmniSearchBox.scripts.OnEnterPressed(OmniSearchBox)
+check("Enter on a source pins its nearest spawn", chat[#chat]:find("^.*Salma Saldean: .*%(56, 31%), map pin set") ~= nil)
+check("an item without sources has none", #ns.search("from: silk cloth") == 0)
+check("and says Questie has no source", ns.emptyText == "Questie has no drop, object or vendor for Silk Cloth")
+check("a unique start of a name is enough", #ns.search("from: gnoll p") == 1)
+check("unknown item name says so", #ns.search("from: perfect egg") == 0 and ns.emptyText:find('^No item called "perfect egg"') ~= nil)
+do
+  local function titles(groups)
+    local t = {}
+    for _, grp in ipairs(groups) do table.insert(t, grp.title) end
+    return table.concat(t, ",")
+  end
+  ns.fromID, ns.fromName = 2589, "linen cloth"
+  local src = ns.search("from: linen cloth")
+  check("objects and vendors too", titles(src) == "Found in,Sold by")
+  check("vendor row says sells", strip(ns.actions.detail(src[2].entries[1])):find("^sells") ~= nil)
+  check("object off your map shows its zone", src[1].entries[1].zone ~= nil and not src[1].entries[1].onMap)
+  -- Objects Questie lists on the item but has no row for (Forever quests):
+  -- say so, and show the quest that needs the item.
+  ns.fromID, ns.fromName = 280132, "perfect razormaw egg"
+  src = ns.search("from: perfect razormaw egg")
+  check("unknown objects get one row that says so", titles(src) == "Found in,For quests"
+    and src[1].entries[1].name == "2 objects Questie has no location for")
+  check("the quest that needs it", src[2].entries[1].kind == "quest" and src[2].entries[1].name == "The Defias Brotherhood")
+end
 g = ns.search("silk cloth")
 check("Questie copy of an owned item is not listed twice", names(g, "item") == "Silk Cloth")
 
@@ -656,7 +702,7 @@ OmniDB.chars["Ded-Forever"].mail[3307] = 0
 ns.open("gnoll paw")
 chat = {}
 OmniSearchBox.scripts.OnEnterPressed(OmniSearchBox)
-check("cached quest item still shows its drops", chat[#chat] and chat[#chat]:find("drops from Salma") ~= nil)
+check("cached quest item still shows its drops", OmniSearchBox:GetText() == "from: Gnoll Paw")
 
 -- Every group is reachable with the arrow keys, and the view scrolls.
 do
@@ -857,6 +903,52 @@ do
   local n = 0
   for _ in pairs(recent) do n = n + 1 end
   check("recent is trimmed", n == ns.RECENT_KEPT and recent["k" .. (ns.RECENT_KEPT + 50)] and not recent.k1)
+end
+
+-- Dungeons ------------------------------------------------------------------
+do
+  local function titles(groups)
+    local t = {}
+    for _, g in ipairs(groups) do table.insert(t, g.title) end
+    return table.concat(t, ",")
+  end
+  local g = ns.search("bfd")
+  check("short name finds the dungeon", names(g, "dungeon") == "Blackfathom Deeps")
+  local bfd
+  for _, grp in ipairs(g) do if grp.kind == "dungeon" then bfd = grp.entries[1] end end
+  check("dungeon row: levels, short name, bosses", strip(ns.actions.detail(bfd)) == "15-32  BFD  7 bosses")
+  check("d: filter", names(ns.search("d: deadm"), "dungeon") == "The Deadmines")
+  check("SM wings by short name", names(ns.search("sm gy"), "dungeon") == "SM Graveyard")
+  -- Enter lists its loot: one group per boss, items you can hover and link.
+  ns.open("bfd")
+  local pick = ns.view.rows[ns.view.pick]
+  check("dungeon picked first for its short name", pick and pick.entry and pick.entry.kind == "dungeon")
+  OmniSearchBox.scripts.OnEnterPressed(OmniSearchBox)
+  check("Enter on a dungeon opens loot:", OmniSearchBox:GetText() == "loot: BFD" and OmniFrame:IsShown())
+  local loot = ns.search("loot: bfd")
+  check("loot groups per boss", titles(loot):find("^Ghamoo%-ra,Lady Sarevess,Gelihast") ~= nil)
+  check("boss drops are items", loot[1].entries[1].kind == "item" and loot[1].entries[1].id == 6907)
+  check("unknown item names wait for the client", loot[1].entries[1].name == "item 6907" and lastCall("request") ~= nil)
+  check("loot: by full name", #ns.search("loot: blackfathom deeps") > 0)
+  check("a quest under an alternate area ID is found too", loot[#loot].title == "Quest: Amongst the Ruins (27)")
+  local quest = loot[#loot - 1]
+  check("dungeon quest after the bosses, with its level", quest.title == "Quest: The Essence of Aku'Mai (22)")
+  check("dungeon quest row, then its reward item", quest.entries[1].kind == "quest" and quest.entries[2].kind == "item"
+    and quest.entries[2].id == 7000)
+  check("other dungeons don't list it", (ns.search("loot: dm")[#ns.search("loot: dm")].title:find("^Quest") == nil))
+  check("loot: unknown dungeon is empty", #ns.search("loot: nowhere") == 0)
+  ns.close()
+end
+
+-- Omni's dungeon table is a copy of UpgradeFinder's: the two must match.
+do
+  local function body(path)
+    local f = assert(io.open(root .. path))
+    local text = f:read("*a")
+    f:close()
+    return text:sub(text:find("ns.DUNGEONS = {", 1, true), -1)
+  end
+  check("Omni and UpgradeFinder dungeon tables match", body("Omni/Dungeons.lua") == body("UpgradeFinder/Dungeons.lua"))
 end
 
 print(failures == 0 and "all Omni tests passed" or (failures .. " Omni test(s) failed"))
