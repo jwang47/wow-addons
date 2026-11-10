@@ -520,6 +520,108 @@ function D.partyText(who)
   return table.concat(parts, ", ")
 end
 
+-- Where a party member is: map position (for a pin) and world position
+-- (for yards and the arrow). Nil when the game does not say (a dungeon,
+-- another continent, out of range).
+function D.unitPlace(unit)
+  local mapID = call(api("C_Map.GetBestMapForUnit"), unit)
+  local pos = mapID and call(api("C_Map.GetPlayerMapPosition"), mapID, unit)
+  if type(pos) ~= "table" or not pos.GetXY then return nil, mapID end
+  local ok, x, y = pcall(pos.GetXY, pos)
+  if not (ok and x and y) or (x == 0 and y == 0) then return nil, mapID end
+  local place = { mapID = mapID, x = x, y = y }
+  local lib = hbd()
+  if lib then place.wx, place.wy, place.inst = call(lib.GetWorldCoordinatesFromZone, lib, x, y, mapID) end
+  return place, mapID
+end
+
+-- Health in percent, or nil when the client hides it (secret values).
+local function healthPct(unit)
+  local h, m = D.plain(call(rawget(_G, "UnitHealth"), unit)), D.plain(call(rawget(_G, "UnitHealthMax"), unit))
+  if type(h) ~= "number" or type(m) ~= "number" or m <= 0 then return nil end
+  return math.floor(h / m * 100 + 0.5)
+end
+
+-- One row per party member: level, class colour, how they are (offline,
+-- dead, AFK, health), where (yards and arrow, or the zone), and the quests
+-- of yours they have with their progress. out: the pass so far (log lists
+-- and party pick-ups).
+function D.memberList(out, members, level)
+  local list = {}
+  local lib = hbd()
+  local px, py, pi
+  if lib then px, py, pi = call(lib.GetPlayerWorldPosition, lib) end
+  local myMap = call(api("C_Map.GetBestMapForUnit"), "player")
+  for i, m in ipairs(members) do
+    local u = m.unit
+    local lvl = D.plain(call(rawget(_G, "UnitLevel"), u))
+    local _, class = call(rawget(_G, "UnitClass"), u)
+    local colors = rawget(_G, "RAID_CLASS_COLORS")
+    local cc = type(class) == "string" and type(colors) == "table" and colors[class]
+    local e = { kind = "member", id = -1000 - i, unit = u, name = m.name, level = type(lvl) == "number" and lvl > 0 and lvl or nil, left = {},
+      classColor = type(cc) == "table" and { cc.r, cc.g, cc.b } or nil }
+    e.color = e.level and D.difficulty(e.level, level) or "white"
+    if call(rawget(_G, "UnitIsConnected"), u) == false then e.status = "Offline"
+    elseif call(rawget(_G, "UnitIsGhost"), u) then e.status = "Ghost"
+    elseif call(rawget(_G, "UnitIsDeadOrGhost"), u) then e.status = "Dead"
+    else
+      e.hp = healthPct(u)
+      e.status = (call(rawget(_G, "UnitIsAFK"), u) and "AFK" or nil)
+    end
+    local place, mapID = D.unitPlace(u)
+    if place then
+      e.spot = place
+      if px and place.wx and place.inst == pi then
+        local dx, dy = place.wx - px, place.wy - py
+        e.dist = math.sqrt(dx * dx + dy * dy)
+        e.wx, e.wy, e.inst = place.wx, place.wy, place.inst
+        e.angle = (call(lib.GetWorldVector, lib, pi, px, py, place.wx, place.wy))
+      end
+    end
+    if not e.dist then
+      local ok, d2, checked = pcall(rawget(_G, "UnitDistanceSquared") or error, u)
+      if ok and checked and type(d2) == "number" then e.dist = math.sqrt(d2) end
+    end
+    if mapID and mapID ~= myMap then
+      local info = call(api("C_Map.GetMapInfo"), mapID)
+      e.zoneName = type(info) == "table" and type(info.name) == "string" and info.name or nil
+    end
+    -- Your quests they have, and how far they are on each.
+    e.shared, e.behind = {}, 0
+    for _, kind in ipairs({ "active", "nearby", "turnin", "log" }) do
+      for _, q in ipairs(out[kind] or {}) do
+        for _, w in ipairs(q.party or {}) do
+          if w.name == m.name then
+            table.insert(e.shared, { id = q.id, name = q.name, progress = w.progress, mine = q.done and "done" or D.progress(q) })
+            if q.done and w.progress ~= "" and w.progress ~= "done" then e.behind = e.behind + 1 end
+          end
+        end
+      end
+    end
+    e.theirs = 0
+    for _, q in ipairs(out.party or {}) do
+      for _, w in ipairs(q.party or {}) do if w.name == m.name then e.theirs = e.theirs + 1 end end
+    end
+    table.insert(list, e)
+  end
+  return list
+end
+
+-- The status line of a member row: "92% hp, in Westfall, 3 quests with
+-- you (1 behind)". Behind: you can hand it in, they are not done.
+function D.memberText(e)
+  local parts = {}
+  if e.status then table.insert(parts, e.status) end
+  if e.hp and e.status ~= "Offline" then table.insert(parts, e.hp .. "% hp") end
+  if e.zoneName then table.insert(parts, "in " .. e.zoneName) end
+  local n = #(e.shared or {})
+  if n > 0 then
+    table.insert(parts, n .. " quest" .. (n == 1 and "" or "s") .. " with you" .. ((e.behind or 0) > 0 and (" (" .. e.behind .. " behind)") or ""))
+  end
+  if (e.theirs or 0) > 0 then table.insert(parts, e.theirs .. " you lack") end
+  return table.concat(parts, ", ")
+end
+
 function D.pickupSecs(e)
   return D.travelSecs(e.dist) + D.PICKUP_SECS + math.max(1, e.objectives) * D.OBJECTIVE_SECS + D.RETURN_SECS
 end
@@ -769,6 +871,7 @@ function D.collect(opts)
   -- Your party: who shares each quest in your log, and the quests they have
   -- that you do not (Questie's party data), nearest giver first.
   local members = opts.party == false and {} or D.partyMembers()
+  out.members = {}
   if #members > 0 then
     for _, list in ipairs({ out.active, out.nearby, out.turnin, out.log }) do
       for _, e in ipairs(list) do e.party = D.partyOn(e.id, members) end
@@ -827,6 +930,8 @@ function D.collect(opts)
   D.sort(out.log, opts.sortLog or "near")
   D.sort(out.pickup, opts.sortPickup or "xp")
   out.area = D.areas(out)
+  -- Your party: how each member is, where, and how far on your quests.
+  out.members = D.memberList(out, members, level)
   -- XP colours: each group's best third green, worst third grey.
   D.tier(out.turnin, "xp")
   D.tier(out.pickup, "rate")

@@ -497,6 +497,10 @@ A small floating list, under the minimap, of the quests that matter now.
   they are placed by screen position (not anchored to the board, which
   would lock the board too), and a change made in combat waits for the
   fight to end.
+- In a group, "Your party" has a row per member: level, health or
+  offline / dead / AFK, yards and arrow (or zone), and your quests they
+  share ("1 behind": you can hand it in, they cannot yet). Point at it for
+  their progress on each one; click pins them on the map.
 - Point at a quest to see its whole chain in the tooltip: each step with
   its level, marked done, `>>` (this one), log or `...` (later).
 - Alt-click any quest row: "I'm doing this" (it stays in Active until

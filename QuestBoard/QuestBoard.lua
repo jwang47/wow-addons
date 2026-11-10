@@ -14,7 +14,7 @@ local defaults = {
   sortLog = "near",      -- near | xp
   sortPickup = "xp",     -- near | xp
   maxAbove = 3,          -- pick-ups at most this many levels over you
-  rows = { active = 4, nearby = 4, area = 3, turnin = 6, log = 8, party = 5, pickup = 8, town = 2 },
+  rows = { active = 4, nearby = 4, area = 3, turnin = 6, log = 8, party = 5, pickup = 8, town = 2, members = 4 },
   collapsed = {},
   combatAlpha = 0.35,
   hideTrackers = false,  -- hide the game's quest tracker (and Questie's)
@@ -41,8 +41,8 @@ local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6
 -- have a small gap between them, groups a bigger one.
 local SUB_UP, ROW_GAP, GROUP_GAP = 3, 4, 10
 local FONT, FONT_DIM = "GameFontHighlightSmall", "GameFontDisableSmall"
-local HEADS = { active = "Active", nearby = "Nearby", area = "Areas", turnin = "Turn in", log = "In your log", party = "Party has", pickup = "Pick up", town = "Town" }
-local ORDER = { "active", "nearby", "area", "turnin", "log", "party", "pickup", "town" }
+local HEADS = { active = "Active", nearby = "Nearby", area = "Areas", turnin = "Turn in", log = "In your log", party = "Party has", pickup = "Pick up", town = "Town", members = "Your party" }
+local ORDER = { "active", "nearby", "members", "area", "turnin", "log", "party", "pickup", "town" }
 
 local panel, rows, heads = nil, {}, {}
 ns.rows = rows
@@ -92,6 +92,7 @@ end
 
 function ns.todoBase(e)
   if e.kind == "area" then return D.areaText(e) end
+  if e.kind == "member" then return D.memberText(e) end
   if e.kind == "town" then
     local where = D.zoneName(e.zone)
     return (e.role == "inn" and "Innkeeper" or "Flight master") .. (where and (", " .. where) or "")
@@ -199,6 +200,26 @@ local function tooltip(r)
   local e, tip = r.entry, rawget(_G, "GameTooltip")
   if not (e and tip) then return end
   tip:SetOwner(r, "ANCHOR_LEFT")
+  if e.kind == "member" then
+    tip:AddLine(e.name .. (e.level and ("  level " .. e.level) or ""), 1, 1, 1)
+    local where = e.dist and (D.yards(e.dist) .. (e.angle and (" " .. D.compass(e.angle)) or "")) or e.zoneName or "place unknown"
+    tip:AddLine((e.status and (e.status .. ", ") or "") .. (e.hp and (e.hp .. "% health, ") or "") .. where, 0.8, 0.8, 0.8)
+    if #(e.shared or {}) > 0 then
+      tip:AddLine(" ")
+      tip:AddLine("Your quests they have (theirs / yours):", 0.6, 0.8, 1)
+      for _, s in ipairs(e.shared) do
+        local theirs = s.progress ~= "" and s.progress or "?"
+        local mine = s.mine ~= "" and s.mine or "-"
+        tip:AddLine("- " .. s.name .. "  " .. theirs .. " / " .. mine, 0.85, 0.85, 0.85)
+      end
+    end
+    if (e.theirs or 0) > 0 then tip:AddLine(e.theirs .. " of their quests you do not have (Party has)", 0.6, 0.6, 0.6) end
+    tip:AddLine(" ")
+    tip:AddLine("Click: pin where they are on the map", 0.5, 0.5, 0.5)
+    tip:AddLine("Progress needs Questie on their side too; /qb party off hides this", 0.5, 0.5, 0.5)
+    tip:Show()
+    return
+  end
   if e.kind == "town" then
     tip:AddLine(e.name .. "  (" .. D.yards(e.dist) .. " " .. D.compass(e.angle) .. ")", 1, 1, 1)
     tip:AddLine(ns.todoBase(e), 0.8, 0.8, 0.8)
@@ -360,7 +381,7 @@ function ns.sayOnce(key, msg)
 end
 
 function ns.link(e)
-  if e.kind == "town" or e.kind == "area" then return end
+  if e.kind == "town" or e.kind == "area" or e.kind == "member" then return end
   local link = call(rawget(_G, "GetQuestLink"), e.id) or e.name
   if not call(rawget(_G, "ChatEdit_InsertLink"), link) then call(rawget(_G, "ChatFrame_OpenChat"), link) end
 end
@@ -414,7 +435,7 @@ function ns.toggleDoing(e)
 end
 
 -- Quest entries (not areas or town rows) can be marked as doing.
-function ns.pinnable(e) return e and e.id and e.kind ~= "area" and e.kind ~= "town" and true or false end
+function ns.pinnable(e) return e and e.id and e.kind ~= "area" and e.kind ~= "town" and e.kind ~= "member" and true or false end
 
 -- The quests in an area that you can mark as doing: every stop there
 -- (objectives, hand-ins and pick-ups).
@@ -444,6 +465,11 @@ end
 
 function ns.click(e, button)
   if not e then return end
+  if e.kind == "member" then
+    if e.spot and e.spot.mapID then return ns.pin(e) end
+    ns.sayOnce("noplace:" .. e.name, e.name .. ": the game does not say where they are (a dungeon or too far)")
+    return false
+  end
   if rawget(_G, "IsAltKeyDown") and IsAltKeyDown() and ns.pinnable(e) then
     return ns.toggleDoing(e)
   end
@@ -595,7 +621,7 @@ ns.TURNIN_TOP_YARDS = 600
 function ns.order(st)
   local t = st and st.turnin and st.turnin[1]
   if st and #(st.active or {}) == 0 and t and t.dist and t.dist <= ns.TURNIN_TOP_YARDS then
-    return { "turnin", "nearby", "area", "active", "log", "party", "pickup", "town" }
+    return { "turnin", "nearby", "members", "area", "active", "log", "party", "pickup", "town" }
   end
   return ORDER
 end
@@ -647,7 +673,7 @@ function ns.render()
     -- Focus: only the quests you are on now, the rest on mouse-over.
     if ns.focused() and kind ~= "active" then show = false end
     -- On a job: Active, plus hand-ins and pick-ups on the way.
-    if show and ns.trimmed() and kind ~= "active" then
+    if show and ns.trimmed() and kind ~= "active" and kind ~= "members" then
       list = ns.ON_WAY_KINDS[kind] and ns.onWay(list, state.active) or {}
       show = #list > 0
     end
@@ -656,7 +682,7 @@ function ns.render()
       local collapsed = ns.db.collapsed[kind]
       h.text:SetText((collapsed and "+ " or "") .. HEADS[kind] .. "  " .. #list)
       local sortKey = kind == "pickup" and "sortPickup" or kind == "log" and "sortLog"
-      h.right:SetText(kind == "active" and "doing now" or kind == "nearby" and "within 300 yd" or kind == "area" and "best XP" or kind == "town" and "click: map pin"
+      h.right:SetText(kind == "active" and "doing now" or kind == "nearby" and "within 300 yd" or kind == "area" and "best XP" or kind == "town" and "click: map pin" or kind == "members" and "click: map pin"
         or sortKey and (ns.db[sortKey] == "xp" and "best XP" or "nearest") or "nearest")
       table.insert(items, { f = h, y = cy, h = HEAD_H, gap = 2 })
       cy = cy + HEAD_H + 2
@@ -669,7 +695,9 @@ function ns.render()
           r.lvl:SetText(e.kind == "area" and #e.stops or e.kind == "town" and (e.role == "inn" and "Inn" or "Fly") or e.level or "?")
           r.lvl:SetTextColor(rgb(e.color))
           r.name:SetText(e.name)
-          if e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55) else r.name:SetTextColor(0.92, 0.92, 0.92) end
+          if e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55)
+          elseif e.classColor then r.name:SetTextColor(e.classColor[1], e.classColor[2], e.classColor[3])
+          else r.name:SetTextColor(0.92, 0.92, 0.92) end
           -- Your Alt-click mark: a gold star before the name.
           if e.kind == "area" then e.pinned = ns.areaPinned(e) or nil end
           r.name:ClearAllPoints()

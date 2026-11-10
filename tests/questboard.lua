@@ -464,6 +464,50 @@ check("party group: quests a member has that you do not", #withParty.party == 1 
   and D.partyText(withParty.party[1].party) == "Ann 2/8")
 check("party row says who and where", ns.todo(withParty.party[1]) == "Ann 2/8  -  Get it from Marshal")
 check("shared row adds who", ns.todo(shared):find("with Ann 5/6", 1, true) ~= nil)
+-- Your party: a row per member with how they are and where.
+local realMap = { C_Map.GetBestMapForUnit, C_Map.GetPlayerMapPosition, C_Map.GetMapInfo }
+local realLevel = UnitLevel
+UnitLevel = function(u) if u == "party1" then return 12 end return realLevel(u) end
+UnitClass = function() return "Mage", "MAGE" end
+RAID_CLASS_COLORS = { MAGE = { r = 0.25, g = 0.78, b = 0.92 } }
+UnitHealth = function() return 45 end
+UnitHealthMax = function() return 60 end
+UnitIsAFK = function() return false end
+C_Map.GetBestMapForUnit = function(u) return u == "party1" and 1436 or 1437 end
+C_Map.GetPlayerMapPosition = function() return { GetXY = function() return 0.5, 0.5 end } end
+C_Map.GetMapInfo = function(id) return { name = id == 1436 and "Westfall" or "Elwynn" } end
+local realWorld = HBD.GetWorldCoordinatesFromZone
+HBD.GetWorldCoordinatesFromZone = function() return 300, 400, 0 end
+D.resetModules()
+local mem = D.collect({}).members
+local ann = mem and mem[1]
+check("members: one row per member", mem and #mem == 1 and ann.name == "Ann" and ann.level == 12 and ann.classColor[1] == 0.25)
+check("members: where they are", ann.dist == 500 and ann.spot.mapID == 1436 and ann.zoneName == "Westfall")
+check("members: status line", D.memberText(ann) == "75% hp, in Westfall, 1 quest with you, 1 you lack"
+  and D.memberText({ theirs = 2 }) == "2 you lack")
+check("members: row text and distance", ns.todo(ann) == D.memberText(ann) and strip(ns.meta(ann)) == "500 yd")
+check("members: not pinnable, no link", not ns.pinnable(ann))
+ns.refresh()
+for _ = 1, 50 do ns.step() end
+local memRow
+for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and f.entry.kind == "member" then memRow = f end end
+GameTooltip.lines = {}
+if memRow then memRow.scripts.OnEnter(memRow) end
+local tipHas = false
+for _, l in ipairs(GameTooltip.lines) do if strip(l):find("75% health, 500 yd", 1, true) then tipHas = true end end
+check("members: a row on the board with a tooltip", memRow and tipHas)
+UnitIsDeadOrGhost = function() return true end
+check("members: dead", D.collect({}).members[1].status == "Dead")
+UnitIsDeadOrGhost = nil
+UnitIsConnected = function() return false end
+local off = D.collect({}).members[1]
+check("members: offline, no health", off.status == "Offline" and D.memberText(off):find("^Offline") ~= nil and not off.hp)
+UnitIsConnected = nil
+check("members: party off hides them", #D.collect({ party = false }).members == 0)
+check("members: behind when you can hand in and they cannot", D.memberText({ shared = { 1, 2 }, behind = 1 }) == "2 quests with you (1 behind)")
+UnitLevel, UnitClass, RAID_CLASS_COLORS, UnitHealth, UnitHealthMax, UnitIsAFK = realLevel, nil, nil, nil, nil, nil
+C_Map.GetBestMapForUnit, C_Map.GetPlayerMapPosition, C_Map.GetMapInfo = realMap[1], realMap[2], realMap[3]
+HBD.GetWorldCoordinatesFromZone = realWorld
 UnitName = realUnitName
 mods.QuestieComms = nil
 C_QuestLog.IsUnitOnQuest = nil

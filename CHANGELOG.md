@@ -44,6 +44,12 @@ the same, and a test checks that every `.toc` version has a section here.
   quest 3 of 5", then each step with its level, marked done, ">>" (this
   quest), log (in your log) or "..." (later). A long chain shows the 8
   steps around this quest.
+- A "Your party" group: one row per party member with their level (in
+  their class colour), how they are (offline, dead, AFK, health), how far
+  and which way (or their zone), and how many of your quests they share
+  and how many they are behind on. Point at a row for their progress on
+  each shared quest; click pins where they are on the map. `/qb party off`
+  hides it.
 
 ## GroupUp 0.1.0
 
