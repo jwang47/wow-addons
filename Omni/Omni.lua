@@ -54,7 +54,30 @@ end
 function ns.search(text)
   local only, q = M.parse(text)
   if only == "loot" then return (S.dungeonLoot(q)) end
+  if only == "from" then return ns.sourcesFor(q) end
   return (M.search(lists, text, ns.db().recent))
+end
+
+-- "from: Silk Cloth": where to get the item. ns.fromID is the item Enter
+-- was pressed on; a typed name looks the item up by its exact name.
+function ns.sourcesFor(q)
+  local id = ns.fromID and ns.fromName == q and ns.fromID
+  if not id then
+    for _, src in ipairs(lists) do
+      for _, e in ipairs(src) do
+        if e.kind == "item" and e.lname == q then id = e.id break end
+      end
+      if id then break end
+    end
+  end
+  if not id then return {} end
+  return S.itemSources(id)
+end
+
+-- Shows where to get an item (Enter on an item row).
+function ns.showSources(e)
+  ns.fromID, ns.fromName = e.id, M.norm(e.name)
+  ns.setText("from: " .. e.name)
 end
 
 -- Puts text in the box (the next refresh searches it).
@@ -320,6 +343,10 @@ function ns.startSearch(text)
   if only == "loot" then
     lootTries = {}
     return showLoot(text, q)
+  end
+  if only == "from" then
+    job = nil
+    return show(ns.sourcesFor(q))
   end
   local my = { text = text, ms = 0, frames = 0 }
   job = my

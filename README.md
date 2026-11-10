@@ -74,7 +74,7 @@ tooltips get Auctionator's and LootValue's lines from those addons.
 
 | Result | From | Enter | Shift+Enter |
 | --- | --- | --- | --- |
-| Items | bags (live), bank and mail (saved each time you open them), every item name in the Auctionator scan, `MageMentorDB.itemNames` (with MageMentor), and Questie quest items; the row shows the AH price and its age ("today", "3d old"), and the tooltip adds the last AH scan time | link in chat; at the Auction House, an Auctionator search; a Questie quest item you don't have: where it drops | link in chat |
+| Items | bags (live), bank and mail (saved each time you open them), every item name in the Auctionator scan, `MageMentorDB.itemNames` (with MageMentor), and Questie quest items; the row shows the AH price and its age ("today", "3d old"), and the tooltip adds the last AH scan time | where to get it (`from: Linen Cloth`, with Questie): the mobs that drop it, the objects that hold it and the vendors that sell it, nearest first with yards on your map, else the zone; Enter on one opens the map and pins it. At the Auction House, an Auctionator search. With no Questie source: link in chat | link in chat |
 | Places | every continent, zone, city and dungeon below the world map (`C_Map`); MageMentor's level range (green when it fits you) and hub | open the map there | |
 | Dungeons | the Classic dungeons by name or short name ("bfd", "sm gy", "brd"); the row shows the levels (green when they fit you), the short name and the boss count. Data: `Omni/Dungeons.lua`, a copy of `UpgradeFinder/Dungeons.lua` (a test checks that they match) | list its loot: `loot: BFD` shows one group per boss with its drops, then the dungeon's quests (with Questie) and their reward items. Hover an item for its tooltip, Enter links it; Enter on a quest shows where it starts | |
 | People | friends, guild, group, and the last 30 people you whispered with | whisper | invite |
@@ -100,6 +100,7 @@ nothing). Fuzzy hits rank below exact ones.
 Filters: `i:` items, `p:` places, `@` or `w:` people, `s:` spells, `n:` NPCs,
 `q:` quests (your log and Questie), `l:` your log only, `c:` commands,
 `d:` dungeons, `loot:` one dungeon's drops and quests (`loot: bfd`),
+`from:` where to get an item (`from: linen cloth`),
 `near:` or `nb:` nearby NPCs (alone: everything nearby, nearest first). The Nearby group always comes first. An empty box lists the 5 nearest NPCs, then what you used last.
 
 Ranking: a name that starts with the query first, then names where each

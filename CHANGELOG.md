@@ -12,6 +12,10 @@ the same, and a test checks that every `.toc` version has a section here.
 - Enter on a dungeon (or `loot: bfd`) lists each boss's drops, then the
   dungeon's quests and their reward items (with Questie). Hover an item
   for its tooltip; Enter links it.
+- Enter on an item shows where to get it (with Questie): the mobs that
+  drop it, the objects that hold it and the vendors that sell it, nearest
+  first, with yards on your map or the zone. Enter on one pins it on the
+  map. Shift+Enter links the item.
 
 ## Omni 0.1.1
 
