@@ -76,7 +76,11 @@ C_Spell = {
 C_UnitAuras = {
   GetAuraDataByIndex = function(u, i)
     local list = {}
-    for name, exp in pairs(U(u) and U(u).auras or {}) do list[#list + 1] = { name = name, expirationTime = exp, duration = 1800 } end
+    local x = U(u) or {}
+    for name, exp in pairs(x.auras or {}) do
+      list[#list + 1] = { name = name, expirationTime = exp, duration = 1800,
+                          sourceUnit = x.src and x.src[name], auraInstanceID = #name * 1000 + (exp or 0) }
+    end
     table.sort(list, function(a, b) return a.name < b.name end)
     return list[i]
   end,
@@ -147,13 +151,23 @@ ns.refresh()
 check("next: renew the priest", st.next and st.next.unit == "party2")
 T = T - 50
 
--- A stranger buffs you: return the favour first.
+-- A stranger buffs you: return the favour first. The UNIT_AURA payload
+-- is secret on Forever (reading it raises an error), so it is never read.
+local secretPayload = setmetatable({}, { __index = function() error("attempt to read a secret value") end })
 W.units.nameplate2 = { first = "Chrome", last = "Steelhart", class = "PALADIN", auras = {}, stranger = true }
-ns.onPlayerAura({ addedAuras = { { name = "Blessing of Wisdom", sourceUnit = "nameplate2", duration = 300 } } })
+W.units.player.src = { ["Blessing of Wisdom"] = "nameplate2", ["Battle Shout"] = "nameplate2" }
+W.units.player.auras["Blessing of Wisdom"] = T + 300
+local okEvent, err = pcall(ev.scripts.OnEvent, ev, "UNIT_AURA", "player", secretPayload)
+check("a secret UNIT_AURA payload raises no error", okEvent)
+if not okEvent then print(err) end
 ns.refresh()
 check("next: returns a favour", st.next and st.next.reason == "returns a favour" and st.next.name == "Chrome Steelhart")
-ns.onPlayerAura({ addedAuras = { { name = "Battle Shout", sourceUnit = "nameplate2", duration = 120 } } })
+W.units.player.auras["Battle Shout"] = T + 120
+ev.scripts.OnEvent(ev, "UNIT_AURA", "player", secretPayload)
 check("a shout is not a favour", #st.owed == 1)
+W.units.player.auras["Blessing of Wisdom"], W.units.player.auras["Battle Shout"] = nil, nil
+ev.scripts.OnEvent(ev, "UNIT_AURA", "player", secretPayload)
+check("a buff that ends adds nothing", #st.owed == 1)
 
 -- Pressing it removes it; a right-click skips the next one.
 ns.pressed("LeftButton")
