@@ -13,6 +13,10 @@ S.PATTERNS = {
   { "dps", "^%(([%d%.]+) damage per second%)" },
   { "armor", "^(%d+) Armor" },
   { "block", "^(%d+) Block" },
+  -- Spell damage against one creature type ("Increases damage done to Undead
+  -- by magical spells and effects by up to 12."): its own stat, worth little
+  -- outside some zones and dungeons. Before "sp", which also matches it.
+  { "slay", "damage done to [%a%s]+ by magical spells and effects by up to (%d+)" },
   -- One school only: its own stat, weighted per class (0 = not your school).
   { "frost", "by Frost spells and effects by up to (%d+)" },
   { "fire", "by Fire spells and effects by up to (%d+)" },

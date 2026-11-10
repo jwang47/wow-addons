@@ -189,9 +189,9 @@ function Scan.forget() for k in pairs(cache) do cache[k] = nil end end
 -- thousands of tooltips again. They are kept while the weights are the
 -- same: the key holds the weight set, VERSION (bump it when scoring
 -- changes), and for a mage with MageMentor a fingerprint of its weights.
-Scan.VERSION = 4 -- 3: recipes score as the item they make; 4: their reagents
+Scan.VERSION = 5 -- 3: recipes score as the item they make; 4: their reagents; 5: damage vs Undead
 Scan.SKIP_FOR = 24 * 3600 -- items that never loaded are skipped this long
-local PROBE = { "int", "spi", "sta", "sp", "frost", "fire", "arcane", "crit", "hit", "mp5", "armor" }
+local PROBE = { "int", "spi", "sta", "sp", "frost", "fire", "arcane", "crit", "hit", "mp5", "armor", "slay" }
 function Scan.cacheKey()
   -- The weights themselves are in the key, so a changed weight or a loaded
   -- preset scores the items again.
