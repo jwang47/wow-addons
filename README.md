@@ -260,6 +260,40 @@ the price to buy the made item on the AH instead.
   (new Forever items) get nothing. Item keys used: `questRewards`,
   `npcDrops`, `vendors`, `objectDrops`, `itemDrops`.
 
+## GroupUp (in development)
+
+A panel that gives you the numbers to decide whether to group up. `/gu`
+shows or hides it. It is not in the release yet (not in `tools/release.py`
+`ADDONS`); try it with `dev.ps1 GroupUp`.
+
+| Part | What it shows |
+| --- | --- |
+| Top line | Which way the numbers lean ("Leans group", "Leans solo", "About even") and why. |
+| XP per hour | Your measured XP per hour solo, and in each group size you played in, at your level and the 2 levels below. Rested bonus XP is left out, so solo and grouped compare fairly. Each row also has the play time, the XP a kill, the kills a minute and the part of the XP from quests. A number shows after 5 minutes of play in that group size. |
+| Kill XP in a group | Your share of the solo kill XP: in your group now (by level), or for a group of 2 to 5 at your level when you are solo. A warning when a member is so far above you that mobs at your level are grey for them (kill XP is worked out from the highest level in the group, so nobody gets XP). |
+| Your quests | Each open quest with what a group does for it: "needs a group" (an Elite, Group or Dungeon tag, or a suggested group size), "kills count for all" (kill objectives left), "drops or clicks" (only item or object objectives left) or "talk or explore". "+Name" shows the party members who have the quest too. |
+
+How it works, and what to keep in mind:
+
+- Classic splits kill XP: the group gets the kill XP times a bonus (1x for
+  2, 1.166x for 3, 1.3x for 4, 1.4x for 5) and each member near the kill
+  gets a part by level. In a duo of the same level you get 50% a kill, so
+  the duo must kill twice as fast to keep up. Quest XP is never split.
+- A kill counts for the kill objectives of every member near it, so a kill
+  quest goes about as many times faster as there are members on it.
+- Drops and clicks are less clear: some quest items drop for each member
+  who needs them, some do not, and each member clicks their own objects.
+  The measured XP per hour is the real test.
+- The time count stops at a gap of more than 10 minutes with no XP (a
+  break). Time in town and on the road counts, because it is part of the
+  cost of each way to play.
+- When someone invites you, two lines go to chat: the quest counts and
+  your solo and grouped XP per hour. `/gu invite off` stops that; `/gu
+  sum` prints them at any time.
+- `/gu reset` moves the panel back to the centre, `/gu clear` forgets the
+  XP data of this character. Drag the panel to move it; right-click hides it.
+- The data is per character, in `GroupUpDB` (SavedVariables).
+
 ## Forever client notes
 
 - Addons may not use the combat log: registering for
