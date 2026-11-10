@@ -5,6 +5,54 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## Glance 0.1.0
+
+- New addon, a lighter HUD (`/glance`). Not in the releases yet: try it
+  with `dev.ps1 Glance`.
+- A large enemy cast bar near your character, with a COUNTERSPELL call-out
+  while you can interrupt. Click it in combat to interrupt.
+- A watch row of key spells (Blink, Counterspell ...) under your character.
+  Click an icon to cast it.
+- Range on the target frame: a green or red edge, exact yards for party
+  members and a yard bracket for anyone else.
+- Party members are easy to find: a large class-coloured name above each
+  one's nameplate while you are in a group (`/glance party off`).
+- Edge pointers on the minimap for party members, your map pin and your
+  corpse when they are off the map; addons can add their own.
+- The game's Edit Mode unlocks Glance too: move the bar and the minimap,
+  size the minimap.
+- A Reload button under the minimap.
+- An XP buff chip: time left, rested XP on hover, and a reminder in the
+  middle of the screen when no XP buff is on (`/glance xpremind off`).
+  It reads the buff tooltip too, and a click on the chip lets you mark a
+  buff it missed (`/glance xpbuff NAME`).
+- Alerts under the minimap: unspent talents, Legacy points, old ranks and
+  free bag slots, each a chip that opens the window.
+- Old spell ranks: an amber corner on the key, and `/glance ranks` swaps
+  in your best rank.
+- A keyboard bar: one button per key of the left hand (1-6, Tab Q W E R T,
+  A S D F G, Z X), laid out like the keyboard. At the first login it
+  reads your key bindings, so each spell shows on the key it is already on.
+  Movement keys and keys with other commands stay as they are. Drag a spell
+  onto a key to put it there; hold Shift to see and fill the Shift layer.
+  Drag a spell between keys to move or swap it (`/glance lock` makes that
+  need Alt). `/glance take all` puts
+  every key with another command (except Tab, the bag keys and the character pane) on the bar. In edit mode the
+  bar can be dragged to another place (`/glance reset` puts it back).
+- Small player and target bars under your character (health and mana as
+  numbers), and a cast bar below them. They hide Blizzard's player, target and cast frames
+  (`/glance blizzard on` brings those back).
+- A square minimap in the top-right corner: mouse-wheel zoom, the zone,
+  coordinates and clock under it, and the addon buttons in one drawer.
+  Drag the gold corner, use Shift+mouse wheel or type `/glance map SIZE` to resize it.
+- `/glance bars hide`: hides the Bartender4 bottom bars (the right-edge
+  bars 3 and 4 stay) and Blizzard's bottom bars, the
+  gryphon art and the old XP bar (a thin XP line replaces it).
+- Chat in the same look: faint panel, tabs only under the mouse, no side
+  buttons, text fades after 30 quiet seconds.
+- Shift layer and cooldown sweeps work in the game (first test round).
+- Works with the client's hidden (secret) health, power and cast values.
+
 ## LootValue 0.2.0
 
 - Auto-loot that leaves cheap junk on the body. It always takes money,
