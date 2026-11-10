@@ -19,7 +19,7 @@ for i, k in ipairs(M.GROUPS) do ORDER[k] = i end
 -- quests in your log (their entries have also = "quest").
 M.FILTERS = { i = "item", item = "item", s = "spell", spell = "spell", p = "place", z = "place",
   place = "place", w = "person", person = "person", n = "npc", npc = "npc", q = "quest", quest = "quest", l = "log", log = "log",
-  c = "command", cmd = "command", near = "near", nb = "near", d = "dungeon", dungeon = "dungeon", loot = "loot", from = "from", r = "recipe", recipe = "recipe" }
+  c = "command", cmd = "command", near = "near", nb = "near", d = "dungeon", dungeon = "dungeon", loot = "loot", from = "from", r = "recipe", recipe = "recipe", ah = "ah" }
 
 function M.norm(s)
   s = tostring(s or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
