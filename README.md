@@ -61,8 +61,12 @@ the 5% cut, the disenchant value).
   estimates them from the Classic disenchant table and the AH prices of the
   materials ("disenchant: no price" when no value is known).
 - A soulbound copy gets no AH option.
-- With an AH price on the line, it says how old Auctionator's last scan is
-  ("AH scan 3h ago").
+- With an AH price on the line, it says how old Auctionator's last full
+  scan is ("AH full scan 3h ago"). An item that a full scan today did not
+  see says "not in today's full scan": nobody lists it now, and its price,
+  listings and trend are from an older day. Auctionator counts price days
+  from local midnight, so an item seen only last night is "1 day old" in
+  the morning.
 
 ### Auto-loot
 
@@ -175,6 +179,30 @@ price is the craft cost: the pattern plus the reagents (from the line after
 lower; a "+" marks a reagent with no price. The tooltip lists the parts and
 the price to buy the made item on the AH instead.
 
+- Crafting lines (`UpgradeFinder/Craft.lua`): hover a recipe item (in your
+  bags, at a vendor, on the AH) or a recipe in your profession window (the
+  recipe list rows and the made item's icon) and the tooltip adds:
+  **Cost to craft** (the reagents at the AH price, or the vendor price when
+  lower; "+?" and a "No price:" line for a reagent with no price),
+  **Sells for** (the best of the AH after the 5% cut, the vendor and, with
+  Enchanting and LootValue, the disenchant estimate; times the number
+  made), **Profit** or **Loss**, and for gear the **Score of the made item**
+  against what you wear (MageMentor's score for a mage with MageMentor).
+  A bind on pickup item sells only to the vendor. An enchanting formula
+  makes no item, so it gets the cost only. On a recipe tooltip the game
+  reports the made item, so that gives its price. A recipe names its
+  reagents only by name, and the game finds an item by name only once the
+  client has seen it; so UpgradeFinder learns the names of the items in the
+  Auctionator scan in the background, starting 5 s after login (names the
+  client knows at once, others asked from the server 150 per 1.5 s), and saves them in
+  `UpgradeFinderDB.names`. A reagent that shows "No price" at first gets
+  its price on the next hover. A material you can turn into another item
+  with one reagent (Silk Cloth into Bolt of Silk Cloth, ore into bars)
+  gets a "Make into" line: what one craft gains or loses, with the cost
+  and the sale ("+7s 50c (40s -> ~47s 50c)"). The cloth bolts are built
+  in; other such recipes are read each time you open a profession window
+  and saved in `UpgradeFinderDB.recipes`. `/uf craft` turns the lines off
+  and on.
 - Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
   **Any price / Can afford**, and **All sources / AH only / Dungeons / Bags
