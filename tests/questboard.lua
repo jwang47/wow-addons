@@ -741,6 +741,21 @@ check("dungeons off: not in Nearby", not inNext)
 GetQuestTagInfo = nil
 D.resetTags()
 
+-- Level weight: a quest over your level counts slower; red near not doable.
+check("level factor", D.levelFactor(10, 10) == 1 and D.levelFactor(12, 10) == 1.6 and D.levelFactor(15, 10) == D.RED_SLOW
+  and D.levelFactor(6, 10) == D.LOW_FAST and D.levelFactor(nil, 10) == 1)
+local easy = D.pickupSecs({ level = P.level, objectives = 2 })
+local hard = D.pickupSecs({ level = P.level + 3, objectives = 2 })
+check("level factor: a pick-up 3 over takes longer", hard > easy and math.abs((hard - easy) - 2 * D.OBJECTIVE_SECS * 1.2) < 0.01)
+local savedPace = D.pace
+D.pace = {}
+local w1 = D.workSecs({ id = 77001, level = P.level, left = { { have = 0, need = 4 } } })
+local w2 = D.workSecs({ id = 77002, level = P.level + 2, left = { { have = 0, need = 4 } } })
+D.pace = { [77003] = 20 }
+local w3 = D.workSecs({ id = 77003, level = P.level + 2, left = { { have = 0, need = 4 } } })
+D.pace = savedPace
+check("level factor: guessed work scales, measured pace does not", math.abs(w2 - w1 * 1.6) < 0.01 and w3 == 80)
+
 -- Distances take a colour: green near, yellow a walk, grey far.
 check("distance colours", D.yardsText(120):find("^|cff") and D.yardsText(120) ~= D.yardsText(700)
   and D.yardsText(700) ~= D.yardsText(3000) and strip(D.yardsText(700)) == "700 yd")

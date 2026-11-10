@@ -59,6 +59,11 @@ the same, and a test checks that every `.toc` version has a section here.
   22G (the game's quest tag, else Questie's, else the group size).
   `/qb dungeons off` keeps dungeon and raid quests to the Log tab and
   leaves their pick-ups out; `/qb dungeons on` brings them back.
+- Quests over your level count slower in time left and XP per minute:
+  1.25x at +1, 1.6x at +2, 2.2x at +3, 3.2x at +4, 6x at +5 or more (red,
+  hard alone); 3 or more under, 0.85x. Once you make progress on a quest,
+  your measured pace on it counts instead. The tooltip says when a quest
+  is counted slower.
 
 - Alt-click pins any quest, not only the ones you are working on: a
   hand-in or a pick-up goes to Active with a gold star too. A pinned

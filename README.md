@@ -522,6 +522,10 @@ hand-in or a pick-up). It stays while you are within 600 yards
   monsters and Questie's nameplate icons (`/questie`, Nameplates) show from
   further away. `/qb far off` puts the old settings back. Addons cannot mark
   monsters in the world or target them, so nameplates are the way.
+- Level weight: a quest over your level counts slower (`D.levelFactor`:
+  1.25x at +1, 1.6x at +2, 2.2x at +3, 3.2x at +4, 6x at +5 or more; 0.85x
+  at 3 or more under), in time left and XP per minute, until your own pace
+  on that quest is measured. The tooltip says so.
 - XP per minute is an estimate: the run to the place at 7 yards a second
   (or your speed when faster), 90 s per open objective, 30 s at the giver
   and 60 s back. The numbers are in `QuestBoard/Data.lua`.

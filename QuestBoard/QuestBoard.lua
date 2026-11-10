@@ -283,6 +283,11 @@ local function tooltip(r)
     return
   end
   tip:AddLine(e.name, rgb(e.color))
+  local slow = (e.kind == "log" or e.kind == "pickup" or e.kind == "party") and not e.done and not D.pace[e.id] and D.levelFactor(e.level) or 1
+  if slow > 1 then
+    tip:AddLine(string.format("%d level%s over you: counted %.1fx slower%s", e.level - D.playerLevel(), e.level - D.playerLevel() == 1 and "" or "s", slow,
+      slow >= D.RED_SLOW and " (hard to do alone)" or ""), 1, 0.6, 0.3)
+  end
   if e.tag then tip:AddLine("Level " .. (e.level or "?") .. " " .. D.TAG_TEXT[e.tag] .. (D.isDungeon(e) and " (/qb dungeons off hides these outside the Log tab)" or ""), 1, 0.6, 0.3) end
   local lvl = "Level " .. (e.level or "?")
   if e.req and e.req ~= e.level then lvl = lvl .. " (needs " .. e.req .. ")" end

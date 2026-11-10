@@ -389,14 +389,29 @@ function D.unitsLeft(e)
   return n
 end
 
--- Time for the work left on a quest: the kills or loots left times your
--- pace on this quest (drop rates included, since it is measured). Before
--- you make progress on it, the pace over all quests or UNIT_SECS, and the
--- second value says it is a guess.
+-- How much slower a quest over your level goes: tougher mobs, more deaths
+-- and rests. 5 or more over (red) counts as close to not doable alone. A
+-- quest 3 or more under goes a bit faster.
+D.LEVEL_SLOW = { [1] = 1.25, [2] = 1.6, [3] = 2.2, [4] = 3.2 }
+D.RED_SLOW, D.LOW_FAST = 6, 0.85
+function D.levelFactor(questLevel, level)
+  level = level or D.playerLevel()
+  if not (questLevel and level) or questLevel <= 0 then return 1 end
+  local diff = questLevel - level
+  if diff >= 5 then return D.RED_SLOW end
+  if diff >= 1 then return D.LEVEL_SLOW[diff] end
+  if diff <= -3 then return D.LOW_FAST end
+  return 1
+end
+
+-- The work left on a quest: kills or loot left at your pace on it (it
+-- already shows how hard the quest is for you), else at your pace over
+-- all quests (or a guess) times the level factor. Second value: a guess.
 function D.workSecs(e)
   local own = D.pace[e.id]
-  local pace = own or math.max(D.anyPace or 0, D.UNIT_SECS)
-  return D.unitsLeft(e) * pace, not own
+  if own then return D.unitsLeft(e) * own, false end
+  local pace = math.max(D.anyPace or 0, D.UNIT_SECS)
+  return D.unitsLeft(e) * pace * D.levelFactor(e.level), true
 end
 
 function D.logSecs(e)
@@ -711,7 +726,7 @@ function D.memberText(e)
 end
 
 function D.pickupSecs(e)
-  return D.travelSecs(e.dist) + D.PICKUP_SECS + math.max(1, e.objectives) * D.OBJECTIVE_SECS + D.RETURN_SECS
+  return D.travelSecs(e.dist) + D.PICKUP_SECS + math.max(1, e.objectives) * D.OBJECTIVE_SECS * D.levelFactor(e.level) + D.RETURN_SECS
 end
 
 ---------------------------------------------------------------------------
@@ -866,7 +881,7 @@ end
 ---------------------------------------------------------------------------
 local function zoneWork(e)
   if e.kind == "pickup" or e.kind == "party" then
-    return D.PICKUP_SECS + math.max(1, e.objectives or 0) * D.OBJECTIVE_SECS + D.RETURN_SECS
+    return D.PICKUP_SECS + math.max(1, e.objectives or 0) * D.OBJECTIVE_SECS * D.levelFactor(e.level) + D.RETURN_SECS
   end
   return stopSecs(e)
 end
