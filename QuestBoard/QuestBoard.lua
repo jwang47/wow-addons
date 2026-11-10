@@ -17,10 +17,10 @@ local defaults = {
   rows = { active = 4, area = 3, turnin = 6, log = 8, party = 5, pickup = 8 },
   collapsed = {},
   combatAlpha = 0.35,
-  hideTrackers = false,
+  hideTrackers = false,  -- hide the game's quest tracker (and Questie's)
   locked = false,        -- /qb lock: no dragging
   compact = false,       -- /qb compact: one line per quest, no "what to do" line
-  focus = true,          -- show only Next and Active until the mouse is over the board  -- hide the game's quest tracker (and Questie's)
+  focus = true,          -- in combat and instances: only Next and Active until mouse-over
   point = nil,           -- saved position { point, x, y }
 }
 
@@ -405,7 +405,7 @@ function ns.render()
     local h = heads[kind] or makeHead(kind)
     local show = #list > 0 or kind == "pickup" and state and state.questie
     -- Focus: only the quests you are on now, the rest on mouse-over.
-    if ns.db.focus and not ns.expanded and kind ~= "active" then show = false end
+    if ns.focused() and kind ~= "active" then show = false end
     if show then
       h:ClearAllPoints()
       h:SetPoint("TOPLEFT", PAD, y)
@@ -487,8 +487,17 @@ ns.FULL_SECS = 3
 -- back to Next and Active a moment after the mouse leaves.
 ns.LEAVE_SECS = 0.4
 local awaySecs = 0
+-- Focus applies in combat and in a dungeon or other instance; out in the
+-- world the whole board shows.
+function ns.busy()
+  if rawget(_G, "InCombatLockdown") and InCombatLockdown() then return true end
+  local inside = call(rawget(_G, "IsInInstance"))
+  return inside and true or false
+end
+function ns.focused() return ns.db.focus and ns.busy() and not ns.expanded end
+
 function ns.hover(over, dt)
-  if not ns.db.focus then return end
+  if not (ns.db.focus and ns.busy()) then ns.expanded = false return end
   if over then
     awaySecs = 0
     if not ns.expanded then ns.expanded = true ns.render() end
@@ -646,7 +655,7 @@ events:SetScript("OnEvent", function(_, event)
     return
   end
   if not panel then return end
-  if event == "PLAYER_REGEN_DISABLED" then panel:SetAlpha(ns.db.combatAlpha) return end
+  if event == "PLAYER_REGEN_DISABLED" then panel:SetAlpha(ns.db.combatAlpha) ns.render() return end
   if event == "PLAYER_REGEN_ENABLED" then
     panel:SetAlpha(1)
     if ns.db.hideTrackers then ns.applyTrackers() end
@@ -702,7 +711,7 @@ SlashCmdList.QUESTBOARD = function(text)
   elseif cmd == "focus" then
     ns.db.focus = not ns.db.focus
     ns.expanded = false
-    say(ns.db.focus and "showing Next and Active; mouse over the board for the rest" or "showing the whole board")
+    say(ns.db.focus and "in combat and instances: Next and Active only, mouse over for the rest" or "showing the whole board all the time")
     return ns.render()
   elseif cmd == "compact" then
     ns.db.compact = not ns.db.compact

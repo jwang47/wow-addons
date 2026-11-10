@@ -248,7 +248,11 @@ local function countRows()
   return n
 end
 ns.render()
-check("focus: no rows when nothing is active", countRows() == 0 and QuestBoardFrame.next.shown)
+check("out in the world the whole board shows", countRows() == 5)
+local inside = true
+function IsInInstance() return inside end
+ns.render()
+check("focus: in an instance, no rows when nothing is active", countRows() == 0 and QuestBoardFrame.next.shown)
 local over = false
 QuestBoardFrame.IsMouseOver = function() return over end
 over = true
@@ -261,6 +265,10 @@ QuestBoardFrame.scripts.OnUpdate(QuestBoardFrame, 0.5)
 check("focus: then only Next and Active again", countRows() == 0)
 SlashCmdList.QUESTBOARD("focus")
 check("/qb focus off shows the whole board", countRows() == 5 and QuestBoardDB.focus == false)
+SlashCmdList.QUESTBOARD("focus")
+inside = false
+ns.render()
+check("leaving the instance shows the whole board again", countRows() == 5)
 
 local shownRows = 0
 local firstRow

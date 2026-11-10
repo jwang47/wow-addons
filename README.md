@@ -279,10 +279,11 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   Ann 5/6"): the game's `IsUnitOnQuest`, plus Questie's party data for the
   progress. Party members need Questie too for their progress and for the
   Party has group.
-- Focus (on by default): the board shows only the Next line and the Active
-  group. Move the mouse over it and the whole board opens; it closes again
-  a moment after the mouse leaves. `/qb focus` shows the whole board all the
-  time (again to undo).
+- Focus (on by default): in combat and inside a dungeon or other instance,
+  the board shows only the Next line and the Active group. Move the mouse
+  over it and the whole board opens; it closes again a moment after the
+  mouse leaves. Out in the world the whole board shows. `/qb focus` shows
+  the whole board everywhere (again to undo).
 - The top line says what to do next: the open objective of a quest you
   are on now (Active), else the best area when it has 3 or more stops, else
   the nearest hand-in, else the nearest quest.
