@@ -7,6 +7,8 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## UpgradeFinder 0.2.0
 
+- `UpgradeFinderAPI.recipe(itemID)` gives other addons a recipe's skill,
+  craft cost, sale price and profit (Omni uses it to list recipes).
 - New: crafting lines on recipes. Hover a pattern or other recipe item, or
   a recipe in your profession window, to see the cost to craft, what the
   made item sells for (AH, vendor or disenchant), the profit or loss, and
@@ -31,6 +33,11 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## Omni 0.1.3
 
+- Search recipes: a recipe word anywhere ("bag recipes", "patterns
+  silk") or `r:` lists the recipes Omni knows (bags, bank, mail, the AH
+  scan). "bag" also finds packs, pouches and satchels. With UpgradeFinder,
+  each row shows the skill it needs and the profit of one craft, best
+  profit first. Hover a row for the recipe tooltip with the full craft lines.
 - The item tooltip says "AH full scan 3h ago" like LootValue, and "not in
   today's full scan" next to an old price.
 

@@ -950,6 +950,12 @@ tt = fakeTooltip("FakeTipI", "|Hitem:121::|h[Earthen Hood]|h")
 tt:AddLine("Pattern: Earthen Hood")
 Cr.onTooltip(tt)
 check("craft: the learned name gives the price", tt:find("Cost to craft") == "42s 00c" and tt:find("Profit") == "+43s 50c")
+-- The made item's name is learned from the AH scan like the reagents' names.
+UpgradeFinderDB.names["Earthen Hood"] = 121
+local sum = UpgradeFinderAPI.recipe(120)
+check("API: recipe summary for other addons", sum and sum.skill == "Tailoring" and sum.rank == 150 and sum.cost == 4200
+  and sum.profit == 4350 and sum.how == "AH" and sum.made == "Earthen Hood")
+check("API: not a recipe gives nil", UpgradeFinderAPI.recipe(106) == nil)
 SlashCmdList.UPGRADEFINDER("craft names")
 check("/uf craft names says how many names it knows", chat[#chat]:match("item names: %d+ learned") ~= nil)
 C_Item.GetItemInfo = infoNow

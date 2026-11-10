@@ -949,6 +949,34 @@ do
   ns.close()
 end
 
+-- Recipes: "bag recipes" lists recipe items, best profit first (UpgradeFinderAPI).
+do
+  local M = ns.match
+  check("a recipe word lists recipes", select(1, M.parse("bag recipes")) == "recipe" and select(2, M.parse("bag recipes")) == "bag")
+  check("r: filter", select(1, M.parse("r: silk")) == "recipe")
+  local E = ns.sources.entry
+  local list = { E("item", 5000, "Pattern: Small Silk Pack"), E("item", 5001, "Pattern: Linen Bag"),
+    E("item", 5002, "Pattern: Silk Robe"), E("item", 5003, "Linen Bag"), E("item", 5004, "Pattern: Red Linen Bag") }
+  local instant = C_Item.GetItemInfoInstant
+  C_Item.GetItemInfoInstant = function(id) return id, "", "", "", 0, id == 5003 and 1 or 9 end
+  local SUM = { [5000] = { skill = "Tailoring", rank = 150, profit = 5000, cost = 3000 },
+    [5001] = { skill = "Tailoring", rank = 45, profit = -200, cost = 400 },
+    [5002] = { skill = "Tailoring", rank = 125, profit = 9000, cost = 100 } }
+  UpgradeFinderAPI = { recipe = function(id) return SUM[id] end }
+  local g, loading = ns.sources.recipes({ list }, "bag")
+  local got = {}
+  for _, e in ipairs(g[1] and g[1].entries or {}) do table.insert(got, e.name) end
+  check("bag recipes: packs too, not the bag itself, best profit first",
+    table.concat(got, ",") == "Pattern: Small Silk Pack,Pattern: Linen Bag,Pattern: Red Linen Bag")
+  check("a recipe still loading is retried", loading == true)
+  check("recipe row: skill and profit", strip(ns.actions.detail(g[1].entries[1])):find("^Tailoring 150  %+50s 0c") ~= nil)
+  check("recipe row: a loss", strip(ns.actions.detail(g[1].entries[2])):find("^Tailoring 45  %-2s 0c") ~= nil)
+  UpgradeFinderAPI = nil
+  g = ns.sources.recipes({ list }, "")
+  check("without UpgradeFinder: recipes by name, title says why", #g[1].entries == 4 and g[1].title:find("UpgradeFinder") ~= nil)
+  C_Item.GetItemInfoInstant = instant
+end
+
 -- Omni's dungeon table is a copy of UpgradeFinder's: the two must match.
 do
   local function body(path)

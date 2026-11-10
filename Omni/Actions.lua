@@ -345,6 +345,19 @@ function A.detail(e)
   local k = e.kind
   if k == "item" then
     local parts = {}
+    local r = e.recipe
+    if r then
+      -- A recipe: the skill it needs, then the profit of one craft.
+      if r.skill then table.insert(parts, "|cffffd100" .. r.skill .. (r.rank and (" " .. r.rank) or "") .. "|r") end
+      if r.profit then
+        table.insert(parts, (r.profit >= 0 and "|cff40ff40+" or "|cffff6060-") .. ns.money(math.abs(r.profit))
+          .. (r.unknown and " ?" or "") .. "|r")
+      elseif r.made and r.made:match("^Enchant ") then
+        table.insert(parts, "costs " .. ns.money(r.cost))
+      else
+        table.insert(parts, "|cff9d9d9dno sale price|r")
+      end
+    end
     for _, w in ipairs({ "bags", "bank", "mail" }) do
       if e.where and e.where[w] then table.insert(parts, w .. " " .. e.where[w]) end
     end

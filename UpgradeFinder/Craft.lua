@@ -239,10 +239,31 @@ function C.recipe(id)
   for _, l in ipairs(lines) do
     if l == rawget(_G, "RETRIEVING_ITEM_INFO") or l:match("^Retrieving item") then return nil end
   end
-  local made, reagents, bop = Scan.recipeParts(lines)
+  local made, reagents, bop, craft = Scan.recipeParts(lines)
   if not made or #reagents == 0 then return nil end
-  recipes[id] = { made = made, reagents = reagents, bop = bop }
+  local skill, rank
+  if craft then skill, rank = craft:match(Scan.PROFESSION) end
+  recipes[id] = { made = made, reagents = reagents, bop = bop, skill = skill, rank = tonumber(rank) }
   return recipes[id]
+end
+
+-- The numbers for one recipe item, for other addons (Omni lists recipes by
+-- profit): { made, skill, rank, cost, unknown, sale, how, profit }. nil
+-- while the recipe's tooltip is still loading or it is not a recipe.
+-- profit is nil when the made item has no price.
+function C.summary(id)
+  local r = C.recipe(id)
+  if not r then return nil end
+  local cost = C.cost(r.reagents)
+  local out = { made = r.made, skill = r.skill, rank = r.rank, cost = cost.total, unknown = #cost.missing > 0 }
+  if not r.made:match("^Enchant ") then
+    local sale = C.sale(r.made, r.bop)
+    if sale then
+      out.sale, out.how = sale.best, sale.how
+      if cost.total > 0 or not out.unknown then out.profit = sale.best - cost.total end
+    end
+  end
+  return out
 end
 
 -- product: the made item's id when the caller knows it (the game's recipe

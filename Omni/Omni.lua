@@ -55,6 +55,7 @@ function ns.search(text)
   local only, q = M.parse(text)
   if only == "loot" then return (S.dungeonLoot(q)) end
   if only == "from" then return ns.sourcesFor(q) end
+  if only == "recipe" then return (S.recipes(lists, q)) end
   return (M.search(lists, text, ns.db().recent))
 end
 
@@ -346,15 +347,15 @@ end
 -- loaded yet show as "item 1234"; look again shortly (a few times).
 ns.LOOT_RETRIES = 5
 local lootTries = {}
-local function showLoot(text, q)
+local function showLoot(text, q, fn)
   job = nil
-  local groups, loading = S.dungeonLoot(q)
+  local groups, loading = (fn or S.dungeonLoot)(q)
   show(groups)
   local n = (lootTries[text] or 0) + 1
   lootTries[text] = n
   if loading and n <= ns.LOOT_RETRIES then
     call(api("C_Timer.After"), 0.4, function()
-      if frame and frame:IsShown() and box:GetText() == text then showLoot(text, q) end
+      if frame and frame:IsShown() and box:GetText() == text then showLoot(text, q, fn) end
     end)
   end
 end
@@ -369,6 +370,16 @@ function ns.startSearch(text)
   if only == "from" then
     job = nil
     return show(ns.sourcesFor(q))
+  end
+  if only == "recipe" then
+    lootTries = {}
+    return showLoot(text, q, function(query)
+      local groups, loading = S.recipes(lists, query)
+      if #groups == 0 then
+        ns.emptyText = "No recipe matches. Omni knows the recipes in your bags, bank, mail and the AH scan."
+      end
+      return groups, loading
+    end)
   end
   local my = { text = text, ms = 0, frames = 0 }
   job = my

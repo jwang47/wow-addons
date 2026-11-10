@@ -566,6 +566,53 @@ function S.questsByZone(short)
 end
 
 ---------------------------------------------------------------------------
+-- Recipes ("bag recipes", "r: silk"): recipe items Omni knows (bags, bank,
+-- mail, the Auctionator scan), with what crafting gives when UpgradeFinder
+-- is loaded (UpgradeFinderAPI.recipe: skill, cost, sale, profit), best
+-- profit first.
+---------------------------------------------------------------------------
+S.RECIPE_CLASS = 9
+S.RECIPES_MAX = 40
+local recipeClass = {} -- [item id] = true / false
+local function isRecipe(id)
+  if recipeClass[id] == nil then
+    local instant = api("C_Item.GetItemInfoInstant") or rawget(_G, "GetItemInfoInstant")
+    local class = select(6, call(instant, id))
+    if class == nil then return false end -- not known yet: ask again next time
+    recipeClass[id] = class == S.RECIPE_CLASS
+  end
+  return recipeClass[id]
+end
+
+-- Groups and whether any recipe is still loading its tooltip.
+function S.recipes(lists, q)
+  local uf = rawget(_G, "UpgradeFinderAPI")
+  local recipe = type(uf) == "table" and type(uf.recipe) == "function" and uf.recipe
+  local hits, seen, loading = {}, {}, false
+  for _, src in ipairs(lists) do
+    for _, e in ipairs(src) do
+      if e.kind == "item" and not seen[e.id] and isRecipe(e.id) and ns.match.allWords(e.lname, q) then
+        seen[e.id] = true
+        local sum = recipe and recipe(e.id)
+        if recipe and not sum then loading = true end
+        table.insert(hits, entry("item", e.id, e.name, { where = e.where, owned = e.owned, recipe = sum or false }))
+      end
+    end
+  end
+  table.sort(hits, function(a, b)
+    local pa, pb = a.recipe and a.recipe.profit or nil, b.recipe and b.recipe.profit or nil
+    if (pa ~= nil) ~= (pb ~= nil) then return pa ~= nil end
+    if pa and pb and pa ~= pb then return pa > pb end
+    return a.name < b.name
+  end)
+  if #hits == 0 then return {}, loading end
+  local g = { kind = "recipe", title = recipe and "Recipes, best profit first" or "Recipes (load UpgradeFinder for the profit)",
+    entries = {}, more = math.max(0, #hits - S.RECIPES_MAX) }
+  for i = 1, math.min(#hits, S.RECIPES_MAX) do g.entries[i] = hits[i] end
+  return { g }, loading
+end
+
+---------------------------------------------------------------------------
 -- Dungeons: ns.DUNGEONS (Dungeons.lua), found by name or short name ("bfd").
 -- Enter opens "loot: <short>", which lists each boss's drops as items.
 ---------------------------------------------------------------------------
