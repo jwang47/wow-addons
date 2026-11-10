@@ -720,6 +720,27 @@ check("why: in the log", D.whyQuest("stopping", whyState, ns.WHERE, 3) == "Stopp
 check("why: a level too high", D.unfitReason({ level = 20 }, 10, 3):find("level 20, more than 3 over you", 1, true) ~= nil)
 check("why: unknown name", D.whyQuest("no such quest", whyState, ns.WHERE, 3):find("no quest named", 1, true) ~= nil)
 
+-- Dungeon quests: the level gets a tag, and /qb dungeons off keeps them
+-- to the Log tab.
+D.resetTags()
+GetQuestTagInfo = function(id) if id == 122 then return 81, "Dungeon" end if id == 201 then return 62, "Raid" end end
+check("tag: dungeon, raid, group by size", D.questTag(122) == "D" and D.questTag(201) == "R" and D.questTag(999, 5) == "G" and D.questTag(998) == nil)
+local tagged = D.collect({})
+local q122t
+for _, kind in ipairs({ "active", "nearby", "log" }) do for _, e in ipairs(tagged[kind]) do if e.id == 122 then q122t = e end end end
+check("tag: a log quest has it", q122t and q122t.tag == "D" and not q122t.hiddenTag)
+local hid = D.collect({ dungeons = false })
+local q122h, p201
+for _, kind in ipairs({ "active", "nearby", "log" }) do for _, e in ipairs(hid[kind]) do if e.id == 122 then q122h = e end end end
+for _, e in ipairs(hid.pickup) do if e.id == 201 then p201 = e end end
+check("dungeons off: the log quest stays for the Log tab, marked hidden", q122h and q122h.hiddenTag)
+check("dungeons off: a raid pick-up is left out", p201 == nil)
+local inNext = false
+for _, e in ipairs(ns.nextList(hid)) do if e.id == 122 then inNext = true end end
+check("dungeons off: not in Nearby", not inNext)
+GetQuestTagInfo = nil
+D.resetTags()
+
 -- Distances take a colour: green near, yellow a walk, grey far.
 check("distance colours", D.yardsText(120):find("^|cff") and D.yardsText(120) ~= D.yardsText(700)
   and D.yardsText(700) ~= D.yardsText(3000) and strip(D.yardsText(700)) == "700 yd")

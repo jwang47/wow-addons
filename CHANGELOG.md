@@ -55,6 +55,10 @@ the same, and a test checks that every `.toc` version has a section here.
   220 to 560, or `/qb width N`). While you drag, a gold outline shows the
   max size and its numbers, so you see the limit even when the board is
   shorter.
+- Dungeon, raid and group quests have a tag after the level: 28D, 40R,
+  22G (the game's quest tag, else Questie's, else the group size).
+  `/qb dungeons off` keeps dungeon and raid quests to the Log tab and
+  leaves their pick-ups out; `/qb dungeons on` brings them back.
 
 - Alt-click pins any quest, not only the ones you are working on: a
   hand-in or a pick-up goes to Active with a gold star too. A pinned

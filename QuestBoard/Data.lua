@@ -194,19 +194,47 @@ local function objectivesLeft(id)
   return left, all, count, all > 0 and sum / all or nil
 end
 
+-- A quest's tag: "D" dungeon, "R" raid, "G" group or elite, or nil. From the
+-- game (GetQuestTagInfo), else Questie, else the suggested group size.
+D.TAG_IDS = { [1] = "G", [62] = "R", [81] = "D", [85] = "D", [88] = "R", [89] = "R" }
+D.TAG_NAMES = { Group = "G", Elite = "G", Dungeon = "D", Heroic = "D", Raid = "R" }
+local tagCache = {}
+function D.questTag(id, suggested)
+  if not id then return nil end
+  if tagCache[id] ~= nil then return tagCache[id] or nil end
+  local tagID, tagName = call(rawget(_G, "GetQuestTagInfo"), id)
+  tagID, tagName = plain(tagID), plain(tagName)
+  if not tagID and not tagName then
+    local qdb = D.module("QuestieDB")
+    if qdb then
+      tagID, tagName = call(qdb.GetQuestTagInfo, id)
+      tagID, tagName = plain(tagID), plain(tagName)
+    end
+  end
+  local tag = (type(tagID) == "number" and D.TAG_IDS[tagID]) or (type(tagName) == "string" and D.TAG_NAMES[tagName]) or nil
+  suggested = plain(suggested)
+  if not tag and type(suggested) == "number" and suggested > 1 then tag = "G" end
+  tagCache[id] = tag or false
+  return tag
+end
+function D.resetTags() tagCache = {} end
+D.TAG_TEXT = { D = "dungeon quest", R = "raid quest", G = "group or elite quest" }
+-- Dungeon and raid quests (not plain group quests).
+function D.isDungeon(e) return e.tag == "D" or e.tag == "R" end
+
 -- One entry per quest in the log, headers skipped.
 function D.logQuests()
   local list, zone = {}, nil
   local n = call(api("C_QuestLog.GetNumQuestLogEntries")) or 0
   local title = rawget(_G, "GetQuestLogTitle")
   for i = 1, n do
-    local name, level, header, id, done
+    local name, level, header, id, done, suggested
     local info = call(api("C_QuestLog.GetInfo"), i)
     if type(info) == "table" then
-      name, level, header, id = info.title, info.level, info.isHeader, info.questID
+      name, level, header, id, suggested = info.title, info.level, info.isHeader, info.questID, info.suggestedGroup
     elseif title then
-      local t, l, _, h, _, c, _, q = call(title, i)
-      name, level, header, id, done = t, l, h, q, c == 1
+      local t, l, g, h, _, c, _, q = call(title, i)
+      name, level, header, id, done, suggested = t, l, h, q, c == 1, g
     end
     if header then zone = name
     elseif id and type(name) == "string" and name ~= "" and not (info and info.isHidden) then
@@ -216,7 +244,7 @@ function D.logQuests()
       local left, all, count, frac = objectivesLeft(id)
       -- A quest with objectives and none left is ready even if the flag lags.
       if all > 0 and #left == 0 then done = true end
-      table.insert(list, { id = id, name = name, level = plain(level), header = zone, done = done,
+      table.insert(list, { id = id, name = name, level = plain(level), header = zone, done = done, tag = D.questTag(id, suggested),
         left = left, objectives = all, count = count, frac = frac, index = i, kind = done and "turnin" or "log" })
     end
   end
@@ -473,7 +501,7 @@ function D.pickup(id, level, maxAbove, kind)
   elseif not D.fits(quest.level, quest.requiredLevel, level, maxAbove) then
     return nil
   end
-  local e = { id = id, name = quest.name or ("Quest " .. id), level = quest.level, req = quest.requiredLevel,
+  local e = { id = id, name = quest.name or ("Quest " .. id), level = quest.level, req = quest.requiredLevel, tag = D.questTag(id),
     kind = kind or "pickup", objectives = 0, left = {} }
   -- Raw objectives: [1] creatures, [2] objects, [3] items (lists of entries).
   local raw = type(quest.objectives) == "table" and quest.objectives or {}
@@ -792,7 +820,7 @@ function D.areas(out)
     for _, e in ipairs(out[kind] or {}) do
       -- Only real stops: not an item-started quest (no giver to visit; its
       -- place is a drop or the finisher), not a party quest you cannot take.
-      local stop = not (e.fromItem and (e.kind == "pickup" or e.kind == "party"))
+      local stop = not e.hiddenTag and not (e.fromItem and (e.kind == "pickup" or e.kind == "party"))
         and not (e.kind == "party" and not e.canTake)
       if stop and e.wx and e.dist then table.insert(pts, e) end
     end
@@ -848,7 +876,7 @@ function D.zones(out)
   for _, kind in ipairs({ "active", "nearby", "turnin", "log", "pickup", "farPickup" }) do
     for _, e in ipairs(out[kind] or {}) do
       local name = D.zoneName(e.zone) or (e.kind ~= "pickup" and e.header) or nil
-      if name then
+      if name and not e.hiddenTag then
         local z = by[name]
         if not z then
           z = { kind = "zone", name = name, color = "white", stops = {}, counts = {}, xp = 0, work = 0, left = {}, id = "zone:" .. name }
@@ -971,6 +999,8 @@ function D.collect(opts)
   for _, e in ipairs(D.logQuests()) do
     inLog[e.id] = true
     D.finish(D.placeLog(e), level)
+    -- /qb dungeons off: a dungeon quest stays in the Log tab only.
+    e.hiddenTag = opts.dungeons == false and D.isDungeon(e) or nil
     if D.questItem then e.item = D.questItem(e) end
     local pinned = opts.doing and opts.doing[e.id]
     e.pinned = pinned and true or nil
@@ -1021,6 +1051,7 @@ function D.collect(opts)
     for _, id in ipairs(D.availableIDs()) do
       if not inLog[id] then
         local e = D.pickup(id, level, opts.maxAbove)
+        if e and opts.dungeons == false and D.isDungeon(e) then e = nil end
         if e and e.far then
           -- Far away: for Areas, or Doing when you pinned it (a zone you swap to).
           e.pinned = opts.doing and opts.doing[id] and true or nil

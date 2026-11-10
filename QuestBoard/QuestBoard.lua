@@ -23,6 +23,7 @@ local defaults = {
   hideTrackers = false,  -- hide the game's quest tracker (and Questie's)
   locked = false,        -- /qb lock: no dragging
   compact = false,       -- /qb compact: one line per quest, no "what to do" line
+  dungeons = true,       -- /qb dungeons off: dungeon and raid quests only in the Log tab
   party = true,          -- /qb party off: no party quests here, nor Questie's party objectives on the map
   focus = true,          -- in combat and instances: only the quests you are on until mouse-over
   point = nil,           -- saved position { point, x, y }
@@ -282,6 +283,7 @@ local function tooltip(r)
     return
   end
   tip:AddLine(e.name, rgb(e.color))
+  if e.tag then tip:AddLine("Level " .. (e.level or "?") .. " " .. D.TAG_TEXT[e.tag] .. (D.isDungeon(e) and " (/qb dungeons off hides these outside the Log tab)" or ""), 1, 0.6, 0.3) end
   local lvl = "Level " .. (e.level or "?")
   if e.req and e.req ~= e.level then lvl = lvl .. " (needs " .. e.req .. ")" end
   tip:AddLine(lvl, 0.8, 0.8, 0.8)
@@ -801,7 +803,7 @@ function ns.nextList(st)
   end
   for _, kind in ipairs({ "turnin", "nearby", "active", "log", "pickup", "party" }) do
     for _, e in ipairs(st[kind] or {}) do
-      local take = not inArea[e] and e.dist and e.dist <= ns.NEXT_YARDS and not (e.kind == "party" and not e.canTake)
+      local take = not inArea[e] and not e.hiddenTag and e.dist and e.dist <= ns.NEXT_YARDS and not (e.kind == "party" and not e.canTake)
       if take then table.insert(list, e) end
     end
   end
@@ -833,7 +835,7 @@ function ns.sections(st, tab)
     for _, e in ipairs(st.active) do isActive[e] = true end
     for _, kind in ipairs({ "turnin", "nearby", "pickup", "party" }) do
       for _, e in ipairs(st[kind] or {}) do
-        if not isActive[e] and not (e.kind == "party" and not e.canTake) then table.insert(cand, e) end
+        if not isActive[e] and not e.hiddenTag and not (e.kind == "party" and not e.canTake) then table.insert(cand, e) end
       end
     end
     local way = ns.onWay(cand, st.active)
@@ -923,7 +925,7 @@ function ns.render()
           local r = rows[used] or makeRow(used)
           local e = shown[i]
           r.entry = e
-          r.lvl:SetText(e.kind == "more" and "" or (e.kind == "area" or e.kind == "zone") and #e.stops or e.kind == "town" and (e.role == "inn" and "Inn" or "Fly") or e.level or "?")
+          r.lvl:SetText(e.kind == "more" and "" or (e.kind == "area" or e.kind == "zone") and #e.stops or e.kind == "town" and (e.role == "inn" and "Inn" or "Fly") or ((e.level or "?") .. (e.tag or "")))
           r.lvl:SetTextColor(rgb(e.color))
           r.name:SetText(e.name)
           if e.kind == "more" then r.name:SetTextColor(0.6, 0.6, 0.6)
@@ -1178,7 +1180,7 @@ function ns.refresh()
   if not (ns.db and ns.db.shown) then return end
   if job then again = true return end
   job = coroutine.create(function()
-    state = D.collect({ party = ns.db.party, doing = ns.db.doing, sortLog = ns.db.sortLog, sortPickup = ns.db.sortPickup, maxAbove = ns.db.maxAbove,
+    state = D.collect({ dungeons = ns.db.dungeons, party = ns.db.party, doing = ns.db.doing, sortLog = ns.db.sortLog, sortPickup = ns.db.sortPickup, maxAbove = ns.db.maxAbove,
       yield = coroutine.yield })
   end)
   runner:SetScript("OnUpdate", step)
@@ -1469,6 +1471,7 @@ local help = {
   "/qb range N - pick-ups at most N levels over you (now %d)",
   "/qb rows N - rows per group (now %d)",
   "/qb height N - at most N pixels tall, scroll for the rest (off: no limit; or drag the grip)",
+  "/qb dungeons off - dungeon and raid quests (28D, 40R) only in the Log tab, no pick-ups (on brings them back)",
   "/qb width N - the board's width, 220 to 560 (reset: 270; or drag the grip sideways)",
   "/qb doing | nearby | areas | log - open that tab (the board picks Doing or Nearby by itself)",
   "/qb why NAME - where a quest is on the board, or why it is not there",
@@ -1528,6 +1531,10 @@ SlashCmdList.QUESTBOARD = function(text)
     ns.setMaxHeight(n)
     say(n and ("max height " .. ns.db.maxHeight .. ", scroll for the rest") or "no max height")
     return
+  elseif cmd == "dungeons" and (rest == "on" or rest == "off") then
+    ns.db.dungeons = rest == "on"
+    say(ns.db.dungeons and "dungeon and raid quests show everywhere" or "dungeon and raid quests show only in the Log tab (and Pick up leaves them out)")
+    return ns.refresh()
   elseif cmd == "width" and (n or rest == "reset") then
     ns.setWidth(n)
     say("width " .. ns.width())

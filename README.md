@@ -428,6 +428,10 @@ hand-in or a pick-up). It stays while you are within 600 yards
   Questie's nearest mob, object or NPC for it ("Underbelly Whelp Scale:
   3/6 (Underbelly Whelp)"), or who takes it in. `/qb compact` drops that
   line.
+- A dungeon, raid or group quest has a tag after its level: 28D, 40R, 22G
+  (`GetQuestTagInfo`, else Questie's `GetQuestTagInfo`, else the suggested
+  group size). `/qb dungeons off` keeps dungeon and raid quests to the Log
+  tab (out of Doing, Nearby and Areas) and leaves their pick-ups out.
 - The level number is in the quest log colours (grey, green, yellow,
   orange, red). Each row shows the distance and an arrow that turns with
   you. The distance is green within 300 yards, yellow up to 1000 yards and
