@@ -41,6 +41,9 @@ the same, and a test checks that every `.toc` version has a section here.
   coloured by XP per minute; "~" is a guess). A gear line comes only when
   there is gear: "Reward: [Rose Mantle]" or "Leads to [Seal of Wrynn],
   4 quests on", in place of "chain +4 ->".
+- A calmer top: no "Quests / level" title line (the tabs are the top), no
+  count on the Log tab, no group name that repeats the tab, and the group
+  hints ("within 300 yd") moved into the group's tooltip.
 - Fix: a Lua error ("Items.lua:60: table index is nil") when a pinned
   quest that starts from an item was on the board.
 - Fix: a level with a tag ("33G") no longer wraps and pushes the name

@@ -790,7 +790,8 @@ local function makeHead(kind)
     if not (tip and self.list) then return end
     tip:SetOwner(self, "ANCHOR_LEFT")
     local n = #ns.listQuests(self.list)
-    tip:AddLine("Click: fold or open", 1, 1, 1)
+    if self.hint then tip:AddLine(self.hint, 1, 1, 1) end
+    tip:AddLine("Click: fold or open", 0.6, 0.6, 0.6)
     if n > 0 then
       tip:AddLine(ns.listPinned(self.list) and ("Alt-click: unpin these " .. n .. " quests") or ("Alt-click: pin all " .. n .. " quests (keep them in Doing)"), 0.6, 0.8, 1)
     end
@@ -995,32 +996,41 @@ function ns.render()
   panel:SetWidth(W)
   local y = -PAD
   local level = state and state.level or D.playerLevel()
-  panel.title:SetText("Quests")
-  panel.sub:SetText(state and (state.questie and ("level " .. level) or "level " .. level .. "  (no Questie: log only)") or "")
-  if ns.focused() then panel.sub:SetText(panel.sub:GetText() .. "  -  hover: all") end
-  y = y - HEAD_H
+  -- No title line: the tabs are the top of the board. A line under them
+  -- only when something is wrong (no Questie).
+  panel.title:SetText("")
+  panel.sub:SetText("")
+  local warn = state and not state.questie and "No Questie: your log only" or nil
   -- The tabs: the one shown is gold, the others grey.
   local cur = ns.tab()
   local tw = math.floor((W - 2 * PAD) / #ns.TABS)
   for i, t in ipairs(ns.TABS) do
     local b = panel.tabs[i]
     local label = ns.TAB_NAMES[t]
-    if t == "log" and state then label = label .. " " .. #ns.logAll(state) end
     b.text:SetText(label)
-    if t == cur then b.text:SetTextColor(1, 0.82, 0.25) b.line:Show() else b.text:SetTextColor(0.6, 0.6, 0.6) b.line:Hide() end
+    if t == cur then b.text:SetTextColor(1, 0.82, 0.25) b.line:Show() else b.text:SetTextColor(0.5, 0.5, 0.5) b.line:Hide() end
     b:ClearAllPoints()
     b:SetPoint("TOPLEFT", PAD + (i - 1) * tw, y)
     b:SetWidth(tw)
     b:Show()
   end
   panel.next:Hide()
-  y = y - ROW_H - 4
+  y = y - ROW_H - 6
+  if warn then
+    panel.sub:ClearAllPoints()
+    panel.sub:SetPoint("TOPLEFT", PAD, y)
+    panel.sub:SetText(warn)
+    y = y - ROW_H
+  end
   local top = y
   -- First pass: what goes where, from the top of the groups (cy).
   local items, cy, used = {}, 0, 0
   for _, h in pairs(heads) do h:Hide() end
-  for _, sec in ipairs(ns.sections(state)) do
+  local curName = ns.TAB_NAMES[cur]
+  for si, sec in ipairs(ns.sections(state)) do
     local kind, list = sec.key, sec.list
+    -- The first group needs no name when the tab already says it.
+    if si == 1 and sec.head == curName then sec.nohead = true end
     do
       local collapsed = not sec.nohead and ns.db.collapsed[kind]
       local cap = sec.cap or ns.db.rows[kind] or 6
@@ -1028,7 +1038,8 @@ function ns.render()
         local h = heads[kind] or makeHead(kind)
         local count = (#list > cap and not (ns.db.showAll and ns.db.showAll[kind])) and (cap .. " of " .. #list) or #list
         h.text:SetText((collapsed and "+ " or "") .. sec.head .. "  " .. count)
-        h.right:SetText(sec.right or "")
+        h.right:SetText("")   -- the hint is in the group's tooltip
+        h.hint = sec.right
         h.list = ns.shownRows(kind, list, cap)   -- pin all takes the rows you see
         table.insert(items, { f = h, y = cy, h = HEAD_H, gap = 2 })
         cy = cy + HEAD_H + 2

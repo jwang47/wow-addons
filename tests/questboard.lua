@@ -383,7 +383,8 @@ D.heldAt = {}
 ns.refresh()
 for _ = 1, 50 do ns.step() end
 check("tabs: Nearby is picked and gold", QuestBoardFrame.tabs[2].text.text == "Nearby" and QuestBoardFrame.tabs[2].line.shown
-  and QuestBoardFrame.tabs[4].text.text == "Log 3" and not QuestBoardFrame.next.shown)
+  and QuestBoardFrame.tabs[4].text.text == "Log" and not QuestBoardFrame.next.shown)
+check("tabs: no title line above them", QuestBoardFrame.title.text == "" and QuestBoardFrame.sub.text == "")
 SlashCmdList.QUESTBOARD("compact")
 check("/qb compact drops the what-to-do line", firstRow.sub.text == "")
 SlashCmdList.QUESTBOARD("compact")
