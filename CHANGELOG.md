@@ -5,6 +5,14 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## Workbench 0.1.0
+
+- New addon: one window for crafting (`/wb`). It lists every recipe of your
+  professions with the cost to craft, what the made item sells for and the
+  profit, best first. The Skill-ups view sorts by what one skill point
+  costs. It opens beside your profession window (`/wb dock` turns that
+  off). It needs UpgradeFinder, which reads the recipes and the prices.
+
 ## UpgradeFinder 0.2.0
 
 - New: crafting lines on recipes. Hover a pattern or other recipe item, or
