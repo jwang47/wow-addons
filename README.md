@@ -290,7 +290,13 @@ How it works, and what to keep in mind:
 - When someone invites you, two lines go to chat: the quest counts and
   your solo and grouped XP per hour. `/gu invite off` stops that; `/gu
   sum` prints them at any time.
-- `/gu reset` moves the panel back to the centre, `/gu clear` forgets the
+- **Thanks & leave**: while you are in a group, a button above the party
+  frames says "Thanks for the group!" in party chat and leaves the group 5
+  seconds later. Press it again in that time to stay. `/gu bye` does the
+  same. `/gu bye text ...` sets the words (empty: leave without a word),
+  `/gu bye delay N` the seconds (up to 60), `/gu button off` hides the
+  button. Shift-drag moves it.
+- `/gu reset` moves the panel and the button back, `/gu clear` forgets the
   XP data of this character. Drag the panel to move it; right-click hides it.
 - The data is per character, in `GroupUpDB` (SavedVariables).
 

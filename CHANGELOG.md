@@ -11,6 +11,8 @@ the same, and a test checks that every `.toc` version has a section here.
   shows which quests in your log a group speeds up, your measured XP per
   hour solo and in each group size at about your level, and how kill XP is
   split in a group. When someone invites you, two summary lines go to chat.
+- A "Thanks & leave" button while you are in a group (`/gu bye`): it thanks
+  the party in chat and leaves 5 seconds later.
 
 ## Omni 0.1.1
 

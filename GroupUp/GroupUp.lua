@@ -13,6 +13,10 @@ local defaults = {
   shown = false,
   onInvite = true,       -- chat summary when someone invites you
   point = nil,           -- saved position { point, x, y }
+  byeText = "Thanks for the group!",  -- /gu bye: said in party chat
+  byeDelay = 5,          -- seconds between the thanks and leaving
+  byeButton = true,      -- show the button while in a group
+  byePoint = nil,        -- its saved position
   chars = {},            -- [name-realm] = { levels = { [level][size] = bucket } }
 }
 
@@ -115,6 +119,48 @@ end
 function ns.summary()
   local r = ns.rates()
   return M.summary(M.quests(ns.units()), r.solo, r.grouped)
+end
+
+---------------------------------------------------------------------------
+-- Thanks and leave: say thanks in party chat, leave byeDelay seconds later.
+-- A second press in that time cancels the leave.
+---------------------------------------------------------------------------
+ns.bye = nil             -- { at = GetTime() of the leave } while counting down
+
+function ns.inGroup()
+  return (plain(call(rawget(_G, "GetNumGroupMembers"))) or 0) > 0
+end
+
+function ns.leave()
+  local f = M.api("C_PartyInfo.LeaveParty") or rawget(_G, "LeaveParty")
+  call(f)
+end
+
+function ns.thanksAndLeave()
+  if ns.bye then
+    ns.bye = nil
+    say("staying in the group")
+    ns.refresh()
+    return
+  end
+  if not ns.inGroup() then say("you are not in a group") return end
+  local chan = call(rawget(_G, "IsInRaid")) and "RAID" or "PARTY"
+  local text = ns.db.byeText
+  if type(text) == "string" and text ~= "" then call(rawget(_G, "SendChatMessage"), text, chan) end
+  local delay = tonumber(ns.db.byeDelay) or 5
+  local token = {}
+  ns.bye = { at = now() + delay, token = token }
+  say(string.format("leaving the group in %d s (press again to stay)", delay))
+  local after = M.api("C_Timer.After")
+  local function go()
+    if ns.bye and ns.bye.token == token then
+      ns.bye = nil
+      if ns.inGroup() then ns.leave() end
+      ns.refresh()
+    end
+  end
+  if after then after(delay, go) else go() end
+  ns.refresh()
 end
 
 ---------------------------------------------------------------------------
@@ -221,6 +267,7 @@ function ns.rows()
 end
 
 function ns.refresh()
+  ns.updateButton()
   if not (panel and panel:IsShown()) then return end
   local rows = ns.rows()
   for i, r in ipairs(rows) do
@@ -233,6 +280,36 @@ function ns.refresh()
   end
   for i = #rows + 1, #lines do lines[i].left:Hide() lines[i].right:Hide() end
   panel:SetHeight(PAD * 2 + #rows * LINE)
+end
+
+-- The "Thanks & leave" button: shown while you are in a group (/gu button
+-- off hides it). It sits above the party frames; Shift-drag moves it.
+local byeButton
+function ns.updateButton()
+  if not ns.db then return end
+  if not byeButton then
+    byeButton = CreateFrame("Button", "GroupUpByeButton", UIParent, "UIPanelButtonTemplate")
+    byeButton:SetSize(110, 20)
+    local p = ns.db.byePoint
+    local party = rawget(_G, "PartyMemberFrame1")
+    if p then byeButton:SetPoint(p[1], UIParent, p[1], p[2], p[3])
+    elseif party then byeButton:SetPoint("BOTTOMLEFT", party, "TOPLEFT", 0, 8)
+    else byeButton:SetPoint("LEFT", UIParent, "LEFT", 20, 120) end
+    byeButton:SetMovable(true)
+    byeButton:SetClampedToScreen(true)
+    byeButton:RegisterForDrag("LeftButton")
+    byeButton:SetScript("OnDragStart", function(f) if call(rawget(_G, "IsShiftKeyDown")) then f:StartMoving() end end)
+    byeButton:SetScript("OnDragStop", function(f)
+      f:StopMovingOrSizing()
+      local point, _, _, x, y = f:GetPoint()
+      ns.db.byePoint = { point, x, y }
+    end)
+    byeButton:SetScript("OnClick", function() ns.thanksAndLeave() end)
+  end
+  if ns.bye then byeButton:SetText("Stay in group") byeButton:Show()
+  elseif ns.inGroup() and ns.db.byeButton then byeButton:SetText("Thanks & leave") byeButton:Show()
+  else byeButton:Hide() end
+  ns.byeButton = byeButton
 end
 
 local function build()
@@ -304,6 +381,7 @@ events:SetScript("OnEvent", function(_, event, a, b)
       M.xpDelta(ns.st, plain(call(rawget(_G, "UnitXP"), "player")), plain(call(rawget(_G, "UnitXPMax"), "player")))
     end
     if ns.db.shown then ns.show(true) end
+    ns.updateButton()
   elseif event == "PLAYER_XP_UPDATE" then
     ns.onXP() soon()
   elseif event == "CHAT_MSG_COMBAT_XP_GAIN" then
@@ -330,6 +408,7 @@ end)
 ---------------------------------------------------------------------------
 SLASH_GROUPUP1, SLASH_GROUPUP2 = "/gu", "/groupup"
 SlashCmdList.GROUPUP = function(msg)
+  local orig = msg
   msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
   if not ns.db then return end
   if msg == "" or msg == "show" then
@@ -340,8 +419,23 @@ SlashCmdList.GROUPUP = function(msg)
   elseif msg == "invite on" or msg == "invite off" then
     ns.db.onInvite = msg == "invite on"
     say("summary on invite " .. (ns.db.onInvite and "on" or "off"))
+  elseif msg == "bye" then
+    ns.thanksAndLeave()
+  elseif msg:match("^bye delay %d+$") then
+    ns.db.byeDelay = math.min(60, tonumber(msg:match("%d+")))
+    say("leave " .. ns.db.byeDelay .. " s after the thanks")
+  elseif msg:match("^bye text") then
+    local raw = (orig or ""):match("^%s*[Bb][Yy][Ee]%s+[Tt][Ee][Xx][Tt]%s*(.-)%s*$") or ""
+    ns.db.byeText = raw
+    say(raw ~= "" and ("thanks text: " .. raw) or "no thanks text: /gu bye only leaves")
+  elseif msg == "button on" or msg == "button off" then
+    ns.db.byeButton = msg == "button on"
+    ns.updateButton()
+    say("Thanks & leave button " .. (ns.db.byeButton and "on" or "off"))
   elseif msg == "reset" then
-    ns.db.point = nil
+    ns.db.point, ns.db.byePoint = nil, nil
+    if byeButton then byeButton:Hide() byeButton = nil end
+    ns.updateButton()
     if panel then panel:ClearAllPoints() panel:SetPoint("CENTER", UIParent, "CENTER", 0, 120) end
     say("panel moved back")
   elseif msg == "clear" then
@@ -351,6 +445,6 @@ SlashCmdList.GROUPUP = function(msg)
     say("XP data for this character cleared")
     ns.refresh()
   else
-    say("/gu: show or hide the panel   /gu sum: summary in chat   /gu invite on|off   /gu reset   /gu clear (forget this character's XP data)")
+    say("/gu: show or hide the panel   /gu sum: summary in chat   /gu bye: thanks and leave (/gu bye delay N, /gu bye text ..., /gu button on|off)   /gu invite on|off   /gu reset   /gu clear (forget this character's XP data)")
   end
 end

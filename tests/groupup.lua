@@ -212,6 +212,43 @@ check("/gu again hides it", GroupUpFrame.shown == false)
 SlashCmdList.GROUPUP("clear")
 check("/gu clear forgets the data", ns.rates().solo.secs == 0)
 
+-- Thanks and leave
+local sent, left = {}, 0
+function SendChatMessage(t, chan) table.insert(sent, { t, chan }) end
+local pendingTimers = {}
+C_Timer = { After = function(_, f) table.insert(pendingTimers, f) end }
+C_PartyInfo = { LeaveParty = function() left = left + 1 P.party = {} end }
+P.party = { { name = "Ann", level = 27 } }
+fire(ns.events, "GROUP_ROSTER_UPDATE")
+for _, f in ipairs(pendingTimers) do f() end
+pendingTimers = {}
+check("button shows in a group", GroupUpByeButton and GroupUpByeButton.shown and GroupUpByeButton.text == "Thanks & leave")
+GroupUpByeButton.scripts.OnClick()
+check("thanks said in party chat", sent[1] and sent[1][1] == "Thanks for the group!" and sent[1][2] == "PARTY")
+check("not left yet", left == 0 and GroupUpByeButton.text == "Stay in group")
+GroupUpByeButton.scripts.OnClick()
+for _, f in ipairs(pendingTimers) do f() end
+pendingTimers = {}
+check("second press cancels the leave", left == 0 and ns.bye == nil)
+SlashCmdList.GROUPUP("bye text Thanks all, good luck!")
+SlashCmdList.GROUPUP("bye delay 8")
+check("bye text keeps its case", GroupUpDB.byeText == "Thanks all, good luck!" and GroupUpDB.byeDelay == 8)
+sent = {}
+SlashCmdList.GROUPUP("bye")
+check("custom thanks said", sent[1] and sent[1][1] == "Thanks all, good luck!")
+for _, f in ipairs(pendingTimers) do f() end
+pendingTimers = {}
+check("leaves after the delay", left == 1)
+check("button hides when solo", GroupUpByeButton.shown == false)
+chat = {}
+SlashCmdList.GROUPUP("bye")
+check("bye when solo says so", chat[1] == "GroupUp: you are not in a group" and #sent == 1)
+SlashCmdList.GROUPUP("button off")
+P.party = { { name = "Ann", level = 27 } }
+ns.updateButton()
+check("button off hides it in a group", GroupUpByeButton.shown == false)
+P.party = {}
+
 -- Secret values count as unknown
 issecretvalue = function(v) return v == 777 end
 check("secret level is unknown", M.plain(777) == nil)
