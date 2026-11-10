@@ -1022,6 +1022,14 @@ check("modern window: a learned recipe is known, with its colour and rank", bolt
   and bolt2.kind == "medium" and bolt2.rank == 130 and bolt2.profit == 750)
 check("modern window: an unlearned recipe goes with the ones to learn", band and band.source == "trainer"
   and band.cost == 3000)
+local schematics = 0
+local getSch = C_TradeSkillUI.GetRecipeSchematic
+C_TradeSkillUI.GetRecipeSchematic = function(...) schematics = schematics + 1 return getSch(...) end
+Cr.readTradeSkills()
+Cr.readProfession()
+check("modern window: the same list is not read again within a minute", schematics == 0)
+local k1 = UpgradeFinderAPI.known()
+check("known: the list is kept between keystrokes", UpgradeFinderAPI.known() == k1)
 C_TradeSkillUI = nil
 tt = fakeTooltip("FakeTipK", "item:2770")
 Cr.onTooltip(tt)

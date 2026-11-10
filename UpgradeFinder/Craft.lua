@@ -355,12 +355,19 @@ end
 -- every recipe of the open profession, learned or not. relativeDifficulty
 -- 0-3 is the skill-up colour.
 C.DIFFICULTY = { [0] = "optimal", [1] = "medium", [2] = "easy", [3] = "trivial" }
+C.REREAD = 60
+local lastRead = { at = -math.huge }
 function C.readProfession()
   -- Blizzard's own list uses GetFilteredRecipeIDs; GetAllRecipeIDs skips
   -- the window's filters where the client has it.
   local ids = call(api("C_TradeSkillUI.GetAllRecipeIDs"))
   if type(ids) ~= "table" or #ids == 0 then ids = call(api("C_TradeSkillUI.GetFilteredRecipeIDs")) end
   if type(ids) ~= "table" or #ids == 0 then return false end
+  -- The window fires its update events often (every bag change, every
+  -- craft): read the same list once a minute at most.
+  local now, sig = call(rawget(_G, "GetTime")) or 0, #ids .. ":" .. tostring(ids[1]) .. ":" .. tostring(ids[#ids])
+  if lastRead.sig == sig and now - lastRead.at < C.REREAD then return true end
+  lastRead.sig, lastRead.at = sig, now
   local list, unlearned = {}, {}
   for _, rid in ipairs(ids) do
     local r = call(api("C_TradeSkillUI.GetRecipeInfo"), rid)
@@ -460,8 +467,10 @@ end
 -- easy, trivial). Recipes merge in, so a filtered window loses nothing.
 -- unlearned: recipes the modern window lists that you do not know yet;
 -- they go with the trainer's (UpgradeFinderDB.trainer).
+local knownCache -- { at, list }: C.known() is asked on every Omni keystroke
 function C.saveKnown(prof, rank, max, list, unlearned)
   if type(prof) ~= "string" or prof == "" then return end
+  knownCache = nil
   local all = dbTable("known")
   local p = all[prof] or { recipes = {} }
   p.rank, p.max = rank, max
@@ -496,6 +505,7 @@ function C.readTrainer()
         reagents = reagents }
     end
   end
+  knownCache = nil
   local all = dbTable("trainer")
   for skill, list in pairs(out) do
     all[skill] = all[skill] or {}
@@ -518,7 +528,17 @@ end
 -- Every saved recipe: { prof, name, product, source ("known" or
 -- "trainer"), kind, req, price, rank, max, cost, unknown, sale, how,
 -- profit }. A trainer recipe you know already is left out.
+-- Prices change slowly: the list is kept C.KNOWN_TTL seconds.
+C.KNOWN_TTL = 15
 function C.known()
+  local now = call(rawget(_G, "GetTime")) or 0
+  if knownCache and now - knownCache.at < C.KNOWN_TTL then return knownCache.list end
+  local out = C.knownNow()
+  knownCache = { at = now, list = out }
+  return out
+end
+
+function C.knownNow()
   local out, have = {}, {}
   local recipes = recipesDB()
   for prof, p in pairs(dbTable("known")) do
@@ -542,6 +562,17 @@ function C.known()
     end
   end
   return out
+end
+
+-- Runs fn once, C.READ_DELAY seconds after the first of a burst of events.
+C.READ_DELAY = 1
+local soonPending = {}
+function C.soon(key, fn)
+  local after = api("C_Timer.After")
+  if not after then return C.guard(fn) end
+  if soonPending[key] then return end
+  soonPending[key] = true
+  after(C.READ_DELAY, function() soonPending[key] = nil C.guard(fn) end)
 end
 
 -- Errors are reported once in chat, so a broken line does not fail silently.
@@ -912,12 +943,13 @@ function C.hook()
       -- Learn the names soon after login, before the first recipe hover.
       local after = api("C_Timer.After")
       if after then after(5, function() C.guard(C.learnNames) end) end
-    elseif ev == "TRADE_SKILL_SHOW" or ev == "TRADE_SKILL_UPDATE" then
-      C.guard(C.readTradeSkills)
-      C.guard(C.shopButton)
-      pcall(shopText)
-    elseif ev == "TRADE_SKILL_LIST_UPDATE" then C.guard(C.readProfession)
-    elseif ev == "TRAINER_SHOW" or ev == "TRAINER_UPDATE" then C.guard(C.readTrainer)
+    elseif ev == "TRADE_SKILL_SHOW" or ev == "TRADE_SKILL_UPDATE" or ev == "TRADE_SKILL_LIST_UPDATE" then
+      C.soon("trade", C.readTradeSkills)
+      if ev ~= "TRADE_SKILL_LIST_UPDATE" then
+        C.guard(C.shopButton)
+        pcall(shopText)
+      end
+    elseif ev == "TRAINER_SHOW" or ev == "TRAINER_UPDATE" then C.soon("trainer", C.readTrainer)
     elseif ev == "BANKFRAME_OPENED" then C.bankSeen(true)
     elseif name == "Blizzard_TradeSkillUI" or name == "Blizzard_Professions" then C.hookRows() C.guard(C.shopButton) end
   end)
