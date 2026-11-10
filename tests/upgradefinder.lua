@@ -1029,6 +1029,110 @@ check("transform: a loss shows red", tt:find("Make into Copper Bar (1 each)") ==
 local n2 = #tt.lines
 Cr.onTooltip(tt)
 check("transform: added once", #tt.lines == n2)
+-- Shopping for several crafts: 4 Silk Cloth and 1 Fine Thread per bolt.
+local BAGS = { [4306] = 6, [901] = 10 }
+GetItemCount = function(id, bank) return bank and BAGS[id] or 0 end
+local made, conv = nil, {}
+Auctionator.API.v1.ConvertToSearchString = function(_, t)
+  table.insert(conv, t)
+  return '"' .. t.searchString .. '";;;;;;;;;;;;;;' .. tostring(t.quantity)
+end
+Auctionator.API.v1.CreateShoppingList = function(_, name, terms) made = { name = name, terms = terms } end
+GetTradeSkillSelectionIndex = function() return 3 end
+GetTradeSkillInfo = function(i) return ({ "Smelting", "Copper Bar", "Bolt of Silk Cloth" })[i], i == 1 and "header" or "optimal" end
+GetTradeSkillNumReagents = function(i) return i == 3 and 2 or (i == 2 and 1 or 0) end
+GetTradeSkillReagentInfo = function(i, r)
+  if i == 3 then return r == 1 and "Silk Cloth" or "Fine Thread", "icon", r == 1 and 4 or 1, 0 end
+  return "Copper Ore", "icon", 1, 0
+end
+GetTradeSkillReagentItemLink = function(i, r)
+  if i == 3 then return r == 1 and "|Hitem:4306::|h[Silk Cloth]|h" or "|Hitem:901::|h[Fine Thread]|h" end
+  return "|Hitem:2770::|h[Copper Ore]|h"
+end
+TradeSkillInputBox = widget("TradeSkillInputBox")
+function TradeSkillInputBox:GetNumber() return 3 end
+local nChat = #chat
+SlashCmdList.UPGRADEFINDER("shop")
+local said = table.concat(chat, "\n", nChat + 1)
+check("shop: the Create box count and what to buy", said:find("Shopping for 3x Bolt of Silk Cloth", 1, true)
+  and said:find("Silk Cloth: buy 6 (need 12, have 6), 10s 00c each", 1, true) ~= nil)
+check("shop: a reagent you have enough of", said:find("You have enough Fine Thread", 1, true) ~= nil)
+check("shop: the estimated cost", said:find("Cost: about 60s 00c at the AH.", 1, true) ~= nil)
+check("shop: the Auctionator list has the amount to buy", made and made.name == "UpgradeFinder crafts"
+  and #made.terms == 1 and made.terms[1]:find('^"Silk Cloth"') and conv[1].quantity == 6 and conv[1].isExact)
+check("shop: the bank is not counted before a visit", said:find("open your bank once", 1, true) ~= nil)
+-- Shift: add 2 copper bars; the bank was seen.
+Cr.bankSeen(true)
+GetTradeSkillSelectionIndex = function() return 2 end
+nChat = #chat
+SlashCmdList.UPGRADEFINDER("shop add 2")
+said = table.concat(chat, "\n", nChat + 1)
+check("shop add: both recipes in one list", said:find("Shopping for 3x Bolt of Silk Cloth, 2x Copper Bar (less your bags and bank)", 1, true)
+  and said:find("Copper Ore: buy 2 (need 2, have 0)", 1, true) and #made.terms == 2
+  and said:find("Cost: about 62s 00c at the AH.", 1, true) ~= nil)
+BAGS[4306], BAGS[2770] = 20, 5
+nChat = #chat
+local rows = Cr.shop(3, false, 3)
+said = table.concat(chat, "\n", nChat + 1)
+check("shop: nothing to buy", said:find("You have every reagent.", 1, true) ~= nil and rows[1].buy == 0)
+GetTradeSkillSelectionIndex = function() return 1 end
+nChat = #chat
+SlashCmdList.UPGRADEFINDER("shop")
+check("shop: a header is not a recipe", chat[#chat]:find("pick a recipe", 1, true) ~= nil)
+SlashCmdList.UPGRADEFINDER("shop clear")
+check("/uf shop clear", UpgradeFinderDB.shop == nil)
+TradeSkillFrame, TradeSkillReagentLabel = widget("TradeSkillFrame"), widget("TradeSkillReagentLabel")
+local sb = Cr.shopButton()
+check("shop: a Shop button with the Create box count", sb and sb:GetText() == "Shop x3" and Cr.shopButton() == sb)
+GetTradeSkillSelectionIndex = function() return 3 end
+sb.scripts.OnClick(sb)
+check("shop: the button shops for the selected recipe", UpgradeFinderDB.shop and UpgradeFinderDB.shop.crafts[1] == "3x Bolt of Silk Cloth")
+nChat = #chat
+SlashCmdList.UPGRADEFINDER("shop debug")
+check("/uf shop debug says where the button is", tostring(chat[nChat + 1]):find("UpgradeFinderShopButton: shown", 1, true) ~= nil
+  and tostring(chat[#chat]):find("last error", 1, true) ~= nil)
+TradeSkillFrame, TradeSkillReagentLabel = nil, nil
+-- Forever's modern profession window: ProfessionsFrame and C_TradeSkillUI.
+GetTradeSkillSelectionIndex, GetTradeSkillInfo = nil, nil
+Cr.forgetShopButton()
+UpgradeFinderDB.shop = nil
+BAGS[4306], BAGS[901] = 6, 10
+local form = widget("SchematicForm")
+form.Reagents = widget("Reagents")
+form.Reagents.Label = widget("ReagentsLabel")
+function form:GetRecipeInfo() return { recipeID = 3914, name = "Earthen Silk Hood" } end
+function form:GetCurrentRecipeLevel() return 1 end
+local inits = {}
+function form:Init() end
+hooksecurefunc = hooksecurefunc or function(t, k, fn) inits[#inits + 1] = fn end
+local multi = widget("CreateMultipleInputBox")
+function multi:GetValue() return 3 end
+ProfessionsFrame = { CraftingPage = { SchematicForm = form, CreateMultipleInputBox = multi } }
+Enum = Enum or {}
+Enum.CraftingReagentType = { Basic = 0, Optional = 1 }
+C_TradeSkillUI = { GetRecipeSchematic = function(id)
+  if id ~= 3914 then return nil end
+  return { reagentSlotSchematics = {
+    { reagentType = 0, quantityRequired = 4, reagents = { { itemID = 4306 } } },
+    { reagentType = 0, quantityRequired = 1, reagents = { { itemID = 901 } } },
+    { reagentType = 1, quantityRequired = 1, reagents = { { itemID = 2770 } } }, -- optional: not bought
+  } }
+end }
+local rn, rr = Cr.selectedRecipe()
+check("professions: the selected recipe and its basic reagents", rn == "Earthen Silk Hood" and #rr == 2
+  and rr[1][1] == 4306 and rr[1][2] == 4 and rr[1][3] == "Silk Cloth")
+local pb = Cr.shopButton()
+check("professions: the Shop button on the recipe pane", pb and pb:GetText() == "Shop x3")
+nChat = #chat
+pb.scripts.OnClick(pb)
+said = table.concat(chat, "\n", nChat + 1)
+check("professions: shop for 3 crafts", said:find("Shopping for 3x Earthen Silk Hood", 1, true)
+  and said:find("Silk Cloth: buy 6 (need 12, have 6)", 1, true) ~= nil)
+ProfessionsFrame, C_TradeSkillUI = nil, nil
+Cr.forgetShopButton()
+Cr.bankSeen(false)
+Auctionator.API.v1.CreateShoppingList, Auctionator.API.v1.ConvertToSearchString = nil, nil
+GetItemCount, TradeSkillInputBox = nil, nil
 C_Item.GetItemInfo, Auctionator.API.v1.GetAuctionPriceByItemID = infoT, ahT
 SlashCmdList.UPGRADEFINDER("craft")
 tt = fakeTooltip("FakeTipD", "item:118")
