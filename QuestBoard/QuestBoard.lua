@@ -102,8 +102,8 @@ function ns.nextStep(st)
   return todo and (todo .. (e.dist and ("  " .. D.yards(e.dist)) or "")), e
 end
 
--- Right-hand text of a row: progress, XP (hand-ins), XP/min (pick-ups),
--- distance. The
+-- Right-hand text of a row: progress, XP and run time (hand-ins), XP/min
+-- (pick-ups), distance. The
 -- progress is in the "what to do" line unless the board is compact.
 function ns.meta(e)
   local parts = {}
@@ -112,6 +112,8 @@ function ns.meta(e)
     if p ~= "" then table.insert(parts, p) end
   end
   if e.kind == "turnin" and e.xp then table.insert(parts, D.short(e.xp) .. " xp") end
+  -- A hand-in: the run there, so you can weigh the trip against the XP.
+  if e.kind == "turnin" and e.dist then table.insert(parts, D.mins(D.travelSecs(e.dist))) end
   if (e.kind == "pickup" or e.kind == "area") and e.rate then table.insert(parts, "~" .. D.short(e.rate) .. " xp/m") end
   if e.dist then table.insert(parts, D.yardsText(e.dist))
   elseif e.far then table.insert(parts, "|cff909090far|r")
@@ -152,7 +154,11 @@ local function tooltip(r)
   if e.req and e.req ~= e.level then lvl = lvl .. " (needs " .. e.req .. ")" end
   tip:AddLine(lvl, 0.8, 0.8, 0.8)
   if e.xp then tip:AddLine(D.short(e.xp) .. " XP", 0.6, 0.8, 1) end
-  if e.rate and e.secs then
+  if e.kind == "turnin" and e.dist then
+    tip:AddLine(string.format("About %s to run there, ~%s XP per minute of the trip", D.mins(D.travelSecs(e.dist)), D.short(e.rate)), 0.6, 0.8, 1)
+  elseif e.kind == "turnin" and e.far then
+    tip:AddLine("On another continent or in an instance: a boat, a flight or a dungeon run", 0.8, 0.5, 0.5)
+  elseif e.rate and e.secs then
     tip:AddLine(string.format("~%s XP per minute (about %d min)", D.short(e.rate), math.max(1, math.floor(e.secs / 60 + 0.5))), 0.6, 0.8, 1)
   end
   local verb = e.kind == "turnin" and "Turn in at " or (e.kind == "pickup" or e.kind == "party") and "Get it from " or "Nearest: "

@@ -301,10 +301,14 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   orange, red). Each row shows the distance and an arrow that turns with
   you. The distance is green within 300 yards, yellow up to 1000 yards and
   grey beyond (`D.NEAR_YARDS`, `D.MID_YARDS`).
-- A Turn in row shows the XP and the best item that the quest gives
+- A Turn in row shows the XP, the run time to the finisher (distance at
+  your current speed, at least run speed, `D.RUN_SPEED`) and the best item that the quest gives
   ("[Murloc Charm] +1" when you choose one of two), or "no item". When the
   chain goes on to better gear, the row says so ("chain -> [Axe]"). The
-  item index comes from Questie's item data (`questRewards`).
+  item index comes from Questie's item data (`questRewards`). Hover the
+  row for the XP per minute of the trip. Questie's distance is in world
+  yards, so a finisher in the next zone counts the full run; one on
+  another continent shows "far".
 - A quest you Alt-clicked (pinned) has a gold star before its name.
 - Group order follows what you do: when no quest is Active and a hand-in
   is within 600 yards (`ns.TURNIN_TOP_YARDS`), Turn in comes first. Else

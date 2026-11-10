@@ -657,6 +657,13 @@ function D.yards(d)
   return string.format("%d yd", math.floor(d / 10 + 0.5) * 10)
 end
 
+-- Travel time in a few characters: "<1 min", "4 min".
+function D.mins(secs)
+  if not secs then return "" end
+  if secs < 60 then return "<1 min" end
+  return string.format("%d min", math.floor(secs / 60 + 0.5))
+end
+
 -- Distance in a colour by how far: green within the Nearby range, yellow
 -- up to a short ride, grey beyond.
 D.NEAR_YARDS, D.MID_YARDS = 300, 1000

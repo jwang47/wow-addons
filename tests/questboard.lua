@@ -520,7 +520,9 @@ check("chain: the tag is on the what-to-do line", ns.todo(q125):find("Ironforge 
 local q127 = chained.turnin[1]
 check("turn-in: reward is the best own item, a choice of two", q127.chain.own and q127.chain.own.id == 902 and q127.chain.count == 2)
 check("turn-in: what-to-do line names the reward", strip(ns.todo(q127)) == "Hand in to Wiley   [Murloc Charm] +1")
-check("turn-in: meta has the XP", strip(ns.meta(q127)) == "1.5k xp  300 yd")
+check("turn-in: meta has the XP", strip(ns.meta(q127)) == "1.5k xp  <1 min  300 yd")
+check("run time", D.mins(30) == "<1 min" and D.mins(300) == "5 min")
+check("turn-in: a long run shows its minutes", strip(ns.meta({ kind = "turnin", xp = 900, dist = 2100 })) == "900 xp  5 min  2.1k yd")
 check("turn-in: no item says so", D.rewardTag({ steps = 0, count = 0 }) == "no item")
 check("turn-in: better gear on down the chain",
   strip(D.rewardTag({ steps = 1, count = 1, own = { id = 1, name = "Pie", quality = 1 }, best = { id = 2, name = "Axe", quality = 3, gear = true } })) == "[Pie], chain -> [Axe]")
