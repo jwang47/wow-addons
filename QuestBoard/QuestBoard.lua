@@ -355,7 +355,7 @@ local function tooltip(r)
     tip:AddLine(e.pinned and "Alt-click: no longer doing it" or "Alt-click: I'm doing this (keep it in Active)", 0.5, 0.5, 0.5)
   end
   if e.kind ~= "pickup" and e.kind ~= "party" then tip:AddLine("Right-click: open the quest log", 0.5, 0.5, 0.5)
-  else tip:AddLine("Right-click: show the giver on the map", 0.5, 0.5, 0.5) end
+  else tip:AddLine("Right-click: show the giver on the map (not in your quest log yet)", 0.5, 0.5, 0.5) end
   tip:Show()
 end
 
