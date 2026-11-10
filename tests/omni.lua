@@ -182,7 +182,7 @@ local QUEST = { [65] = { name = "The Defias Brotherhood", startedBy = { { 234 } 
   [6921] = { name = "Amongst the Ruins", questLevel = 27, zoneOrSort = 10020 },
   [79975] = { name = "A Spot to Rest", questLevel = 30, preQuestSingle = { 79974 } },
   [79974] = { name = "Weary Traveler", questLevel = 28 },
-  [79976] = { name = "This Must Be The Place", questLevel = 32, preQuestSingle = { 79975 } } }
+  [79976] = { name = "This Must Be The Place", questLevel = 32, preQuestSingle = { 79975 }, startedBy = { nil, { 50 } } } }
 local ITEM = { [3307] = { name = "Gnoll Paw", npcDrops = { 235 } }, [4306] = { name = "Silk Cloth" },
   [7000] = { name = "Heartwood Girdle", questRewards = { 6563 } },
   [2589] = { name = "Linen Cloth", objectDrops = { 50 }, vendors = { 234 } },
@@ -627,6 +627,9 @@ do
   local bag = ns.search("from: cozy sleeping bag")
   check("reward quests come before the vendor", titles(bag) == "Reward from,Sold by (may need the quest first)")
   check("chain start, then the quest that gives it", names(bag, "quest") == "Weary Traveler,This Must Be The Place")
+  calls = {}
+  ns.actions.run(bag[1].entries[2])
+  check("a quest that starts at an object pins the object", chat[#chat]:find("This Must Be The Place %(at Old Crate%)") ~= nil)
   check("chain notes", strip(ns.actions.detail(bag[1].entries[1])):find("chain start, 3 quests") ~= nil
     and strip(ns.actions.detail(bag[1].entries[2])):find("gives it, quest 3 of 3") ~= nil)
   check("the quest that needs it", src[2].entries[1].kind == "quest" and src[2].entries[1].name == "The Defias Brotherhood")
