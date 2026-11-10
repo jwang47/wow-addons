@@ -1,0 +1,14 @@
+## Interface: 16001
+## Title: Niceties: Small Quality-of-Life Tweaks
+## Notes: A home for small nice-to-haves. Now: zoom the camera out much further. /nice
+## Author: jwang47
+## Version: 0.1.0
+## SavedVariables: NicetiesDB
+
+Niceties.lua
+Camera.lua
+Spare1.lua
+Spare2.lua
+Spare3.lua
+Spare4.lua
+Spare5.lua
