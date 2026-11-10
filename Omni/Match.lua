@@ -8,6 +8,7 @@ M.PER_GROUP = 8
 M.RECENT_MAX = 8
 
 -- Group order when two groups have equal best scores, and the titles.
+-- Nearby is always first when it has hits.
 M.GROUPS = { "command", "near", "log", "spell", "item", "place", "person", "npc", "quest" }
 M.TITLES = { command = "Commands", spell = "Spells", item = "Items", place = "Places",
   person = "People", log = "Your quest log", npc = "NPCs (Questie)", near = "Nearby", quest = "Quests (Questie)", recent = "Recent" }
@@ -172,6 +173,21 @@ end
 --   onExact(g)   the exact groups, before a fuzzy pass runs
 -- Also returns matched: every exact hit, in source order (for narrow).
 M.TICK = 400
+M.NEAR_EMPTY = 5 -- nearest NPCs shown above Recent for an empty query
+
+-- The Nearby group with the max nearest entries, or nil.
+local function nearest(lists, max)
+  local list = {}
+  for _, src in ipairs(lists) do
+    for _, e in ipairs(src) do if e.kind == "near" then table.insert(list, e) end end
+  end
+  if #list == 0 then return nil end
+  table.sort(list, function(a, b) return (a.boost or 0) > (b.boost or 0) end)
+  local g = { kind = "near", title = M.TITLES.near, entries = {}, more = math.max(0, #list - max) }
+  for i = 1, math.min(#list, max) do g.entries[i] = list[i] end
+  return g
+end
+
 function M.search(lists, text, recent, opts)
   recent = recent or {}
   opts = opts or {}
@@ -179,17 +195,18 @@ function M.search(lists, text, recent, opts)
   local seen, hits = {}, {}
   if q == "" and only == "near" then
     -- "near:" alone lists everything nearby, nearest first.
-    local list = {}
-    for _, src in ipairs(lists) do
-      for _, e in ipairs(src) do if e.kind == "near" then table.insert(list, e) end end
-    end
-    table.sort(list, function(a, b) return (a.boost or 0) > (b.boost or 0) end)
-    local g = { kind = "near", title = M.TITLES.near, entries = {}, more = math.max(0, #list - M.PER_GROUP * 3) }
-    for i = 1, math.min(#list, M.PER_GROUP * 3) do g.entries[i] = list[i] end
-    return #list > 0 and { g } or {}
+    local g = nearest(lists, M.PER_GROUP * 3)
+    return g and { g } or {}
   end
   if q == "" then
     if only then return {} end
+    -- Nearby first, then what you used last.
+    local groups = {}
+    local near = nearest(lists, M.NEAR_EMPTY)
+    if near then
+      table.insert(groups, near)
+      for _, e in ipairs(near.entries) do seen[e.key] = true end
+    end
     local list = {}
     for _, src in ipairs(lists) do
       for _, e in ipairs(src) do
@@ -201,8 +218,8 @@ function M.search(lists, text, recent, opts)
     end
     table.sort(list, function(a, b) return recent[a.key] > recent[b.key] end)
     while #list > M.RECENT_MAX do table.remove(list) end
-    if #list == 0 then return {} end
-    return { { kind = "recent", title = M.TITLES.recent, entries = list } }
+    if #list > 0 then table.insert(groups, { kind = "recent", title = M.TITLES.recent, entries = list }) end
+    return groups
   end
   -- Keep only the best M.PER_GROUP hits of each kind (insertion into a
   -- short sorted list), so a one-letter query over 40k entries stays fast.
@@ -252,6 +269,7 @@ function M.search(lists, text, recent, opts)
       table.insert(groups, g)
     end
     table.sort(groups, function(a, b)
+      if (a.kind == "near") ~= (b.kind == "near") then return a.kind == "near" end
       if a.best ~= b.best then return a.best > b.best end
       if a.recent ~= b.recent then return a.recent > b.recent end
       return (ORDER[a.kind] or 99) < (ORDER[b.kind] or 99)
