@@ -313,7 +313,8 @@ local function tooltip(r)
   elseif e.rate and e.secs then
     local guess = (e.kind == "log" and not e.done) and select(2, D.workSecs(e))
     tip:AddLine(string.format("~%s XP per minute (about %d min%s)", D.short(e.rate), math.max(1, math.floor(e.secs / 60 + 0.5)),
-      guess and ", a guess until you make progress" or ""), 0.6, 0.8, 1)
+      D.runSecs and D.runSecs(e) and (e.tag == "R" and ", a raid run" or ", a dungeon run")
+        or guess and ", a guess until you make progress" or ""), 0.6, 0.8, 1)
   end
   local verb = e.kind == "turnin" and "Turn in at " or e.toFinisher and "Hand in to " or (e.kind == "pickup" or e.kind == "party") and "Get it from " or "Nearest: "
   if e.target then

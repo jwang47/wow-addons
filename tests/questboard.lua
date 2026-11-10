@@ -777,6 +777,21 @@ for _, e in ipairs(ns.nextList(hid)) do if e.id == 122 then inNext = true end en
 check("dungeons off: not in Nearby", not inNext)
 GetQuestTagInfo = nil
 D.resetTags()
+do
+  -- No tag from the game, but Questie files it under the Stockade (717).
+  local realQ = mods.QuestieDB.QueryQuestSingle
+  mods.QuestieDB.QueryQuestSingle = function(id, key)
+    if key == "zoneOrSort" then return id == 386 and 717 or id == 387 and 2717 or 12 end
+    return realQ and realQ(id, key)
+  end
+  check("tag: an untagged quest filed under a dungeon is D", D.questTag(386) == "D" and D.questTag(387) == "R" and D.questTag(388) == nil)
+  mods.QuestieDB.QueryQuestSingle = realQ
+  D.resetTags()
+  -- A dungeon quest takes a run, not one kill.
+  local secs = D.workSecs({ id = 386, tag = "D", left = { { have = 0, need = 1 } } })
+  check("dungeon quest: the time is a run", secs == D.RUN_SECS.D)
+  check("dungeon quest: half done, half a run", D.workSecs({ id = 386, tag = "D", frac = 0.5 }) == D.RUN_SECS.D / 2)
+end
 
 -- Level weight: a quest over your level counts slower; red near not doable.
 check("level factor", D.levelFactor(10, 10) == 1 and D.levelFactor(12, 10) == 1.6 and D.levelFactor(15, 10) == D.RED_SLOW

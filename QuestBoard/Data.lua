@@ -212,12 +212,40 @@ function D.questTag(id, suggested)
     end
   end
   local tag = (type(tagID) == "number" and D.TAG_IDS[tagID]) or (type(tagName) == "string" and D.TAG_NAMES[tagName]) or nil
+  -- Many Classic dungeon quests have no tag: Questie files them under the
+  -- dungeon (zoneOrSort is the dungeon's area id).
+  if not tag or tag == "G" then tag = D.instanceTag(id) or tag end
   suggested = plain(suggested)
   if not tag and type(suggested) == "number" and suggested > 1 then tag = "G" end
   tagCache[id] = tag or false
   return tag
 end
 function D.resetTags() tagCache = {} end
+
+-- Area ids of the Classic dungeons and raids, for when Questie's ZoneDB
+-- cannot say.
+D.DUNGEON_AREAS = {
+  [209] = true, [491] = true, [717] = true, [718] = true, [719] = true, [721] = true,
+  [722] = true, [796] = true, [1176] = true, [1337] = true, [1477] = true, [1581] = true,
+  [1583] = true, [1584] = true, [2017] = true, [2057] = true, [2100] = true, [2437] = true,
+  [2557] = true,
+}
+D.RAID_AREAS = {
+  [1977] = true, [2159] = true, [2677] = true, [2717] = true, [3428] = true, [3429] = true,
+  [3456] = true,
+}
+-- "D" or "R" when Questie files the quest under a dungeon or a raid.
+function D.instanceTag(id)
+  local qdb = D.module("QuestieDB")
+  if not (qdb and qdb.QueryQuestSingle) then return nil end
+  local area = plain(call(qdb.QueryQuestSingle, id, "zoneOrSort"))
+  if type(area) ~= "number" or area <= 0 then return nil end
+  if D.RAID_AREAS[area] then return "R" end
+  if D.DUNGEON_AREAS[area] then return "D" end
+  local zdb = D.module("ZoneDB")
+  if zdb and type(zdb.IsDungeonZone) == "function" and call(zdb.IsDungeonZone, zdb, area) then return "D" end
+  return nil
+end
 D.TAG_TEXT = { D = "dungeon quest", R = "raid quest", G = "group or elite quest" }
 -- Dungeon and raid quests (not plain group quests).
 function D.isDungeon(e) return e.tag == "D" or e.tag == "R" end
@@ -407,7 +435,18 @@ end
 -- The work left on a quest: kills or loot left at your pace on it (it
 -- already shows how hard the quest is for you), else at your pace over
 -- all quests (or a guess) times the level factor. Second value: a guess.
+-- A dungeon or raid quest takes a run, not a few kills: about this long,
+-- less the part you have done.
+D.RUN_SECS = { D = 45 * 60, R = 120 * 60 }
+function D.runSecs(e)
+  local run = D.RUN_SECS[e.tag]
+  if not run then return nil end
+  return run * math.max(0.25, 1 - (e.frac or 0))
+end
+
 function D.workSecs(e)
+  local run = D.runSecs(e)
+  if run then return run, true end
   local own = D.pace[e.id]
   if own then return D.unitsLeft(e) * own, false end
   local pace = math.max(D.anyPace or 0, D.UNIT_SECS)
@@ -726,7 +765,8 @@ function D.memberText(e)
 end
 
 function D.pickupSecs(e)
-  return D.travelSecs(e.dist) + D.PICKUP_SECS + math.max(1, e.objectives) * D.OBJECTIVE_SECS * D.levelFactor(e.level) + D.RETURN_SECS
+  local work = D.runSecs(e) or math.max(1, e.objectives) * D.OBJECTIVE_SECS * D.levelFactor(e.level)
+  return D.travelSecs(e.dist) + D.PICKUP_SECS + work + D.RETURN_SECS
 end
 
 ---------------------------------------------------------------------------

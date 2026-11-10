@@ -50,6 +50,11 @@ the same, and a test checks that every `.toc` version has a section here.
   item drops) is no longer offered as a pick-up: you cannot go and get it.
   A pin keeps it, marked "drop unknown", and its tooltip says "Hand in to"
   in place of "Get it from".
+- Dungeon and raid quests that the game does not tag (most Classic ones,
+  like The Fury Runs Deep) now get their D or R: Questie files them under
+  the dungeon. Their time is a run (about 45 min for a dungeon, 2 h for a
+  raid, less the part you have done), not a few kills, so XP per minute is
+  real.
 - New layout: four tabs for what you are doing, in place of nine groups.
   Doing (picked by itself while a quest is Active): the quests you are on,
   the stops on the way, your party, and one line that counts the rest of
