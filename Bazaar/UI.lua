@@ -5,19 +5,28 @@
 local B = Bazaar
 local call, api = B.call, B.api
 
-local W, H = 760, 500
+local W, H = 0, 500
 local ROW_H, ROWS = 18, 20
 local CAT_W = 170
 local COLS = { -- key, title, width, right-aligned
-  { "name", "Item", 250 }, { "req", "Lvl", 40, true }, { "listed", "Listed", 60, true },
-  { "min", "Cheapest", 85, true }, { "fair", "Fair price", 85, true }, { "sold", "Sold 2d", 60, true },
+  { "name", "Item", 210 }, { "req", "Lvl", 35, true }, { "listed", "Listed", 55, true },
+  { "min", "Cheapest", 80, true }, { "fair", "Fair price", 80, true }, { "sold", "Sold 2d", 55, true },
+  { "profit", "Profit", 95, true },
 }
+-- The window fits its columns: categories, the icon, the columns, and the
+-- frame's border.
+for _, c in ipairs(COLS) do W = W + c[3] end
+W = CAT_W + 10 + ROW_H + 4 + W + 30
 
 local frame, rows, catButtons, headers = nil, {}, {}, {}
 local view = { filter = {}, sort = "sold", desc = true, top = 1, list = {}, open = {} }
 B.view = view
 
 local QUALITY = { [0] = "|cff9d9d9d", "|cffffffff", "|cff1eff00", "|cff0070dd", "|cffa335ee", "|cffff8000" }
+
+B.HOW = { craft = "one craft (reagents at AH prices, made item at its sale price)",
+  flip = "buy the cheapest, sell again at the fair price after the 5% AH cut",
+  vendor = "buy the cheapest, sell to a vendor" }
 
 local function moneyOr(v) return v and B.money(v) or "|cff9d9d9d-|r" end
 
@@ -35,6 +44,8 @@ function B.paint()
       row.cells.listed:SetText(r.listed or "")
       row.cells.min:SetText(moneyOr(r.min))
       row.cells.fair:SetText(moneyOr(r.fair))
+      row.cells.profit:SetText(r.profit and ((r.profit >= 0 and "|cff40ff40+" or "|cffff6060-") .. B.money(math.abs(r.profit))
+        .. (r.how == "craft" and " |cff9d9d9dcraft|r" or "") .. "|r") or "")
       row.cells.sold:SetText(r.sold and ((r.sold > 0 and "|cff40ff40" or "|cff9d9d9d") .. r.sold .. "|r") or "")
       row:Show()
     else
@@ -211,6 +222,8 @@ function B.build()
       if not self.data then return end
       GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
       GameTooltip:SetHyperlink("item:" .. self.data.id)
+      local how = B.HOW[self.data.how]
+      if how then GameTooltip:AddLine("Bazaar profit: " .. how, 0.6, 0.6, 0.6, true) end
       GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)

@@ -743,6 +743,10 @@ search. Esc closes it.
   price in gold filter the list.
 - Click a column header to sort by it; click again to turn the order
   round. The default is most sold first: what moves.
+- The Profit column estimates what one item earns. For a recipe (with
+  UpgradeFinder loaded) it is the profit of one craft. For other items it
+  is buying the cheapest and selling again at the fair price after the 5%
+  AH cut, or to a vendor when that pays more. The row tooltip says which.
 - Hover a row for the item tooltip; Shift+click links it in chat.
 
 The data comes from LootValue's full scan (LootValue's Scan button above
