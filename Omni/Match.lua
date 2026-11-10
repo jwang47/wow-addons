@@ -9,9 +9,9 @@ M.RECENT_MAX = 8
 
 -- Group order when two groups have equal best scores, and the titles.
 -- Nearby is always first when it has hits.
-M.GROUPS = { "command", "near", "log", "spell", "item", "place", "person", "npc", "quest" }
+M.GROUPS = { "command", "near", "log", "spell", "item", "dungeon", "place", "person", "npc", "quest" }
 M.TITLES = { command = "Commands", spell = "Spells", item = "Items", place = "Places",
-  person = "People", log = "Your quest log", npc = "NPCs (Questie)", near = "Nearby", quest = "Quests (Questie)", recent = "Recent" }
+  person = "People", dungeon = "Dungeons", log = "Your quest log", npc = "NPCs (Questie)", near = "Nearby", quest = "Quests (Questie)", recent = "Recent" }
 local ORDER = {}
 for i, k in ipairs(M.GROUPS) do ORDER[k] = i end
 
@@ -19,7 +19,7 @@ for i, k in ipairs(M.GROUPS) do ORDER[k] = i end
 -- quests in your log (their entries have also = "quest").
 M.FILTERS = { i = "item", item = "item", s = "spell", spell = "spell", p = "place", z = "place",
   place = "place", w = "person", person = "person", n = "npc", npc = "npc", q = "quest", quest = "quest", l = "log", log = "log",
-  c = "command", cmd = "command", near = "near", nb = "near" }
+  c = "command", cmd = "command", near = "near", nb = "near", d = "dungeon", dungeon = "dungeon", loot = "loot", from = "from" }
 
 function M.norm(s)
   s = tostring(s or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
