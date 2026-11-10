@@ -55,6 +55,8 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## LootValue 0.2.0
 
+- The AddOns list names it "LootValue: Sell, Vendor or Disenchant", so it
+  says what it does.
 - Auto-loot that leaves cheap junk on the body. It always takes money,
   quest items, green or better items, cloth and other materials,
   consumables, recipes, bags and keys. It takes other items only when
@@ -69,6 +71,7 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## Omni 0.1.2
 
+- The AddOns list names it "Omni: Search Everything".
 - Search dungeons by name or short name ("bfd", "sm gy"). The row shows
   the levels, the short name and the boss count.
 - Enter on a dungeon (or `loot: bfd`) lists each boss's drops, then the
@@ -142,6 +145,8 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## UpgradeFinder 0.1.9
 
+- The AddOns list names it "UpgradeFinder: Gear Upgrades".
+- Chat messages start with "UpgradeFinder:" instead of "Upgrades:".
 - Spell damage against one creature type ("damage done to Undead by
   magical spells") is its own stat, not spell damage. The built-in weights
   give it 0; with MageMentor, a mage uses MageMentor's weight (0.1).

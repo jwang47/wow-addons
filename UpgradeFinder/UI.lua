@@ -31,7 +31,7 @@ end
 
 local function say(msg)
   local f = rawget(_G, "DEFAULT_CHAT_FRAME")
-  if f then f:AddMessage("|cff69ccf0Upgrades:|r " .. msg) end
+  if f then f:AddMessage("|cff69ccf0UpgradeFinder:|r " .. msg) end
 end
 ns.say = say
 
