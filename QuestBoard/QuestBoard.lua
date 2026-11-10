@@ -7,6 +7,9 @@
 -- map. /qb for the commands.
 local addonName, ns = ...
 QuestBoard = ns                     -- global, for /dump
+-- GroupUp uses these; keep them stable: QuestBoardDB.doing (questID set),
+-- QuestBoard.click(e, button), QuestBoard.panel, row.entry. Ctrl-click on a
+-- quest row belongs to GroupUp.
 ns.VERSION = "0.2.0"
 local D = ns.data
 local call, api = D.call, D.api
