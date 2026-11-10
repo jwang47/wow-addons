@@ -10,7 +10,7 @@ personal details (names of other people, machine paths, emails) out of it.
 
 ## Checks
 
-From the repo root: `lua5.1 tests/lootvalue.lua`, `lua5.1 tests/omni.lua`, `lua5.1 tests/upgradefinder.lua`,
+From the repo root: `lua5.1 tests/lootvalue.lua`, `lua5.1 tests/omni.lua`, `lua5.1 tests/upgradefinder.lua`, `lua5.1 tests/buffcheck.lua`,
 `python3 -m unittest tests/test_release.py`. The `tests` workflow
 runs them on every push and PR. Say in the PR which checks you ran.
 To try a branch in the game, check it out in a wow-addons checkout and run

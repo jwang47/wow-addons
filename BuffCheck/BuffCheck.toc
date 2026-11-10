@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: BuffCheck: Party Buffs at a Glance
+## Notes: Your buffs and your group's at a glance: green on, yellow ending, red missing. Click a row to buff that person; the Next line (with a key) buffs whoever needs it. /buffs
+## Author: jwang47
+## Version: 0.1.0
+## SavedVariables: BuffCheckDB
+
+Logic.lua
+BuffCheck.lua

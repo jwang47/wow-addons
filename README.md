@@ -260,8 +260,42 @@ the price to buy the made item on the AH instead.
   (new Forever items) get nothing. Item keys used: `questRewards`,
   `npcDrops`, `vendors`, `objectDrops`, `itemDrops`.
 
+## BuffCheck
+
+**BuffCheck: Party Buffs at a Glance** shows your buffs and your group's in a
+small grid (`/buffs`). It is not in the release yet.
+
+- One row for you and one for each party member (in a raid: your
+  subgroup). One column for each buff your group can give: Int (mage),
+  Fort (priest), Wild (druid), Bless (paladin, any Blessing). Your own row
+  also has an Armor column (mage armors, Inner Fire, Demon Armor).
+- Green: the buff is on. Yellow with minutes left: it ends in under 3
+  minutes. Red `x`: missing. Grey `?`: unknown (the member is too far, or
+  the client hides the aura). Warriors and rogues get no Int cell.
+- Click a row to cast your buff on that person (on your own row: your
+  armor when your buff is already on).
+- The **Next** line under the grid names the next person to buff and why,
+  and a click casts on them. Bind a key to it in Key Bindings > BuffCheck.
+  The order: a stranger who buffed you (return the favour), your group
+  (missing, then under 1 minute left), your armor, then players within
+  about 10 yards without your buff. It gives your target back after a
+  cast on a stranger. Right-click skips that person for 10 minutes.
+- Next is empty while you are mounted. It does not offer nearby players
+  below 30% mana. `/buffs nearby off` stops the nearby offers.
+- Nothing changes in combat (the game locks the buttons), but the colours
+  stay live. Drag the header to move the grid; `/buffs reset` moves it back,
+  `/buffs` hides or shows it.
+- It replaces the third-party Manners addon: turn Manners off in the
+  AddOns list so that the two do not both prompt you.
+
 ## Forever client notes
 
+- A secure button (a click that casts) works only when it is registered
+  for `AnyDown` with the attribute `pressAndHoldAction` set to true, as
+  Blizzard's own Forever buttons do. `/cast [@Name]` does not reach
+  players outside your group: target them by name, cast, then
+  `/targetlasttarget`. `UnitName` gives the surname as its second value:
+  `/target First Surname` finds the player.
 - Addons may not use the combat log: registering for
   `COMBAT_LOG_EVENT_UNFILTERED` brings up "blocked from an action only
   available to the Blizzard UI" right after login. UpgradeFinder leaves it
@@ -293,9 +327,10 @@ Checks, from the repo root (Lua 5.1 and Python 3):
 | `lua5.1 tests/lootvalue.lua` | LootValue against a mock of the game and Auctionator APIs |
 | `lua5.1 tests/omni.lua` | Omni against a mock of the game API |
 | `lua5.1 tests/upgradefinder.lua` | UpgradeFinder against a mock of the game API |
+| `lua5.1 tests/buffcheck.lua` | BuffCheck against a mock of the game API |
 | `python3 -m unittest tests/test_release.py` | Zips, manifest, version guard, changelog, page |
 
-The `tests` workflow runs all four on each push and pull request. The real
+The `tests` workflow runs all five on each push and pull request. The real
 check is in game.
 
 ### Dev mode: try a checkout in the game
