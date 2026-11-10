@@ -23,6 +23,9 @@ the same, and a test checks that every `.toc` version has a section here.
   a day old just after a "scan".
 - An item that today's full scan did not see says "not in today's full
   scan" instead of yesterday's listings and price trend.
+- On a pattern or other recipe, the line prices the recipe itself. Before,
+  it priced the item the recipe makes (the game reports that item on a
+  recipe tooltip), so a pattern showed a disenchant value.
 
 ## Omni 0.1.3
 

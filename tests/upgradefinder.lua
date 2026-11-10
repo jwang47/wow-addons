@@ -899,6 +899,20 @@ check("trade skill: cost, two made and the profit", lineOf(ts, "Cost to craft") 
   and lineOf(ts, "Sells for (x2)") == "~3g 80s AH" and lineOf(ts, "Profit") == "+3g 78s"
   and lineOf(ts, "Score of the made item") ~= nil)
 check("trade skill: no reagents, no lines", Cr.forTradeSkill(2) == nil)
+-- The game's recipe tooltip: GetItem gives the made item, the first line names the pattern.
+INFO["Pattern: Silk Robe"] = { 118, 2, 25, "", 400, 9 }
+byId[118] = "Pattern: Silk Robe"
+tt = fakeTooltip("FakeTipE", "|Hitem:117::|h[Silk Robe]|h")
+tt:AddLine("Pattern: Silk Robe")
+Cr.onTooltip(tt)
+check("craft: GetItem gives the made item, the first line finds the pattern", tt:find("Profit") == "+1g 88s")
+tt = fakeTooltip("FakeTipF", "item:117")
+Cr.onTooltip(tt, { id = 118 })
+check("craft: the tooltip data id finds the pattern", tt:find("Cost to craft") == "2s 00c")
+tt = fakeTooltip("FakeTipG", "|Hitem:117::|h[Silk Robe]|h")
+tt:AddLine("Silk Robe")
+Cr.onTooltip(tt)
+check("craft: the made item itself gets no lines", #tt.lines == 1)
 SlashCmdList.UPGRADEFINDER("craft")
 tt = fakeTooltip("FakeTipD", "item:118")
 Cr.onTooltip(tt)

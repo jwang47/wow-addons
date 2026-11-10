@@ -172,18 +172,44 @@ function C.forRecipe(id)
   return C.lines({ reagents = r.reagents, product = r.made, bop = r.bop, enchant = enchant, score = score })
 end
 
-local function onTooltip(tt)
+-- The recipe a tooltip shows. On a recipe tooltip GetItem gives the item
+-- it makes, so also try the tooltip data id and the first line (the
+-- recipe's name). Returns the recipe id, or nil when the item is not a recipe.
+local function isRecipe(id)
+  local instant = api("C_Item.GetItemInfoInstant") or rawget(_G, "GetItemInfoInstant")
+  return id and select(6, call(instant, id)) == Scan.RECIPE_CLASS
+end
+function C.recipeOf(tt, data)
+  local _, link = tt:GetItem()
+  local name = tt.GetName and tt:GetName()
+  local fs = name and rawget(_G, name .. "TextLeft1")
+  local first = fs and fs.GetText and fs:GetText()
+  local byName = first and info(first)
+  for _, id in ipairs({ type(data) == "table" and tonumber(data.id) or false, idOf(link) or false,
+    byName and byName.id or false }) do
+    if id and isRecipe(id) then return id end
+  end
+end
+
+local function onTooltip(tt, data)
   if not (tt and tt.GetItem) or not on() then return end
   if tt == rawget(_G, "UpgradeFinderScanTooltip") then return end
-  local _, link = tt:GetItem()
-  local id = idOf(link)
-  if not id then return end
-  local instant = api("C_Item.GetItemInfoInstant") or rawget(_G, "GetItemInfoInstant")
-  if select(6, call(instant, id)) ~= Scan.RECIPE_CLASS or hasLines(tt) then return end
+  local id = C.recipeOf(tt, data)
+  if not id or hasLines(tt) then return end
   local lines = C.forRecipe(id)
   if lines then add(tt, lines) end
 end
-C.onTooltip = function(tt) pcall(onTooltip, tt) end
+
+-- Errors are reported once in chat, so a broken line does not fail silently.
+local reported = false
+function C.guard(fn, ...)
+  local ok, err = pcall(fn, ...)
+  if not ok and not reported then
+    reported = true
+    if ns.say then ns.say("crafting lines error: " .. tostring(err)) end
+  end
+end
+C.onTooltip = function(tt, data) C.guard(onTooltip, tt, data) end
 
 ---------------------------------------------------------------------------
 -- The profession window (Blizzard_TradeSkillUI)
@@ -238,7 +264,7 @@ function C.hookRows()
   for i = 1, rawget(_G, "TRADE_SKILLS_DISPLAYED") or 8 do
     local row = rawget(_G, "TradeSkillSkill" .. i)
     if row and row.HookScript then
-      row:HookScript("OnEnter", function(self) pcall(rowEnter, self) end)
+      row:HookScript("OnEnter", function(self) C.guard(rowEnter, self) end)
       row:HookScript("OnLeave", function(self) pcall(rowLeave, self) end)
     end
   end
@@ -259,7 +285,7 @@ function C.hook()
   end
   local gt, secure = rawget(_G, "GameTooltip"), rawget(_G, "hooksecurefunc")
   if gt and gt.SetTradeSkillItem and secure then
-    secure(gt, "SetTradeSkillItem", function(tt, index, reagent) pcall(afterSetTradeSkillItem, tt, index, reagent) end)
+    secure(gt, "SetTradeSkillItem", function(tt, index, reagent) C.guard(afterSetTradeSkillItem, tt, index, reagent) end)
   end
   C.hookRows()
   local f = CreateFrame("Frame")

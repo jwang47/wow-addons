@@ -244,5 +244,25 @@ check("off: takes nothing", #looted == 0)
 AL.slash("skipped")
 check("/lv skipped lists items", has(chat[#chat], "last skipped:"))
 
+-- A recipe tooltip: GetItem gives the made item, the first line names the recipe.
+do
+  ITEMS[9010] = { 1, 20, 400, 9, 1, "" }
+  local realInfo = C_Item.GetItemInfo
+  C_Item.GetItemInfo = function(x)
+    if x == "Pattern: Robe" or x == 9010 then return "Pattern: Robe", "|Hitem:9010:0|h[Pattern: Robe]|h" end
+    return realInfo(x)
+  end
+  local first = { GetText = function() return "Pattern: Robe" end }
+  rawset(_G, "RecipeTipTextLeft1", first)
+  local tipR = { GetName = function() return "RecipeTip" end, GetItem = function() return "Robe", "|Hitem:9001:0|h[Robe]|h" end }
+  check("recipe tooltip: the recipe, not the made item", LV.tooltipLink(tipR) == "|Hitem:9010:0|h[Pattern: Robe]|h")
+  check("recipe tooltip: the data id works too", LV.tooltipLink(tipR, { id = 9010 }) == "|Hitem:9010:0|h[Pattern: Robe]|h")
+  first.GetText = function() return "Pattern: Unknown" end
+  check("recipe tooltip: unknown recipe, nothing", LV.tooltipLink(tipR) == nil)
+  first.GetText = function() return "Robe" end
+  check("plain tooltip: its own item", LV.tooltipLink(tipR) == "|Hitem:9001:0|h[Robe]|h")
+  C_Item.GetItemInfo = realInfo
+end
+
 if failures > 0 then error(failures .. " LootValue test(s) failed") end
 print("all LootValue tests passed")

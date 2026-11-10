@@ -357,12 +357,33 @@ function LV.isGear(link)
   return ok and loc ~= nil and not NO_DISENCHANT[loc] or false
 end
 
+-- The item a tooltip shows. On a recipe tooltip (a pattern, plan, formula)
+-- GetItem gives the item it makes, not the recipe; the first line still
+-- names the recipe. Then the recipe comes from the tooltip data id or by
+-- name, or nil when neither gives it.
+function LV.tooltipLink(tooltip, data)
+  local _, link = tooltip:GetItem()
+  local name = tooltip.GetName and tooltip:GetName()
+  local fs = name and rawget(_G, name .. "TextLeft1")
+  local first = fs and fs.GetText and fs:GetText()
+  local shown = type(link) == "string" and link:match("%[(.-)%]")
+  if not (link and first and shown) or first == shown then return link end
+  local info = (C_Item and C_Item.GetItemInfo) or rawget(_G, "GetItemInfo")
+  if not info then return nil end
+  for _, key in ipairs({ type(data) == "table" and data.id or false, first }) do
+    local ok, itemName, other = false, nil, nil
+    if key then ok, itemName, other = pcall(info, key) end
+    if ok and other and itemName == first then return other end
+  end
+  return nil
+end
+
 -- MageMentor sets LootValue.deferTo = "MageMentor" and draws the line itself.
-function LV.onTooltipItem(tooltip)
+function LV.onTooltipItem(tooltip, data)
   if LV.deferTo or not tooltip.GetItem then return end
   local name = tooltip.GetName and tooltip:GetName()
   if name and name:find("Scan") then return end
-  local _, link = tooltip:GetItem()
+  local link = LV.tooltipLink(tooltip, data)
   if not link then return end
   local line = LV.adviceLine(link, LV.isGear(link), readContext(tooltip))
   if line then
@@ -371,8 +392,8 @@ function LV.onTooltipItem(tooltip)
   end
 end
 
-local function guarded(tt)
-  local ok, err = pcall(LV.onTooltipItem, tt)
+local function guarded(tt, data)
+  local ok, err = pcall(LV.onTooltipItem, tt, data)
   if not ok and not LV.reported then
     LV.reported = true
     print("|cffffd100LootValue|r: tooltip error: " .. tostring(err))
