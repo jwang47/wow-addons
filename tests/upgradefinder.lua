@@ -879,6 +879,17 @@ check("craft: score of the made item vs what you wear", tostring(tt:find("Score 
 local n = #tt.lines
 Cr.onTooltip(tt)
 check("craft: a second item hook adds nothing", #tt.lines == n)
+-- With LootValue's market quote: the AH counts at its expected value, and
+-- a thin market says so and marks the profit unsure.
+local oldLV = rawget(_G, "LootValue")
+LootValue = { marketQuote = function(id) return id == 117 and { price = 20000, net = 19000, expected = 6000,
+  chance = 0.3, auctions = 2, fresh = true, confidence = "thin", note = "2 listed, ~0.5 sold/day, 30% sells in 24h" } or nil end }
+tt = fakeTooltip("FakeTipQ", "item:118")
+Cr.onTooltip(tt)
+check("craft: AH at its expected value", tt:find("Sells for") == "~60s 00c AH, expected")
+check("craft: thin market warning", tt:find("  Thin market: 2 listed, ~0.5 sold/day, 30% sells in 24h; listed at ~2g 00s"))
+check("craft: unsure profit", tt:find("Profit") == "+58s 00c ?")
+LootValue = oldLV
 -- Frost Circlet: Bleach has no price; the circlet binds on pickup, so only the vendor buys it.
 tt = fakeTooltip("FakeTipB", "item:114")
 Cr.onTooltip(tt)
