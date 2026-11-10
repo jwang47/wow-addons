@@ -237,8 +237,11 @@ local doing = D.collect({ time = 4000, doing = { [122] = true } })
 check("a quest you mark is Active", #doing.active == 1 and doing.active[1].id == 122 and doing.active[1].pinned)
 -- Every quest can be pinned: a hand-in and a pick-up too.
 local pickID = doing.pickup[1].id
-local pins = { [127] = true, [pickID] = true, [9999] = true }
+local pins = { [127] = true, [pickID] = true, [9999] = true, [9998] = true }
+local realDone = C_QuestLog.IsQuestFlaggedCompleted
+C_QuestLog.IsQuestFlaggedCompleted = function(id) return id == 9999 end
 local all = D.collect({ time = 4001, doing = pins })
+C_QuestLog.IsQuestFlaggedCompleted = realDone
 local inActive = {}
 for _, e in ipairs(all.active) do inActive[e.id] = e end
 -- A quest you were working on that is now done stays in Active.
@@ -251,7 +254,8 @@ D.heldAt[127] = nil
 check("a pinned hand-in is Active", inActive[127] and inActive[127].kind == "turnin" and inActive[127].pinned and #all.turnin == 0)
 check("a pinned pick-up is Active", inActive[pickID] and inActive[pickID].kind == "pickup" and inActive[pickID].pinned)
 check("a pinned pick-up leaves Pick up", (function() for _, e in ipairs(all.pickup) do if e.id == pickID then return false end end return true end)())
-check("a pin of a quest gone from the log and the givers goes", pins[9999] == nil and pins[127] and pins[pickID])
+check("a pin of a quest you handed in goes", pins[9999] == nil and pins[127] and pins[pickID])
+check("a pin stays when the quest is not seen yet (just after /reload)", pins[9998])
 check("hand-ins and pick-ups are pinnable", ns.pinnable(inActive[127]) and ns.pinnable(inActive[pickID]) and not ns.pinnable({ kind = "area" }))
 D.HERE_YARDS = 0
 D.seen, D.activeAt, D.heldAt = {}, {}, {}

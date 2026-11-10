@@ -1083,13 +1083,13 @@ function D.collect(opts)
       end
       tick()
     end
-    -- Pins of quests you handed in (or can no longer take) go.
+    -- Pins of quests you handed in go. Only those: just after a login or
+    -- a /reload the log and Questie's list of quests you can take may still
+    -- be empty, and a pin must not go because of that.
     if opts.doing then
-      local party = {}
-      for _, e in ipairs(out.active) do if e.kind == "party" then party[e.id] = true end end
-      for _, e in ipairs(out.party) do party[e.id] = true end
+      local f = api("C_QuestLog.IsQuestFlaggedCompleted") or rawget(_G, "IsQuestFlaggedCompleted")
       for id in pairs(opts.doing) do
-        if not (inLog[id] or avail[id] or party[id]) then opts.doing[id] = nil end
+        if not inLog[id] and f and call(f, id) then opts.doing[id] = nil end
       end
     end
   end

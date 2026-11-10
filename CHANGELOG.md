@@ -44,6 +44,8 @@ the same, and a test checks that every `.toc` version has a section here.
 - More space between quests than between the lines of one quest, and
   space above the progress bar. The "XP only" line is gone (the tooltip
   still says it); a chain shows only when it ends in gear.
+- Fix: pins stay after a /reload or a login. A pin goes only when you
+  hand the quest in.
 - New layout: four tabs for what you are doing, in place of nine groups.
   Doing (picked by itself while a quest is Active): the quests you are on,
   the stops on the way, your party, and one line that counts the rest of
