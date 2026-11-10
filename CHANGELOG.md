@@ -17,9 +17,10 @@ the same, and a test checks that every `.toc` version has a section here.
   6)"), so it asks for a bigger margin before it says AH.
 - `/lv sales` lists the items you sold most, with sold and finished
   auctions. `/lv sales reset` clears the counts.
-- What sells on the whole AH, from full scans: "AH market: ~34 sold in
-  2d, 120 listed, ~9s each". LootValue reads each full scan (its own Scan
-  button above the AH window, or Auctionator's Full Scan) and keeps every
+- What sells on the whole AH, from full scans: "AH market: ~34 sold at
+  ~9s in 2d, 120 listed, fair price ~9s". LootValue reads each full
+  scan (its own Scan button above the AH window, or Auctionator's Full
+  Scan) and keeps every
   auction. An auction that is gone in the next scan while it still had
   more time left than passed counts as sold; a seller who posts the same
   stack again at another price counts as a repost, not a sale.
@@ -28,6 +29,11 @@ the same, and a test checks that every `.toc` version has a section here.
   then walk away; the compare goes on in the background. The status and
   the percentage show above the AH window on every tab. `/lv scan` prints
   it, `/lv scan now` starts a full scan.
+- A fair price from each full scan, with outliers dropped: the cheapest
+  15-30% of the items listed, without a lone cheap undercut or a silly
+  listing. The AH advice uses it for a day after the scan, in place of
+  Auctionator's lowest price. "sold at" is the median price per item of
+  what sold, so one big stack does not pull it.
 - With 10+ listed and none sold across your scans, the AH advice counts
   the market as slow ("none sold in 8h").
 

@@ -280,7 +280,10 @@ local OTHER = { Vendor = "vendor", AH = "AH", ["AH (if tradable)"] = "AH if trad
 function LV.adviceLine(link, isGear, ctx)
   local id = itemID(link)
   if not id or not LV.hasAuctionator() then return nil end
-  local ah = call("GetAuctionPriceByItemLink", link) or call("GetAuctionPriceByItemID", id)
+  -- The fair price from LootValue's own full scan (outliers dropped) when
+  -- it is fresh, else Auctionator's lowest price.
+  local ah = (LV.fairPrice and LV.fairPrice(id)) or call("GetAuctionPriceByItemLink", link)
+    or call("GetAuctionPriceByItemID", id)
   local options = {}
   -- Disenchant: gear only, when you know Enchanting. "disenchant: no price" when
   -- Auctionator has no price for it, so a missing price is visible.

@@ -419,7 +419,20 @@ local sold, gone, listed, posted = SC.compare({}, {}, 0)
 check("scan: compare of nothing is zero", sold == 0 and gone == 0 and listed == 0 and posted == 0)
 local st = SC.stats(2589)
 check("scan: one sale, the rest expired or reposted", st and st.sold == 20 and st.gone == 80 and st.listed == 60)
-check("scan: tooltip market line", has(SC.line("|Hitem:2589:0|h[Linen Cloth]|h"), "AH market: ~20 sold in 6h, 60 listed, ~1s each"))
+check("scan: tooltip market line", has(SC.line("|Hitem:2589:0|h[Linen Cloth]|h"), "AH market: ~20 sold at ~1s in 6h, 60 listed, fair price ~85c"))
+-- Fair price: one cheap and one silly listing do not set it.
+local many = { { "a", 1, 1, 4 }, { "z", 1, 99999, 4 } }
+for i = 1, 30 do table.insert(many, { "s" .. i, 20, 20 * (1000 + i * 5), 4 }) end
+local fair = SC.fairPrice(many)
+check("fair price drops a 1c undercut", fair and fair >= 1000 and fair <= 1100)
+check("fair price of nothing is nil", SC.fairPrice({ { "a", 1, 0, 4 } }) == nil)
+check("weighted median", SC.wmedian({ { 5, 1 }, { 9, 10 }, { 1, 1 } }) == 9)
+check("advice uses the fresh fair price", LV.fairPrice(2589) == 85
+  and has(LV.adviceLine("|Hitem:2589:0|h[Linen Cloth]|h", false, CTX), "AH 80c"))
+local T2 = T
+T = T + 2 * 86400
+check("an old scan's fair price is not used", LV.fairPrice(2589) == nil)
+T = T2
 check("scan: an item that left the AH counts too", SC.stats(2592) and SC.stats(2592).sold == 1)
 check("scan: chat summary", has(chat[#chat], "about 2 auctions sold"))
 

@@ -184,10 +184,65 @@ function S.decode(str, owners)
   return list
 end
 
+-- The weighted median of { value, weight } pairs, or nil.
+function S.wmedian(list)
+  local total = 0
+  for _, p in ipairs(list) do total = total + p[2] end
+  if total <= 0 then return nil end
+  table.sort(list, function(a, b) return a[1] < b[1] end)
+  local cum = 0
+  for _, p in ipairs(list) do
+    cum = cum + p[2]
+    if cum >= total / 2 then return p[1] end
+  end
+end
+
+-- A fair buyout price per item from one scan's auctions, with outliers
+-- dropped: the cheapest 15% of the items listed (up to 30% while the
+-- price climbs less than 20% a step), then without the prices more than
+-- 1.5 standard deviations from that window's mean. So one cheap or silly
+-- listing does not set the price. nil without buyouts.
+function S.fairPrice(entries)
+  local units, total = {}, 0
+  for _, e in ipairs(entries) do
+    if e[3] > 0 and e[2] > 0 then
+      units[#units + 1] = { e[3] / e[2], e[2] }
+      total = total + e[2]
+    end
+  end
+  if total == 0 then return nil end
+  table.sort(units, function(a, b) return a[1] < b[1] end)
+  local window, cum = {}, 0
+  for i, u in ipairs(units) do
+    local prev = units[i - 1]
+    if cum >= total * 0.15 and (cum >= total * 0.3 or (prev and u[1] > prev[1] * 1.2)) then break end
+    window[#window + 1] = u
+    cum = cum + u[2]
+  end
+  local function mean(list)
+    local sum, w = 0, 0
+    for _, u in ipairs(list) do sum, w = sum + u[1] * u[2], w + u[2] end
+    return w > 0 and sum / w or nil, w
+  end
+  local mu, w = mean(window)
+  local var = 0
+  for _, u in ipairs(window) do var = var + u[2] * (u[1] - mu) ^ 2 end
+  local sd = math.sqrt(var / w)
+  if sd > 0 then
+    local kept = {}
+    for _, u in ipairs(window) do
+      if math.abs(u[1] - mu) <= 1.5 * sd then kept[#kept + 1] = u end
+    end
+    if #kept > 0 then mu = mean(kept) end
+  end
+  return math.floor(mu + 0.5)
+end
+
 -- Compares one item's auctions: prev and new are lists of
 -- { owner, count, buyout, band }; dt is seconds between the scans.
--- Returns sold, gone, listed, posted (items), value, valueItems (the
--- buyout of the sold ones that had a buyout) and the sold auctions.
+-- Returns sold, gone, listed, posted (items), the median price per item
+-- of the sold ones with a buyout and how many items that is, and the
+-- sold auctions.
 function S.compare(prev, new, dt)
   local before, after = {}, {}
   for _, e in ipairs(prev) do
@@ -217,7 +272,7 @@ function S.compare(prev, new, dt)
     end
   end
   -- after[k] now holds the kept count per key.
-  local sold, gone, value, valueItems, soldN = 0, 0, 0, 0, 0
+  local sold, gone, soldN, prices = 0, 0, 0, {}
   for k, list in pairs(before) do
     local kept = after[k] or 0
     local vanished = #list - kept
@@ -233,13 +288,15 @@ function S.compare(prev, new, dt)
             newBy[by] = newBy[by] - 1 -- a repost
           else
             sold, soldN = sold + e[2], soldN + 1
-            if e[3] > 0 then value, valueItems = value + e[3], valueItems + e[2] end
+            if e[3] > 0 then prices[#prices + 1] = { e[3] / e[2], e[2] } end
           end
         end
       end
     end
   end
-  return sold, gone, listed, posted, value, valueItems, soldN
+  local priced = 0
+  for _, p in ipairs(prices) do priced = priced + p[2] end
+  return sold, gone, listed, posted, math.floor((S.wmedian(prices) or 0) + 0.5), priced, soldN
 end
 
 ---------------------------------------------------------------------------
@@ -292,7 +349,7 @@ local function work(rows, owners)
     for id in pairs(prev.items) do if not seen[id] then ids[#ids + 1] = id end end
   end
   job.total, job.done = #ids, 0
-  local snap = { t = t, owners = owners, items = {}, n = 0, itemCount = 0 }
+  local snap = { t = t, owners = owners, items = {}, fair = {}, n = 0, itemCount = 0 }
   local ownerIdx = {}
   for i, o in ipairs(owners) do ownerIdx[o] = i end
   local soldAuctions = 0
@@ -304,6 +361,7 @@ local function work(rows, owners)
         parts[j] = (ownerIdx[e[1]] or 0) .. "," .. e[2] .. "," .. e[3] .. "," .. e[4]
       end
       snap.items[id] = table.concat(parts, ";")
+      snap.fair[id] = S.fairPrice(new)
       snap.n = snap.n + #new
       snap.itemCount = snap.itemCount + 1
     end
@@ -412,21 +470,22 @@ function S.stats(id)
   local hist = id and db().market[id]
   if not hist or #hist == 0 then return nil end
   local t = now()
-  local r = { sold = 0, gone = 0, value = 0, vi = 0, scans = 0, span = 0 }
+  local r = { sold = 0, gone = 0, scans = 0, span = 0 }
+  local prices = {}
   for _, line in ipairs(hist) do
     local at, dt, sold, gone, listed, _, value, vi = line:match("^(%d+),(%d+),(%d+),(%d+),(%d+),(%d+),(%d+),(%d+)")
     at = tonumber(at)
     if at and at >= t - S.SHOW then
       r.sold = r.sold + tonumber(sold)
       r.gone = r.gone + tonumber(gone)
-      r.value, r.vi = r.value + tonumber(value), r.vi + tonumber(vi)
+      if tonumber(vi) > 0 then prices[#prices + 1] = { tonumber(value), tonumber(vi) } end
       r.scans = r.scans + 1
       r.span = r.span + tonumber(dt)
       r.listed = tonumber(listed)
     end
   end
   if r.scans == 0 then return nil end
-  r.each = r.vi > 0 and r.value / r.vi or nil
+  r.each = S.wmedian(prices)
   return r
 end
 
@@ -435,12 +494,29 @@ local function span(s)
   return math.max(1, math.floor(s / 3600 + 0.5)) .. "h"
 end
 
+S.FRESH = 86400       -- the fair price counts for a day after its scan
+
+-- The fair price per item from the last full scan (copper), when that
+-- scan is under a day old and saw the item; else nil.
+function S.price(id)
+  local snap = db().snap
+  if not id or not snap or not snap.fair or not snap.t or now() - snap.t > S.FRESH then return nil end
+  return snap.fair[id]
+end
+LV.fairPrice = S.price
+
 function S.line(link)
-  local s = S.stats(tonumber(link and link:match("item:(%d+)")))
-  if not s then return nil end
-  local parts = { (s.sold > 0 and ("~" .. s.sold .. " sold") or "none sold") .. " in " .. span(s.span) }
-  table.insert(parts, (s.listed or 0) .. " listed")
-  if s.each then table.insert(parts, "~" .. LV.money(s.each) .. " each") end
+  local id = tonumber(link and link:match("item:(%d+)"))
+  local s, fair = S.stats(id), S.price(id)
+  if not s and not fair then return nil end
+  local parts = {}
+  if s then
+    local sold = s.sold > 0 and ("~" .. s.sold .. " sold") or "none sold"
+    if s.each then sold = sold .. " at ~" .. LV.money(s.each) end
+    table.insert(parts, sold .. " in " .. span(s.span))
+    table.insert(parts, (s.listed or 0) .. " listed")
+  end
+  if fair then table.insert(parts, "fair price ~" .. LV.money(fair)) end
   return C_GOLD .. "  AH market:" .. R .. " " .. C_GREY .. table.concat(parts, ", ") .. R
 end
 LV.marketLine = S.line
