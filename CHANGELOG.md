@@ -24,6 +24,8 @@ the same, and a test checks that every `.toc` version has a section here.
   item id or name, never to the turn-in. When Questie does not know the
   source, the row points to where you last made progress on it (saved
   across sessions), or has no distance and the tooltip says so.
+- The Next line (when no quest is Active) picks the step with the best XP
+  per minute from where you are, travel included, not a far hand-in.
 - `/qb party off` hides party members' quests on the board (Party has,
   "with" and Party lines) and turns off Questie's party objectives on
   the map; `/qb party on` brings both back.

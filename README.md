@@ -295,7 +295,8 @@ A small floating list, under the minimap, of the quests that matter now.
   whole board, as in focus; `/qb focus` turns both off.
 - The top line says what to do next: the open objective of a quest you
   are on now (Active), else the best area when it has 3 or more stops, else
-  the nearest hand-in, else the nearest quest.
+  the hand-in or quest with the best XP per minute from where you are
+  (travel included).
 - An item-started quest says where the item comes from (a mob that drops
   it, a chest or crate that holds it, or a vendor) and who takes it in.
   When Questie does not know (a world drop), the row says "drop unknown"

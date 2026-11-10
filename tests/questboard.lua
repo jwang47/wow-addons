@@ -723,6 +723,13 @@ HBD.GetPlayerWorldPosition = realPos
 C_Map.GetBestMapForUnit, C_Map.GetPlayerMapPosition = nil, nil
 D.lastSpot[950] = nil
 
+-- Next: the best XP per minute from here, not the biggest XP far away.
+local nx, ne = ns.nextStep({ active = {}, nearby = {}, area = {},
+  turnin = { { kind = "turnin", name = "Far", target = "A", xp = 2000, dist = 7000, rate = 120 },
+    { kind = "turnin", name = "Near", target = "B", xp = 500, dist = 200, rate = 600 } },
+  log = { { kind = "log", name = "L", xp = 1000, dist = 300, rate = 300, left = {} } } })
+check("next: the near hand-in wins on XP per minute", ne and ne.name == "Near")
+
 -- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
 local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },
   { name = "c", xp = 2000 }, { name = "d", dist = 5000, xp = 1500 }, { name = "e", dist = 800, xp = 50 } }, "near")

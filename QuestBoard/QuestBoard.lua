@@ -130,7 +130,19 @@ function ns.nextStep(st)
   if best and #best.stops >= 3 and (best.dist or 0) > D.AREA_YARDS then
     return "Go " .. best.name:lower() .. ": " .. D.areaText(best) .. "  " .. D.yards(best.dist), best
   end
-  local e = st.active[1] or st.turnin[1] or st.nearby[1] or st.log[1]
+  -- Else the step with the best XP per minute from here (travel counts),
+  -- among the hand-ins and quests with a known place; a far hand-in with
+  -- big XP loses to a near one.
+  local e = st.active[1]
+  if not e then
+    local bestRate
+    for _, list in ipairs({ st.turnin, st.nearby, st.log }) do
+      for _, c in ipairs(list or {}) do
+        if c.dist and c.rate and (not bestRate or c.rate > bestRate) then e, bestRate = c, c.rate end
+      end
+    end
+  end
+  e = e or st.turnin[1] or st.nearby[1] or st.log[1]
   if not e then return nil end
   local todo = ns.todoWho(e)
   if e.kind == "turnin" then todo = "Hand in " .. e.name .. (e.target and (" to " .. e.target) or "") end
