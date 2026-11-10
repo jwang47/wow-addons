@@ -84,7 +84,7 @@ end
 -- The lines under an Active quest: each open objective (the first with
 -- where to find it), who in your party has it, and where the chain leads.
 ns.ACTIVE_LINES = 5
-function ns.activeLines(e)
+function ns.activeLines(e, noTag)
   local lines = {}
   for i, o in ipairs(e.left or {}) do
     local text = o.text
@@ -95,7 +95,7 @@ function ns.activeLines(e)
   end
   if #lines == 0 then local t = ns.todoBase(e) if t then table.insert(lines, t) end end
   if e.party and #e.party > 0 then table.insert(lines, "|cff99ccffParty: " .. D.partyText(e.party) .. "|r") end
-  local tag = ns.chainNote(e)
+  local tag = not noTag and ns.chainNote(e)
   if tag then table.insert(lines, tag) end
   while #lines > ns.ACTIVE_LINES do table.remove(lines) end
   return lines
@@ -177,6 +177,59 @@ end
 -- Right-hand text of a row: progress, XP and run time (hand-ins), XP/min
 -- (pick-ups), distance. The
 -- progress is in the "what to do" line unless the board is compact.
+-- Quest rows (not zones, areas, towns or party members) use the two-line
+-- layout: line 1 the name and how far, line 2 what to do and what it pays.
+ns.QUEST_KINDS = { log = true, turnin = true, pickup = true, party = true }
+
+-- Line 1, right: how far, or why there is no distance.
+function ns.place(e)
+  if e.dist then return D.yardsText(e.dist) end
+  if e.far then return "|cff909090far|r" end
+  if e.toFinisher then return "|cff909090drop unknown|r" end
+  if e.kind == "log" and not e.done then return "|cff909090no place|r" end
+  return ""
+end
+
+-- Line 2, right: the same two numbers on every quest, "625 xp  3 min",
+-- coloured by how good the XP per minute is. "~" marks a guess.
+function ns.stats(e, kind)
+  if e.toFinisher then return "" end
+  local secs, guess
+  if e.kind == "turnin" then
+    secs = e.dist and D.travelSecs(e.dist)
+  elseif e.kind == "log" and not e.done and e.left and #e.left > 0 then
+    local work
+    work, guess = D.workSecs(e)
+    secs = D.travelSecs(e.dist) + work
+  else
+    secs, guess = e.secs, true
+  end
+  local parts = {}
+  if e.xp and e.xp > 0 then table.insert(parts, D.short(e.xp) .. " xp") end
+  if secs then table.insert(parts, (guess and "~" or "") .. D.mins(secs)) end
+  return D.tierText(e, table.concat(parts, "  "))
+end
+
+-- The gear line under a quest, or nil when it gives only XP:
+-- "Reward: [Rose Mantle]" or "Leads to [Seal of Wrynn], 4 quests on".
+function ns.rewardLine(e)
+  local info = e.chain
+  if not info then return nil end
+  local b = info.best
+  local good = b and b.gear and (b.quality or 2) >= 2
+  if e.kind == "turnin" then
+    local text = info.own and ("Reward: " .. D.itemText(info.own) .. (info.count > 1 and (" or " .. (info.count - 1) .. " more") or "")) or nil
+    if good and not info.here then
+      text = (text and (text .. ", then ") or "Leads to ") .. D.itemText(b)
+    end
+    return text
+  end
+  if not good then return nil end
+  if info.here then return "Reward: " .. D.itemText(b) end
+  local steps = info.steps or 0
+  return "Leads to " .. D.itemText(b) .. (steps > 0 and (", " .. steps .. (steps == 1 and " quest on" or " quests on")) or "")
+end
+
 function ns.meta(e, kind)
   local parts = {}
   if e.kind == "log" and ns.db and ns.db.compact then
@@ -680,6 +733,10 @@ local function makeRow(i)
   r.sub:SetJustifyH("LEFT")
   if r.sub.SetWordWrap then r.sub:SetWordWrap(false) end
   r.more = {}   -- extra lines for Active quests
+  r.stats = r:CreateFontString(nil, "OVERLAY", FONT_DIM)
+  r.stats:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP)
+  r.stats:SetJustifyH("RIGHT")
+  if r.stats.SetWordWrap then r.stats:SetWordWrap(false) end
   r.pin = r:CreateTexture(nil, "OVERLAY")
   r.pin:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1")
   r.pin:SetSize(10, 10)
@@ -997,16 +1054,36 @@ function ns.render()
           r.name:SetPoint("TOPLEFT", r.lvl, "TOPRIGHT", e.pinned and 18 or 6, 0)
           r.name:SetPoint("TOPRIGHT", r.meta, "TOPLEFT", -6, 0)
           if e.pinned then r.pin:Show() else r.pin:Hide() end
-          r.meta:SetText(ns.meta(e, kind))
+          local full = not ns.db.compact and not sec.compact
+          local split = full and ns.QUEST_KINDS[e.kind]
+          r.meta:SetText(split and ns.place(e) or ns.meta(e, kind))
           ns.setBar(r, e, kind)
-          local todo = (not ns.db.compact and not sec.compact) and ns.todo(e) or nil
-          -- An Active quest gets a line per open objective and one for its
-          -- party; the rest keep one what-to-do line.
-          local lines = (not ns.db.compact and kind == "active") and ns.activeLines(e) or nil
-          if lines and #lines < 2 then lines = nil end
-          if lines then todo = lines[1] end
+          local todo, lines
+          if split then
+            -- Quest rows: what to do (each open objective when you are on
+            -- it), your party, then the gear it leads to.
+            lines = kind == "active" and ns.activeLines(e, true) or { ns.todoWho(e) }
+            local reward = ns.rewardLine(e)
+            if reward then table.insert(lines, reward) end
+            todo = lines[1] or ""
+            lines[1] = todo
+          else
+            todo = full and ns.todo(e) or nil
+            -- An Active quest gets a line per open objective and one for its
+            -- party; the rest keep one what-to-do line.
+            lines = (full and kind == "active") and ns.activeLines(e) or nil
+            if lines and #lines < 2 then lines = nil end
+            if lines then todo = lines[1] end
+            lines = lines or (todo and { todo }) or {}
+          end
+          -- The numbers sit at the right of line 2.
+          r.stats:SetText(split and ns.stats(e, kind) or "")
+          local statsW = split and (r.stats.GetStringWidth and r.stats:GetStringWidth() or 0) or 0
+          r.sub:ClearAllPoints()
+          r.sub:SetPoint("TOPLEFT", TEXT_X, -ROW_H + SUB_UP)
+          r.sub:SetPoint("TOPRIGHT", -16 - (statsW > 0 and statsW + 8 or 0), -ROW_H + SUB_UP)
           -- A line too long for the board goes on to the next line.
-          lines = ns.wrapLines(lines or (todo and { todo }) or {}, W - 2 * PAD - TEXT_X - 16)
+          lines = ns.wrapLines(lines, W - 2 * PAD - TEXT_X - 16 - (statsW > 0 and statsW + 8 or 0))
           r.sub:SetText(lines[1] or "")
           local n = #lines
           for i = 1, math.max(#r.more, n - 1) do

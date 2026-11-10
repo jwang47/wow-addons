@@ -36,6 +36,11 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.2.0
 
+- Cleaner quest rows. Line 1: the name and how far. Line 2: what to do,
+  and at the right the same two numbers on every quest ("625 xp  3 min",
+  coloured by XP per minute; "~" is a guess). A gear line comes only when
+  there is gear: "Reward: [Rose Mantle]" or "Leads to [Seal of Wrynn],
+  4 quests on", in place of "chain +4 ->".
 - Fix: a Lua error ("Items.lua:60: table index is nil") when a pinned
   quest that starts from an item was on the board.
 - Fix: a level with a tag ("33G") no longer wraps and pushes the name

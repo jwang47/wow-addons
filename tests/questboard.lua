@@ -698,6 +698,14 @@ check("turn-in: meta has the XP", strip(ns.meta(q127)) == "1.5k xp  <1 min  300 
 check("run time", D.mins(30) == "<1 min" and D.mins(300) == "5 min")
 check("turn-in: a long run shows its minutes", strip(ns.meta({ kind = "turnin", xp = 900, dist = 2100 })) == "900 xp  5 min  2.1k yd")
 check("turn-in: no item says so", D.rewardTag({ steps = 0, count = 0 }) == "no item")
+-- Two-line quest rows: line 1 how far, line 2 the same two numbers on
+-- every quest, then a gear line only when there is gear.
+check("row: line 1 has only the distance", strip(ns.place(q127)) == "300 yd" and strip(ns.place({ kind = "log", left = {} })) == "no place")
+check("row: a hand-in shows its XP and the run", strip(ns.stats(q127)) == "1.5k xp  <1 min")
+check("row: a pick-up shows XP and a guessed time", strip(ns.stats({ kind = "pickup", xp = 625, secs = 180 })):match("^625 xp  ~3 min$") ~= nil)
+check("row: a hand-in names its reward", strip(ns.rewardLine(q127)) == "Reward: [Murloc Charm] or 1 more")
+check("row: a chain names the gear and how far on", strip(ns.rewardLine(q125)) == "Leads to [Ironforge Gladius], 2 quests on")
+check("row: XP only gets no gear line", ns.rewardLine(q122) == nil)
 check("turn-in: better gear on down the chain",
   strip(D.rewardTag({ steps = 1, count = 1, own = { id = 1, name = "Pie", quality = 1 }, best = { id = 2, name = "Axe", quality = 3, gear = true } })) == "[Pie], chain -> [Axe]")
 GameTooltip.lines = {}
