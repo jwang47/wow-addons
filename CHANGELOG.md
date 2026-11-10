@@ -5,6 +5,21 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## QuestBoard 0.1.0
+
+- New addon (`/qb`): a small board of the quests that matter now.
+  Groups: Active, Nearby, Areas, Turn in, In your log, Party has, Pick up.
+- Each row says what to do next, how far it is (coloured by range) and
+  which way. Turn in rows show the XP, the reward item and the run time.
+  Pick-ups are sorted by estimated XP per minute; far quests by XP.
+- Active quests have a progress bar and the time left at your own kill
+  pace. Alt-click pins a quest (gold star); Alt-click an area pins all.
+- Click opens the map there, right-click the quest log. Quest items get a
+  button beside their quest. Chains say where they lead.
+- In combat, in dungeons and while you do a quest, the board shows only
+  what helps; point at it to see everything. Drag to move it; drag the
+  corner grip to set its max height and scroll for the rest.
+
 ## BuffCheck 0.1.0
 
 - New addon: your buffs and your group's in a small grid (`/buffs`).
