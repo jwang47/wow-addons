@@ -1,6 +1,6 @@
-# wow-addons: LootValue, Omni and UpgradeFinder
+# wow-addons: LootValue, Omni, UpgradeFinder and QuestBoard
 
-Three small World of Warcraft addons for the WoW Forever client (a
+Four small World of Warcraft addons for the WoW Forever client (a
 Classic-based client, interface 16001). They should also work on other
 Classic clients with the same APIs, but we test them only on Forever.
 
@@ -12,6 +12,9 @@ Classic clients with the same APIs, but we test them only on Forever.
 - **UpgradeFinder**: a short list of gear from your Auctionator scan, your
   bags and the dungeon drops that beats what you wear, for any class and
   spec (`/uf`).
+- **QuestBoard**: a small board of the quests that matter now: what you
+  are doing, what to hand in and the best quests to pick up nearby, with
+  XP, rewards and distances (`/qb`). Questie adds places and pick-ups.
 
 Download page: https://jwang47.github.io/wow-addons/ (Windows installer).
 Releases: [GitHub releases](https://github.com/jwang47/wow-addons/releases)
@@ -29,8 +32,9 @@ folder. Run it again whenever you want updates.
 **By hand:** download the zips from the latest release and unzip each one
 into `Interface\AddOns\` in your client folder, so that you get
 `Interface\AddOns\LootValue\LootValue.toc`,
-`Interface\AddOns\Omni\Omni.toc` and
-`Interface\AddOns\UpgradeFinder\UpgradeFinder.toc`.
+`Interface\AddOns\Omni\Omni.toc`,
+`Interface\AddOns\UpgradeFinder\UpgradeFinder.toc` and
+`Interface\AddOns\QuestBoard\QuestBoard.toc`.
 
 Then restart the game fully. `/reload` does not find a new addon folder.
 
@@ -98,7 +102,7 @@ nothing). Fuzzy hits rank below exact ones.
 
 Filters: `i:` items, `p:` places, `@` or `w:` people, `s:` spells, `n:` NPCs,
 `q:` quests (your log and Questie), `l:` your log only, `c:` commands,
-`near:` or `nb:` nearby NPCs (alone: everything nearby, nearest first). An empty box lists what you used last.
+`near:` or `nb:` nearby NPCs (alone: everything nearby, nearest first). The Nearby group always comes first. An empty box lists the 5 nearest NPCs, then what you used last.
 
 Ranking: a name that starts with the query first, then names where each
 query word starts a word, then names that only contain it. Inside each
@@ -260,11 +264,10 @@ the price to buy the made item on the AH instead.
   (new Forever items) get nothing. Item keys used: `questRewards`,
   `npcDrops`, `vendors`, `objectDrops`, `itemDrops`.
 
-## QuestBoard (in development)
+## QuestBoard
 
 A small floating list, under the minimap, of the quests that matter now.
-It is not in the release yet (not in `tools/release.py` `ADDONS`); try it
-with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
+`/qb` shows or hides it.
 
 | Group | What | Sorted by |
 | --- | --- | --- |
@@ -384,8 +387,42 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
 - It refreshes on quest events and every 3 s for distances; each pass
   works at most 3 ms a frame (`ns.data.BUDGET_MS`).
 
+## BuffCheck
+
+**BuffCheck: Party Buffs at a Glance** shows your buffs and your group's in a
+small grid (`/buffs`). It is not in the release yet.
+
+- One row for you and one for each party member (in a raid: your
+  subgroup). One column for each buff your group can give: Int (mage),
+  Fort (priest), Wild (druid), Bless (paladin, any Blessing). Your own row
+  also has an Armor column (mage armors, Inner Fire, Demon Armor).
+- Green: the buff is on. Yellow with minutes left: it ends in under 3
+  minutes. Red `x`: missing. Grey `?`: unknown (the member is too far, or
+  the client hides the aura). Warriors and rogues get no Int cell.
+- Click a row to cast your buff on that person (on your own row: your
+  armor when your buff is already on).
+- The **Next** line under the grid names the next person to buff and why,
+  and a click casts on them. Bind a key to it in Key Bindings > BuffCheck.
+  The order: a stranger who buffed you (return the favour), your group
+  (missing, then under 1 minute left), your armor, then players within
+  about 10 yards without your buff. It gives your target back after a
+  cast on a stranger. Right-click skips that person for 10 minutes.
+- Next is empty while you are mounted. It does not offer nearby players
+  below 30% mana. `/buffs nearby off` stops the nearby offers.
+- Nothing changes in combat (the game locks the buttons), but the colours
+  stay live. Drag the header to move the grid; `/buffs reset` moves it back,
+  `/buffs` hides or shows it.
+- It replaces the third-party Manners addon: turn Manners off in the
+  AddOns list so that the two do not both prompt you.
+
 ## Forever client notes
 
+- A secure button (a click that casts) works only when it is registered
+  for `AnyDown` with the attribute `pressAndHoldAction` set to true, as
+  Blizzard's own Forever buttons do. `/cast [@Name]` does not reach
+  players outside your group: target them by name, cast, then
+  `/targetlasttarget`. `UnitName` gives the surname as its second value:
+  `/target First Surname` finds the player.
 - Addons may not use the combat log: registering for
   `COMBAT_LOG_EVENT_UNFILTERED` brings up "blocked from an action only
   available to the Blizzard UI" right after login. UpgradeFinder leaves it
@@ -418,9 +455,10 @@ Checks, from the repo root (Lua 5.1 and Python 3):
 | `lua5.1 tests/omni.lua` | Omni against a mock of the game API |
 | `lua5.1 tests/upgradefinder.lua` | UpgradeFinder against a mock of the game API |
 | `lua5.1 tests/questboard.lua` | QuestBoard against a mock of the game API and Questie |
+| `lua5.1 tests/buffcheck.lua` | BuffCheck against a mock of the game API |
 | `python3 -m unittest tests/test_release.py` | Zips, manifest, version guard, changelog, page |
 
-The `tests` workflow runs them all on each push and pull request. The real
+The `tests` workflow runs all six on each push and pull request. The real
 check is in game.
 
 ### Dev mode: try a checkout in the game

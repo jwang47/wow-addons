@@ -15,6 +15,7 @@ jobs:
       - run: lua5.1 tests/omni.lua
       - run: lua5.1 tests/upgradefinder.lua
       - run: lua5.1 tests/questboard.lua
+      - run: lua5.1 tests/buffcheck.lua
       - run: python3 -m unittest tests/test_release.py
   updater:
     # update.ps1 in Windows PowerShell 5.1, against a local test build.
@@ -37,7 +38,7 @@ jobs:
           }
           $out = powershell -NoProfile -ExecutionPolicy Bypass -File update.ps1 -Client $client -Manifest $manifest | Out-String
           Write-Host $out
-          if ($out -notmatch 'LootValue 0\.1\.0: up to date' -or $out -notmatch 'Omni 0\.1\.0: up to date') { throw "second run reinstalled" }
+          if ($out -notmatch 'LootValue [0-9.]+: up to date' -or $out -notmatch 'Omni [0-9.]+: up to date') { throw "second run reinstalled" }
           # The live manifest from the latest GitHub release (served as
           # application/octet-stream): -Check reads it and changes nothing.
           $live = Join-Path $env:RUNNER_TEMP 'live\_forever_'

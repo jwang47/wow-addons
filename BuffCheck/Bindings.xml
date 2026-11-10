@@ -1,0 +1,3 @@
+<Bindings>
+	<Binding name="CLICK BuffCheckNext:LeftButton" category="BuffCheck"/>
+</Bindings>

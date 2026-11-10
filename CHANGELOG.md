@@ -7,10 +7,31 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.1.0
 
-- New: a floating board of the quests that matter now. Turn in (nearest
-  finisher first), your log (nearest objective first) and quests to pick up
-  that fit your level (best estimated XP per minute first). Click a row to
-  pin the place on the map. `/qb`.
+- New addon (`/qb`): a small board of the quests that matter now.
+  Groups: Active, Nearby, Areas, Turn in, In your log, Party has, Pick up.
+- Each row says what to do next, how far it is (coloured by range) and
+  which way. Turn in rows show the XP, the reward item and the run time.
+  Pick-ups are sorted by estimated XP per minute; far quests by XP.
+- Active quests have a progress bar and the time left at your own kill
+  pace. Alt-click pins a quest (gold star); Alt-click an area pins all.
+- Click opens the map there, right-click the quest log. Quest items get a
+  button beside their quest. Chains say where they lead.
+- In combat, in dungeons and while you do a quest, the board shows only
+  what helps; point at it to see everything. Drag to move it; drag the
+  corner grip to set its max height and scroll for the rest.
+
+## BuffCheck 0.1.0
+
+- New addon: your buffs and your group's in a small grid (`/buffs`).
+  Green on, yellow ending (minutes left), red missing. Click a row to buff
+  that person. The Next line (and its key binding) buffs whoever needs it
+  next, returns the favour to a stranger who buffed you, and offers your
+  buff to players near you.
+
+## Omni 0.1.1
+
+- Nearby is always the first group in the results.
+- With an empty search, Omni shows the 5 nearest NPCs above Recent.
 
 ## UpgradeFinder 0.1.8
 

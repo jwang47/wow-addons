@@ -282,6 +282,16 @@ do
   check("recent use ranks first within a tier", g2[1].entries[1].name == "Cloth 12")
   local g3 = M.search({ list }, "", { ["item:3"] = 5, ["item:50"] = 9 })
   check("empty query lists recent", g3[1].kind == "recent" and g3[1].entries[1].name == "Bolt of Cloth")
+  -- Nearby is the first group, even when another group scores better.
+  local near = ns.sources.entry("near", 7, "Clothier Ann")
+  near.key, near.boost = "npc:7", -4
+  local far = ns.sources.entry("near", 8, "Cloth Merchant")
+  far.key, far.boost = "npc:8", -9
+  local g4 = M.search({ list, { far, near } }, "cloth", {})
+  check("Nearby group comes first", g4[1].kind == "near" and g4[2].kind == "item")
+  local g5 = M.search({ list, { far, near } }, "", { ["item:50"] = 9, ["npc:7"] = 3 })
+  check("empty query: Nearby nearest first, then Recent without repeats",
+    g5[1].kind == "near" and g5[1].entries[1].name == "Clothier Ann" and g5[2].kind == "recent" and #g5[2].entries == 1)
 end
 
 check("ids: a list of ids", table.concat(ns.sources.ids({ 65 }), ",") == "65")
@@ -514,6 +524,8 @@ g = ns.search("militia")
 check("Nearby matches the NPC's title", names(g, "near") == "Gryan Stoutmantle")
 g = ns.search("near:")
 check("near: alone lists all nearby, nearest first", names(g, "near") == "Salma Saldean,Gryan Stoutmantle")
+g = ns.search("")
+check("empty query shows Nearby first, nearest first", g[1] and g[1].kind == "near" and names(g, "near") == "Salma Saldean,Gryan Stoutmantle")
 check("off-map NPCs are not nearby", names(ns.search("vancleef"), "near") == "" and names(ns.search("vancleef"), "npc") == "Edwin VanCleef")
 check("n: also finds nearby NPCs", names(ns.search("n: gryan"), "near") == "Gryan Stoutmantle")
 local salma
