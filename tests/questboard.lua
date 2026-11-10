@@ -643,6 +643,23 @@ D.townBuild, D.townNPCs = { state = "idle", i = 1 }, nil
 UnitFactionGroup = nil
 D.resetModules()
 
+-- Glance pointers: Next, nearest hand-in, town; registered with Glance.
+local srcFn
+Glance = { minimap = { addPointerSource = function(fn) srcFn = fn end } }
+check("pointers: registered with Glance", ns.registerPointers() and srcFn ~= nil)
+mods.ZoneDB = mods.ZoneDB or {}
+local realUi2 = mods.ZoneDB.GetUiMapIdByAreaId
+mods.ZoneDB.GetUiMapIdByAreaId = function() return 1437 end
+ns.updatePointers({ active = { { kind = "log", name = "Q", target = "Kobold", spawn = { 41, 62 }, zone = 11, left = {} } },
+  turnin = { { kind = "turnin", name = "T", target = "Bob", spawn = { 10, 20 }, zone = 11 } }, nearby = {}, log = {},
+  town = { { kind = "town", role = "inn", name = "Inn Lady", spawn = { 50, 50 }, zone = 11 } } })
+local pts = srcFn()
+check("pointers: next, hand-in and inn", #pts == 3 and pts[1].label == "Kobold" and pts[1].mapID == 1437 and math.abs(pts[1].x - 0.41) < 1e-9
+  and pts[2].label == "Hand in: Bob" and pts[3].label == "Inn: Inn Lady")
+mods.ZoneDB.GetUiMapIdByAreaId = realUi2
+Glance = nil
+ns.pointers = {}
+
 -- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
 local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },
   { name = "c", xp = 2000 }, { name = "d", dist = 5000, xp = 1500 }, { name = "e", dist = 800, xp = 50 } }, "near")

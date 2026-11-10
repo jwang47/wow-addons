@@ -721,6 +721,45 @@ function ns.setMaxHeight(h)
 end
 
 ---------------------------------------------------------------------------
+-- Pointers for Glance's minimap edge arrows: the Next quest's place, the
+-- nearest hand-in and the Town rows. Built once per refresh; Glance reads
+-- the cached list every 0.1 s.
+---------------------------------------------------------------------------
+ns.pointers = {}
+local function pointFor(e, r, g, b, label)
+  if not (e and e.spawn and e.zone and e.spawn[1] and e.spawn[1] >= 0) then return nil end
+  local zdb = D.module("ZoneDB")
+  local mapID = zdb and call(zdb.GetUiMapIdByAreaId, zdb, e.zone)
+  if not mapID then return nil end
+  return { mapID = mapID, x = e.spawn[1] / 100, y = e.spawn[2] / 100, r = r, g = g, b = b, label = label }
+end
+
+function ns.updatePointers(st)
+  local list = {}
+  if st then
+    local _, nextE = ns.nextStep(st)
+    local function add(p) if p and #list < 5 then table.insert(list, p) end end
+    if nextE then add(pointFor(nextE, 1, 0.85, 0.3, nextE.target or nextE.name)) end
+    local t = st.turnin and st.turnin[1]
+    if t and t ~= nextE then add(pointFor(t, 0.45, 0.9, 0.45, "Hand in: " .. (t.target or t.name))) end
+    for _, e in ipairs(st.town or {}) do
+      add(pointFor(e, 0.75, 0.75, 1, (e.role == "inn" and "Inn: " or "Flight: ") .. e.name))
+    end
+  end
+  ns.pointers = list
+end
+
+function ns.registerPointers()
+  local g = rawget(_G, "Glance")
+  local mm = type(g) == "table" and g.minimap
+  if type(mm) == "table" and type(mm.addPointerSource) == "function" then
+    call(mm.addPointerSource, function() return ns.pointers end)
+    return true
+  end
+  return false
+end
+
+---------------------------------------------------------------------------
 -- Refresh: one collect() pass at a time, spread over frames.
 ---------------------------------------------------------------------------
 local job, again = nil, false
@@ -733,6 +772,7 @@ local function step()
     say("refresh failed: " .. tostring(err))
   elseif coroutine.status(job) == "dead" then
     job = nil
+    ns.updatePointers(state)
     ns.render()
     if ns.updateItems then ns.updateItems(state) end
     if again then again = false ns.refresh() end
@@ -963,6 +1003,7 @@ events:SetScript("OnEvent", function(_, event)
     end
     ns.db = QuestBoardDB
     build()
+    ns.registerPointers()
     ns.show(ns.db.shown)
     ns.applyTrackers()
     -- Questie builds its quest lists a few seconds after login.

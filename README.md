@@ -312,6 +312,9 @@ A small floating list, under the minimap, of the quests that matter now.
   orange, red). Each row shows the distance and an arrow that turns with
   you. The distance is green within 300 yards, yellow up to 1000 yards and
   grey beyond (`D.NEAR_YARDS`, `D.MID_YARDS`).
+- Minimap pointers: when Glance is loaded, QuestBoard gives its minimap
+  edge arrows the Next quest's place, the nearest hand-in and the Town
+  rows (`Glance.minimap.addPointerSource`, a list cached per refresh).
 - XP colours: in each group, the best third of the XP (Turn in) or XP per
   minute (Pick up, Party has, Areas) is green and the worst third grey
   (`D.tier`), so the better quests stand out.
