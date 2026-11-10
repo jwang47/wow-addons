@@ -193,23 +193,37 @@ local nextText = ns.nextStep(out)
 check("next step: the nearest hand-in", nextText == "Hand in Murloc Poachers to Wiley  300 yd")
 
 -- Active: a quest whose count went up in the last 5 minutes moves to the top.
-D.seen, D.activeAt = {}, {}
+D.seen, D.activeAt, D.heldAt = {}, {}, {}
 D.collect({ time = 100 })
 OBJ[122][1].numFulfilled = 4
 local act = D.collect({ time = 160 })
 check("a kill makes the quest active", #act.active == 1 and act.active[1].id == 122 and #act.log == 1)
 local later = D.collect({ time = 160 + 301 })
-check("it leaves Active after 5 minutes", #later.active == 0 and #later.log == 2)
-D.seen, D.activeAt = {}, {}
+check("it stays Active for the grace time", #later.active == 1)
+local gone = D.collect({ time = 160 + 601 })
+check("it leaves Active after the grace time", #gone.active == 0 and #gone.log == 2)
+D.seen, D.activeAt, D.heldAt = {}, {}, {}
 local first = D.collect({ time = 1000 })
 check("nothing is active on the first look", #first.active == 0)
 OBJ[122][1].numFulfilled = 3
-D.seen, D.activeAt = {}, {}
+D.seen, D.activeAt, D.heldAt = {}, {}, {}
 D.HERE_YARDS = hereYards
 local here = D.collect({ time = 2000 })
 check("a quest whose objective is near is active", #here.active == 1 and here.active[1].id == 125 and here.active[1].dist == 200)
+-- It stays while you hunt up to STAY_YARDS away, even long after.
+QUESTS[125].place[1] = 500
+D.collect({ time = 2000 + 300 })
+local hunting = D.collect({ time = 2000 + 900 })
+check("an active quest stays while you are within the wider range", #hunting.active == 1 and hunting.active[1].id == 125)
+QUESTS[125].place[1] = 800
+local away = D.collect({ time = 2000 + 900 + 601 })
+check("it leaves when you are far and the grace time is over", #away.active == 0)
+QUESTS[125].place[1] = 500
+local back = D.collect({ time = 2000 + 1600 })
+check("500 yards is not enough to enter Active", #back.active == 0)
+QUESTS[125].place[1] = 200
 D.HERE_YARDS = 0
-D.seen, D.activeAt = {}, {}
+D.seen, D.activeAt, D.heldAt = {}, {}, {}
 
 -- Yields when the frame budget is spent.
 local yields = 0

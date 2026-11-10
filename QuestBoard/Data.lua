@@ -18,6 +18,11 @@ D.FAR = 500000           -- Questie's distance for another continent or instance
 D.BUDGET_MS = 3          -- work per frame when reading the available quests
 D.ACTIVE_SECS = 300      -- a quest whose count went up this recently is "active"
 D.HERE_YARDS = 200       -- ... or whose nearest open objective is this close
+-- Once active, a quest stays: while you are within STAY_YARDS of its open
+-- objective or make progress, and for GRACE_SECS after the last of either.
+-- Hunting for the right mobs often takes you out of the entry range.
+D.STAY_YARDS = 600
+D.GRACE_SECS = 600
 
 local function call(fn, ...)
   if type(fn) ~= "function" then return nil end
@@ -325,7 +330,18 @@ end
 -- ACTIVE_SECS (you killed or looted for it), or whose nearest open
 -- objective is within HERE_YARDS (you are in its area; see collect). The first look at a quest only
 -- records its count, so nothing is active right after login.
-D.seen, D.activeAt = {}, {}
+D.seen, D.activeAt, D.heldAt = {}, {}, {}
+
+-- Whether a log quest is active now (recent: its count just went up).
+function D.isActive(e, recent, clock)
+  local held = D.heldAt[e.id]
+  local wasActive = held and clock - held <= D.GRACE_SECS
+  local near = e.dist and e.dist <= (wasActive and D.STAY_YARDS or D.HERE_YARDS)
+  if recent or near then D.heldAt[e.id] = clock return true end
+  if wasActive then return true end
+  D.heldAt[e.id] = nil
+  return false
+end
 function D.noteProgress(e, clock)
   local before = D.seen[e.id]
   D.seen[e.id] = e.count
@@ -360,8 +376,7 @@ function D.collect(opts)
   for _, e in ipairs(D.logQuests()) do
     inLog[e.id] = true
     D.finish(D.placeLog(e), level)
-    local recent = D.noteProgress(e, clock)
-    if not e.done and (recent or (e.dist and e.dist <= D.HERE_YARDS)) then
+    if not e.done and D.isActive(e, D.noteProgress(e, clock), clock) then
       table.insert(out.active, e)
     else
       table.insert(e.done and out.turnin or out.log, e)
