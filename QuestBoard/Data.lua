@@ -637,6 +637,13 @@ function D.collect(opts)
   D.sort(out.log, opts.sortLog or "near")
   D.sort(out.pickup, opts.sortPickup or "xp")
   out.area = D.areas(out)
+  -- Chains: the reward index is read once (spread over frames), then each
+  -- quest gets what its chain leads to.
+  if out.questie and D.buildRewards and D.buildRewards(opts.yield and tick) then
+    for _, kind in ipairs({ "active", "nearby", "turnin", "log", "party", "pickup" }) do
+      for _, e in ipairs(out[kind]) do e.chain = D.chainInfo(e.id) end
+    end
+  end
   return out
 end
 

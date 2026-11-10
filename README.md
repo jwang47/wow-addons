@@ -305,6 +305,13 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   link the quest in chat. Right-click: open the quest log (your quests) or
   show the giver with Questie's map icon (pick-ups). Hover: XP, the
   estimate, the giver or finisher, the open objectives.
+- Chains: the what-to-do line ends with what the quest leads to. "chain +2
+  -> [Ironforge Gladius]" (in the item's colour) means the best reward is
+  gear two quests further down the chain; "XP only" means no gear anywhere
+  in it, so the quest is fine to drop if the XP is not worth it. It walks
+  Questie's `nextQuestInChain` and, once per session, reads every Questie
+  item's `questRewards` (a slice per frame) to find each quest's rewards.
+  It does not yet say whether the gear is an upgrade for you.
 - Alt-click a quest in your log: "I'm doing this" (it stays in Active until
   you Alt-click it again or hand it in).
 - Click a group name to fold it. Drag the board (anywhere on it) to move it;

@@ -7,4 +7,5 @@
 ## SavedVariables: QuestBoardDB
 
 Data.lua
+Chain.lua
 QuestBoard.lua

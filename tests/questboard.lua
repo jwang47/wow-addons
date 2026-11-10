@@ -136,7 +136,7 @@ local HBD = {
 function LibStub(name) if name == "HereBeDragonsQuestie-2.0" then return HBD end end
 
 local ns = {}
-for _, file in ipairs({ "Data.lua", "QuestBoard.lua" }) do
+for _, file in ipairs({ "Data.lua", "Chain.lua", "QuestBoard.lua" }) do
   local chunk = assert(loadfile(root .. "QuestBoard/" .. file))
   chunk("QuestBoard", ns)
 end
@@ -467,6 +467,37 @@ local nextArea = ns.nextStep(withAreas)
 check("next step: the best area when nothing is active", nextArea:find("^Go near ") ~= nil)
 D.AREA_YARDS = 0
 HBD.GetWorldCoordinatesFromZone = function() return 100, 0, 0 end
+
+-- Chains: 125 leads to 126 and 127; 127 rewards a blue sword. 122 rewards
+-- only a potion: XP only.
+D.rewardBuild = { state = "idle", i = 1 }
+D.rewardsByQuest = nil
+D.resetChains()
+local NEXT = { [125] = 126, [126] = 128 }
+mods.QuestieDB.QueryQuestSingle = function(id, key) if key == "nextQuestInChain" then return NEXT[id] or 0 end end
+local ITEMS = { [900] = { name = "Ironforge Gladius", class = 2, q = { 128 } }, [901] = { name = "Healing Potion", class = 0, q = { 122 } } }
+mods.QuestieDB.ItemPointers = { [900] = 1, [901] = 1 }
+mods.QuestieDB.QueryItemSingle = function(id, key)
+  local it = ITEMS[id]
+  if not it then return nil end
+  if key == "questRewards" then return it.q end
+  return it[key]
+end
+C_Item = { GetItemInfo = function(id) if id == 900 then return "Ironforge Gladius", nil, 3 end if id == 901 then return "Healing Potion", nil, 1 end end }
+D.resetModules()
+local chained = D.collect({})
+local q125, q122
+for _, list in ipairs({ chained.log, chained.nearby, chained.active }) do
+  for _, e in ipairs(list) do if e.id == 125 then q125 = e end if e.id == 122 then q122 = e end end
+end
+check("chain: leads to a blue weapon two quests on", q125.chain and q125.chain.steps == 2 and q125.chain.best.id == 900)
+check("chain: the tag names it in blue", D.chainTag(q125.chain) == "chain +2 -> |cff0070dd[Ironforge Gladius]|r")
+check("chain: a potion only is XP only", D.chainTag(q122.chain) == "XP only")
+check("chain: the tag is on the what-to-do line", ns.todo(q125):find("Ironforge Gladius", 1, true) ~= nil)
+mods.QuestieDB.QueryQuestSingle, mods.QuestieDB.ItemPointers, mods.QuestieDB.QueryItemSingle, C_Item = nil, nil, nil, nil
+D.rewardBuild = { state = "idle", i = 1 }
+D.rewardsByQuest = nil
+D.resetModules()
 
 ---------------------------------------------------------------------------
 -- Without Questie: the log only, no errors.

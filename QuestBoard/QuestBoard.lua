@@ -47,6 +47,13 @@ local function rgb(name) local c = D.COLORS[name] or D.COLORS.yellow return c[1]
 -- What to do for a quest, in a few words: the open objective and where
 -- (Questie's nearest mob, object or NPC for it), or who takes it in.
 function ns.todo(e)
+  local text = ns.todoWho(e)
+  local tag = D.chainTag and D.chainTag(e.chain)
+  if tag then text = (text and (text .. "   ") or "") .. tag end
+  return text
+end
+
+function ns.todoWho(e)
   local text = ns.todoBase(e)
   local with = e.party and #e.party > 0 and D.partyText(e.party)
   if with and with ~= "" then
@@ -88,7 +95,7 @@ function ns.nextStep(st)
   end
   local e = st.active[1] or st.turnin[1] or st.nearby[1] or st.log[1]
   if not e then return nil end
-  local todo = ns.todo(e)
+  local todo = ns.todoWho(e)
   if e.kind == "turnin" then todo = "Hand in " .. e.name .. (e.target and (" to " .. e.target) or "") end
   return todo and (todo .. (e.dist and ("  " .. D.yards(e.dist)) or "")), e
 end
@@ -158,6 +165,15 @@ local function tooltip(r)
   end
   tip:AddLine(" ")
   tip:AddLine("Click: show it on the map   Shift-click: link", 0.5, 0.5, 0.5)
+  local c = e.chain
+  if c then
+    if c.best and c.best.gear then
+      tip:AddLine((c.here and "Reward: " or ("Chain (" .. c.steps .. " more quest" .. (c.steps == 1 and "" or "s") .. ") leads to: ")) ..
+        (D.chainTag({ steps = 0, here = true, best = c.best }):gsub("^%-> ", "")), 1, 1, 1)
+    else
+      tip:AddLine("No gear at the end of this quest" .. (c.steps > 0 and " chain" or "") .. ": XP only, fine to drop", 0.6, 0.6, 0.6)
+    end
+  end
   if e.party and #e.party > 0 then
     tip:AddLine((e.kind == "party" and "Your party has it: " or "With ") .. D.partyText(e.party), 0.6, 0.8, 1)
   end
@@ -450,7 +466,7 @@ function ns.render()
           r.name:SetText(e.name)
           if e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55) else r.name:SetTextColor(0.92, 0.92, 0.92) end
           r.meta:SetText(ns.meta(e))
-          local todo = (not ns.db.compact) and e.kind ~= "pickup" and ns.todo(e)
+          local todo = (not ns.db.compact) and (e.kind ~= "pickup" and ns.todo(e) or e.kind == "pickup" and D.chainTag(e.chain))
           r.sub:SetText(todo or "")
           r:SetHeight(todo and ROW_H * 2 - 2 or ROW_H)
           updateArrow(r)
