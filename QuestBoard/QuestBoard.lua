@@ -151,6 +151,9 @@ local function tooltip(r)
     end
     tip:AddLine(" ")
     tip:AddLine("Click: show it on the map", 0.5, 0.5, 0.5)
+    if #ns.areaQuests(e) > 0 then
+      tip:AddLine(ns.areaPinned(e) and "Alt-click: no longer doing these" or "Alt-click: I'm doing all of these (keep them in Active)", 0.5, 0.5, 0.5)
+    end
     tip:Show()
     return
   end
@@ -327,11 +330,38 @@ function ns.toggleDoing(e)
   ns.refresh()
 end
 
+-- The quests in an area that you can mark as doing (the ones in your log
+-- that are not done yet).
+function ns.areaQuests(a)
+  local list = {}
+  for _, s in ipairs(a.stops or {}) do
+    if (s.kind == "log" or s.kind == "nearby" or s.kind == "active") and not s.done then table.insert(list, s) end
+  end
+  return list
+end
+function ns.areaPinned(a)
+  local list = ns.areaQuests(a)
+  if #list == 0 then return false end
+  for _, s in ipairs(list) do if not (ns.db.doing and ns.db.doing[s.id]) then return false end end
+  return true
+end
+
+-- Alt-click on an area: mark every quest there as doing; again to unmark.
+function ns.toggleArea(a)
+  ns.db.doing = ns.db.doing or {}
+  local off = ns.areaPinned(a)
+  for _, s in ipairs(ns.areaQuests(a)) do
+    if off then ns.db.doing[s.id] = nil D.heldAt[s.id] = nil else ns.db.doing[s.id] = true end
+  end
+  ns.refresh()
+end
+
 function ns.click(e, button)
   if not e then return end
   if rawget(_G, "IsAltKeyDown") and IsAltKeyDown() and (e.kind == "log" or e.kind == "nearby" or e.kind == "active") then
     return ns.toggleDoing(e)
   end
+  if rawget(_G, "IsAltKeyDown") and IsAltKeyDown() and e.kind == "area" then return ns.toggleArea(e) end
   if rawget(_G, "IsShiftKeyDown") and IsShiftKeyDown() then return ns.link(e) end
   if button == "RightButton" then
     if e.kind == "pickup" or e.kind == "party" then return ns.showGiver(e) end
@@ -518,6 +548,7 @@ function ns.render()
           r.name:SetText(e.name)
           if e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55) else r.name:SetTextColor(0.92, 0.92, 0.92) end
           -- Your Alt-click mark: a gold star before the name.
+          if e.kind == "area" then e.pinned = ns.areaPinned(e) or nil end
           r.name:ClearAllPoints()
           r.name:SetPoint("LEFT", r.lvl, "RIGHT", e.pinned and 18 or 6, 0)
           r.name:SetPoint("RIGHT", r.meta, "LEFT", -6, 0)

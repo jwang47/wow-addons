@@ -493,6 +493,16 @@ local area = withAreas.area[1]
 check("areas: nearby stops make one area", area and #area.stops >= 3)
 check("areas: what is there", D.areaText(area):find("hand in", 1, true) ~= nil)
 check("areas: XP per minute counts hand-ins and objectives, not pick-ups", area.xp == 1500 + 1800 + 2400)
+QuestBoardDB.doing = {}
+ns.toggleArea(area)
+local marked = 0
+for _, q in ipairs(ns.areaQuests(area)) do if QuestBoardDB.doing[q.id] then marked = marked + 1 end end
+check("areas: Alt-click marks every quest there", marked > 0 and marked == #ns.areaQuests(area) and ns.areaPinned(area))
+ns.toggleArea(area)
+check("areas: again unmarks them", next(QuestBoardDB.doing) == nil and not ns.areaPinned(area))
+check("areas: a hand-in is not marked", (function()
+  for _, q in ipairs(ns.areaQuests(area)) do if q.kind == "turnin" then return false end end return true end)())
+D.heldAt = {}
 local nextArea = ns.nextStep(withAreas)
 check("next step: the best area when nothing is active", nextArea:find("^Go near ") ~= nil)
 D.AREA_YARDS = 0

@@ -313,6 +313,8 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   yards, so a finisher in the next zone counts the full run; one on
   another continent shows "far".
 - A quest you Alt-clicked (pinned) has a gold star before its name.
+  Alt-click an area to pin every quest in your log there at once (again
+  to unpin them); the area gets the star when all of them are pinned.
 - "Nearest" sorting goes by distance only up to 1000 yards
   (`D.MID_YARDS`). Quests further away, in another zone or on another
   continent come after them, biggest XP first, because the travel guess
