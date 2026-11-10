@@ -409,8 +409,10 @@ small grid (`/buffs`). It is not in the release yet.
   cast on a stranger. Right-click skips that person for 10 minutes.
 - Next is empty while you are mounted. It does not offer nearby players
   below 30% mana. `/buffs nearby off` stops the nearby offers.
-- Nothing changes in combat (the game locks the buttons), but the colours
-  stay live. Drag the header to move the grid; `/buffs reset` moves it back,
+- Nothing changes in combat (the game locks the buttons), and Next says
+  "In combat". The game hides buff names in combat, so the colours come
+  from the last read before the fight: a buff counts as on until its end
+  time. Drag the header to move the grid; `/buffs reset` moves it back,
   `/buffs` hides or shows it.
 - It replaces the third-party Manners addon: turn Manners off in the
   AddOns list so that the two do not both prompt you.
@@ -423,6 +425,9 @@ small grid (`/buffs`). It is not in the release yet.
   players outside your group: target them by name, cast, then
   `/targetlasttarget`. `UnitName` gives the surname as its second value:
   `/target First Surname` finds the player.
+- In combat, aura names (and times) are secret, even your own. BuffCheck
+  keeps the last full read of each unit and counts its buffs as on until
+  their end time; a buff removed early in a fight still shows until then.
 - The `UNIT_AURA` payload can be secret: reading `info.addedAuras` or
   `info.isFullUpdate` raises "table expected, got secret". Do not read
   it; rescan the unit's auras with `C_UnitAuras.GetAuraDataByIndex`

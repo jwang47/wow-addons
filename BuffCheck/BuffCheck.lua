@@ -49,9 +49,40 @@ function ns.fullName(unit)
   return M.joinName(call(G("UnitName"), unit))
 end
 
+-- The last full read of each unit's auras, by GUID (or name). In combat
+-- the Forever client hides aura names, so a read there is partial: buffs
+-- from the last full read that have not run out yet fill it in.
+local remembered = {}
+ns.remembered = remembered
+
+local function auraKey(unit)
+  local guid = plain(call(G("UnitGUID"), unit))
+  if type(guid) == "string" then return guid end
+  return ns.fullName(unit)
+end
+
 -- Every helpful aura on `unit`: name -> { expires, duration }. nil when
 -- nothing can be read; `partial` is set when the client hid some of them.
 function ns.readAuras(unit)
+  local out = ns.readAurasNow(unit)
+  local key = out and auraKey(unit)
+  if not key then return out end
+  if not out.partial then
+    remembered[key] = out
+    return out
+  end
+  local last, t = remembered[key], now()
+  if last then
+    for name, a in pairs(last) do
+      if type(a) == "table" and out[name] == nil and ((a.expires or 0) <= 0 or a.expires > t) then
+        out[name] = a
+      end
+    end
+  end
+  return out
+end
+
+function ns.readAurasNow(unit)
   local api = G("C_UnitAuras")
   local out = {}
   if api and api.GetAuraDataByIndex then
@@ -388,7 +419,7 @@ function ns.refresh()
     for _, n in ipairs(near) do if n.near then nearby[#nearby + 1] = n end end
   end
   local pick = nil
-  if not mounted() then
+  if not mounted() and not combat then
     pick = M.nextBuff({ rows = rows, mine = mine, selfSpell = selfSpell, class = myClass,
       owed = st.owed, nearby = nearby, skip = st.skip, now = t })
   end
@@ -414,7 +445,7 @@ function ns.refresh()
     nextBtn.label:SetText("Next: " .. pick.spell .. " > " .. (pick.name or "?") .. "  |cffa0a0a0(" .. pick.reason .. ")|r")
   else
     nextBtn.icon:Hide()
-    nextBtn.label:SetText("|cffa0a0a0" .. (mounted() and "Mounted" or "Everyone is buffed") .. "|r")
+    nextBtn.label:SetText("|cffa0a0a0" .. (combat and "In combat" or mounted() and "Mounted" or "Everyone is buffed") .. "|r")
   end
   if not combat then
     local hadTarget = call(G("UnitExists"), "target") == true
