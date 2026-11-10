@@ -223,7 +223,9 @@ local function tooltip(r)
   elseif e.kind == "turnin" and e.far then
     tip:AddLine("On another continent or in an instance: a boat, a flight or a dungeon run", 0.8, 0.5, 0.5)
   elseif e.rate and e.secs then
-    tip:AddLine(string.format("~%s XP per minute (about %d min)", D.short(e.rate), math.max(1, math.floor(e.secs / 60 + 0.5))), 0.6, 0.8, 1)
+    local guess = (e.kind == "log" and not e.done) and select(2, D.workSecs(e))
+    tip:AddLine(string.format("~%s XP per minute (about %d min%s)", D.short(e.rate), math.max(1, math.floor(e.secs / 60 + 0.5)),
+      guess and ", a guess until you make progress" or ""), 0.6, 0.8, 1)
   end
   local verb = e.kind == "turnin" and "Turn in at " or (e.kind == "pickup" or e.kind == "party") and "Get it from " or "Nearest: "
   if e.target then

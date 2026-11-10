@@ -604,12 +604,13 @@ C_Map.GetMapInfo = nil
 D.pace, D.anyPace, D.lastGain, D.seen = {}, nil, {}, {}
 local pq = { id = 900, count = 1, left = { { have = 1, need = 6 } } }
 D.noteProgress(pq, 100)
-check("pace: before any kill, the default", D.workSecs(pq) == D.OBJECTIVE_SECS)
+check("pace: before any kill, a guess per kill left", D.workSecs(pq) == 5 * D.UNIT_SECS and select(2, D.workSecs(pq)) == true)
+check("pace: 27 drops left is not 2 minutes", D.workSecs({ id = 999, left = { { have = 3, need = 30 } } }) == 27 * D.UNIT_SECS)
 pq.count = 2 D.noteProgress(pq, 110)
 pq.count = 4 pq.left[1].have = 4 D.noteProgress(pq, 150)
 check("pace: from your kills", D.pace[900] and D.pace[900] == 20)
 check("pace: time left is kills left times pace", math.abs(D.workSecs(pq) - 2 * D.pace[900]) < 1e-9)
-check("pace: other quests use your pace too", D.workSecs({ id = 901, left = { { have = 0, need = 3 } } }) == 3 * D.anyPace)
+check("pace: other quests use your pace too", D.workSecs({ id = 901, left = { { have = 0, need = 3 } } }) == 3 * math.max(D.anyPace, D.UNIT_SECS))
 pq.count = 5 D.noteProgress(pq, 150 + D.PACE_GAP_SECS + 1)
 check("pace: a long break does not count", D.pace[900] == 20)
 check("pace: Active row shows time left", strip(ns.meta({ kind = "log", id = 900, left = pq.left, dist = 70 }, "active")):find("^~<1 min") ~= nil)

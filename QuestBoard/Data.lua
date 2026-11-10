@@ -11,7 +11,8 @@ ns.data = D
 -- in one place: a run to the place, a fixed cost per unfinished objective,
 -- and a fixed cost for the way back to the quest giver.
 D.RUN_SPEED = 7          -- yards per second on foot
-D.OBJECTIVE_SECS = 90    -- one unfinished objective (kill or collect)
+D.OBJECTIVE_SECS = 90    -- one objective of a quest you do not have yet
+D.UNIT_SECS = 30         -- one kill or loot, until the board knows your pace
 D.RETURN_SECS = 60       -- back to the finisher after the objectives
 D.PICKUP_SECS = 30       -- talk to the giver
 D.FAR = 500000           -- Questie's distance for another continent or instance
@@ -360,13 +361,14 @@ function D.unitsLeft(e)
   return n
 end
 
--- Time for the work left on a quest. Once you have made progress, it uses
--- your own pace (seconds per kill or loot, on this quest, else on any
--- quest); before that, OBJECTIVE_SECS per open objective.
+-- Time for the work left on a quest: the kills or loots left times your
+-- pace on this quest (drop rates included, since it is measured). Before
+-- you make progress on it, the pace over all quests or UNIT_SECS, and the
+-- second value says it is a guess.
 function D.workSecs(e)
-  local pace = D.pace[e.id] or D.anyPace
-  if pace then return D.unitsLeft(e) * pace end
-  return math.max(1, #(e.left or {})) * D.OBJECTIVE_SECS
+  local own = D.pace[e.id]
+  local pace = own or math.max(D.anyPace or 0, D.UNIT_SECS)
+  return D.unitsLeft(e) * pace, not own
 end
 
 function D.logSecs(e)
@@ -612,7 +614,7 @@ D.AREA_KINDS = { "active", "nearby", "turnin", "log", "party", "pickup" }
 local function stopSecs(e)
   if e.kind == "turnin" then return D.PICKUP_SECS end
   if e.kind == "pickup" or e.kind == "party" then return D.PICKUP_SECS end
-  return math.max(1, #(e.left or {})) * D.OBJECTIVE_SECS
+  return (D.workSecs(e))
 end
 
 -- XP you earn at the stop itself (a pick-up earns it later, elsewhere).

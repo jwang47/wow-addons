@@ -24,6 +24,9 @@ the same, and a test checks that every `.toc` version has a section here.
   item id or name, never to the turn-in. When Questie does not know the
   source, the row points to where you last made progress on it (saved
   across sessions), or has no distance and the tooltip says so.
+- Time estimates count every kill or loot left (27 drops is not 2
+  minutes): your measured pace on that quest, else a guess of 30 s each,
+  and the tooltip says when it is a guess.
 - The Next line (when no quest is Active) picks the step with the best XP
   per minute from where you are, travel included, not a far hand-in.
 - `/qb party off` hides party members' quests on the board (Party has,
