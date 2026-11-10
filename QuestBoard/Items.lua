@@ -1,6 +1,7 @@
--- QuestBoard items: a column of buttons for the usable quest items of the
--- quests that matter now (Active first, then Nearby, then the rest of the
--- log), just left of the board. A click uses the item.
+-- QuestBoard items: a button for the usable quest item of each quest row
+-- on the board, just left of that row (Active first when there are more
+-- than ITEM_MAX). A click uses the item. A quest whose row is hidden
+-- (trimmed, collapsed or scrolled away) shows no button.
 --
 -- The buttons are secure (SecureActionButtonTemplate, type "item"), so the
 -- game locks them in combat: they are set up only out of combat, and a
@@ -12,7 +13,7 @@ local D = ns.data
 local call, api, plain = D.call, D.api, D.plain
 
 ns.ITEM_MAX = 6
-local SIZE, GAP = 28, 4
+local SIZE, GAP = 24, 3
 local holder, buttons, pending = nil, {}, false
 
 local function itemID(link)
@@ -40,16 +41,24 @@ function D.questItem(e)
   end
 end
 
--- The items to show, in order, one per item.
+-- The shown row of a quest, or nil.
+function ns.rowFor(e)
+  for _, r in ipairs(ns.rows or {}) do
+    if r.entry == e and r:IsShown() then return r end
+  end
+end
+
+-- The items to show, in order, one per item, each with the row it sits by.
 function ns.itemList(st)
   local list, seen = {}, {}
   if not st then return list end
   for _, kind in ipairs({ "active", "nearby", "log", "turnin" }) do
     for _, e in ipairs(st[kind] or {}) do
       local it = e.item
-      if it and not seen[it.id] and #list < ns.ITEM_MAX then
+      local row = it and ns.rowFor(e)
+      if row and not seen[it.id] and #list < ns.ITEM_MAX then
         seen[it.id] = true
-        it.quest = e
+        it.quest, it.row = e, row
         table.insert(list, it)
       end
     end
@@ -83,7 +92,6 @@ local function makeButton(i)
     tip:Show()
   end)
   b:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
-  b:SetPoint("TOPRIGHT", holder, "TOPRIGHT", 0, -(i - 1) * (SIZE + GAP))
   buttons[i] = b
   return b
 end
@@ -112,13 +120,17 @@ function ns.updateItems(st)
     holder = CreateFrame("Frame", "QuestBoardItems", UIParent)
     holder:SetSize(SIZE, SIZE)
   end
-  local left, top = ns.panel:GetLeft(), ns.panel:GetTop()
   holder:ClearAllPoints()
-  if left and top then holder:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", left - GAP, top)
-  else holder:SetPoint("TOPRIGHT", ns.panel, "TOPLEFT", -GAP, 0) end
+  holder:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
   local list = (ns.db.shown and ns.db.items ~= false) and ns.itemList(st) or {}
+  -- The board's left edge and each row's top, in screen units: the buttons
+  -- go there by position, not by anchor, so the board is never locked.
+  local left = ns.panel:GetLeft()
   for i, it in ipairs(list) do
     local b = buttons[i] or makeButton(i)
+    local top = it.row:GetTop()
+    b:ClearAllPoints()
+    if left and top then b:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", left - GAP, top) end
     b.info = it
     b:SetAttribute("item", "item:" .. it.id)
     b.icon:SetTexture(it.texture or "Interface\\Icons\\INV_Misc_QuestionMark")

@@ -41,6 +41,7 @@ local HEADS = { active = "Active", nearby = "Nearby", area = "Areas", turnin = "
 local ORDER = { "active", "nearby", "area", "turnin", "log", "party", "pickup" }
 
 local panel, rows, heads = nil, {}, {}
+ns.rows = rows
 local state = nil        -- last collect() result
 
 local function rgb(name) local c = D.COLORS[name] or D.COLORS.yellow return c[1], c[2], c[3] end
@@ -190,7 +191,7 @@ local function tooltip(r)
   end
   tip:AddLine(" ")
   tip:AddLine("Click: show it on the map   Shift-click: link", 0.5, 0.5, 0.5)
-  if e.item then tip:AddLine("Quest item: the button left of the board uses it", 0.6, 0.8, 1) end
+  if e.item then tip:AddLine("Quest item: the button left of this row uses it", 0.6, 0.8, 1) end
   local c = e.chain
   if c and c.own then
     tip:AddLine("Reward: " .. D.itemText(c.own) .. (c.count > 1 and ("  (one of " .. c.count .. ")") or ""), 1, 1, 1)
@@ -391,7 +392,7 @@ local function dragStop()
   panel.isMoving = false
   ns.dragEnded = rawget(_G, "GetTime") and GetTime() or nil
   ns.pinTop()
-  if ns.updateItems then ns.updateItems(state) end   -- the item column follows (after combat if in it)
+  if ns.updateItems then ns.updateItems(state) end   -- the item buttons follow (after combat if in it)
 end
 
 -- Keeps the board's top edge in place: it is anchored by its top-left
@@ -655,6 +656,8 @@ function ns.render()
     panel.more:Hide()
   end
   panel:SetHeight(height)
+  -- Item buttons follow their rows.
+  if ns.updateItems then ns.updateItems(state) end
 end
 
 -- Mouse wheel over the board: one line (a head or a row) at a time.

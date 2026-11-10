@@ -256,6 +256,22 @@ local itemBtn = QuestBoardItem1
 check("quest item gets a button", itemBtn and itemBtn.shown and itemBtn.attrs.type == "item" and itemBtn.attrs.item == "item:5000")
 check("the button knows its quest", itemBtn.info.quest.id == 122)
 check("only one item button", not QuestBoardItem2)
+local rowOf122
+for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.entry.id == 122 and f.shown then rowOf122 = f end end
+function rowOf122:GetTop() return 400 end
+function QuestBoardFrame:GetLeft() return 900 end
+local placed
+function itemBtn:SetPoint(...) placed = { ... } end
+ns.updateItems(ns.state())
+check("the item button sits left of its quest's row", placed and placed[1] == "TOPRIGHT" and placed[4] == 897 and placed[5] == 400)
+itemBtn.SetPoint, rowOf122.GetTop, QuestBoardFrame.GetLeft = nil, nil, nil
+local savedCollapsed = QuestBoardDB.collapsed
+QuestBoardDB.collapsed = { active = true, nearby = true, log = true, turnin = true }
+ns.render()
+check("no button when the quest's row is hidden", not itemBtn.shown)
+QuestBoardDB.collapsed = savedCollapsed
+ns.render()
+check("the button comes back with the row", itemBtn.shown)
 local combatNow = true
 local realLockdown = InCombatLockdown
 InCombatLockdown = function() return combatNow end
