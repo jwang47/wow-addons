@@ -5,6 +5,14 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## BuffCheck 0.1.0
+
+- New addon: your buffs and your group's in a small grid (`/buffs`).
+  Green on, yellow ending (minutes left), red missing. Click a row to buff
+  that person. The Next line (and its key binding) buffs whoever needs it
+  next, returns the favour to a stranger who buffed you, and offers your
+  buff to players near you.
+
 ## Omni 0.1.1
 
 - Nearby is always the first group in the results.
