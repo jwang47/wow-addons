@@ -17,7 +17,7 @@ D.PICKUP_SECS = 30       -- talk to the giver
 D.FAR = 500000           -- Questie's distance for another continent or instance
 D.BUDGET_MS = 3          -- work per frame when reading the available quests
 D.ACTIVE_SECS = 300      -- a quest whose count went up this recently is "active"
-D.HERE_YARDS = 200       -- ... or whose nearest open objective is this close
+D.HERE_YARDS = 300       -- "Nearby": a log quest whose open objective is this close
 -- Once active, a quest stays: while you are within STAY_YARDS of its open
 -- objective or make progress, and for GRACE_SECS after the last of either.
 -- Hunting for the right mobs often takes you out of the entry range.
@@ -464,7 +464,7 @@ end
 -- getting there and doing it.
 ---------------------------------------------------------------------------
 D.AREA_YARDS = 250       -- stops this close to an area's first stop join it
-D.AREA_KINDS = { "active", "turnin", "log", "party", "pickup" }
+D.AREA_KINDS = { "active", "nearby", "turnin", "log", "party", "pickup" }
 
 local function stopSecs(e)
   if e.kind == "turnin" then return D.PICKUP_SECS end
@@ -523,7 +523,7 @@ end
 function D.areaText(a)
   local c, parts = a.counts, {}
   local hand = c.turnin or 0
-  local obj = (c.active or 0) + (c.log or 0)
+  local obj = (c.active or 0) + (c.nearby or 0) + (c.log or 0)
   local pick = (c.pickup or 0) + (c.party or 0)
   if hand > 0 then table.insert(parts, hand .. " hand in") end
   if obj > 0 then table.insert(parts, obj .. (obj == 1 and " objective" or " objectives")) end
@@ -533,17 +533,18 @@ end
 
 ---------------------------------------------------------------------------
 -- Active quests: a quest whose objective count went up in the last
--- ACTIVE_SECS (you killed or looted for it), or whose nearest open
--- objective is within HERE_YARDS (you are in its area; see collect). The first look at a quest only
+-- ACTIVE_SECS (you killed or looted for it), or that you marked yourself. The first look at a quest only
 -- records its count, so nothing is active right after login.
 D.seen, D.activeAt, D.heldAt = {}, {}, {}
 
 -- Whether a log quest is active now (recent: its count just went up).
-function D.isActive(e, recent, clock)
+-- Only progress (or your own mark, pinned) makes a quest active; being
+-- near only keeps an active quest there.
+function D.isActive(e, recent, clock, pinned)
   local held = D.heldAt[e.id]
   local wasActive = held and clock - held <= D.GRACE_SECS
-  local near = e.dist and e.dist <= (wasActive and D.STAY_YARDS or D.HERE_YARDS)
-  if recent or near then D.heldAt[e.id] = clock return true end
+  local near = wasActive and e.dist and e.dist <= D.STAY_YARDS
+  if recent or near or pinned then D.heldAt[e.id] = clock return true end
   if wasActive then return true end
   D.heldAt[e.id] = nil
   return false
@@ -576,14 +577,18 @@ function D.collect(opts)
       start = now()
     end
   end
-  local out = { active = {}, turnin = {}, log = {}, party = {}, pickup = {}, questie = D.hasQuestie(), level = level }
+  local out = { active = {}, nearby = {}, turnin = {}, log = {}, party = {}, pickup = {}, questie = D.hasQuestie(), level = level }
   local inLog = {}
   local clock = opts.time or call(rawget(_G, "GetTime")) or 0
   for _, e in ipairs(D.logQuests()) do
     inLog[e.id] = true
     D.finish(D.placeLog(e), level)
-    if not e.done and D.isActive(e, D.noteProgress(e, clock), clock) then
+    local pinned = opts.doing and opts.doing[e.id]
+    e.pinned = pinned and true or nil
+    if not e.done and D.isActive(e, D.noteProgress(e, clock), clock, pinned) then
       table.insert(out.active, e)
+    elseif not e.done and e.dist and e.dist <= D.HERE_YARDS then
+      table.insert(out.nearby, e)
     else
       table.insert(e.done and out.turnin or out.log, e)
     end
@@ -593,7 +598,7 @@ function D.collect(opts)
   -- that you do not (Questie's party data), nearest giver first.
   local members = D.partyMembers()
   if #members > 0 then
-    for _, list in ipairs({ out.active, out.turnin, out.log }) do
+    for _, list in ipairs({ out.active, out.nearby, out.turnin, out.log }) do
       for _, e in ipairs(list) do e.party = D.partyOn(e.id, members) end
     end
     if out.questie then
@@ -627,6 +632,7 @@ function D.collect(opts)
     return (a.dist or math.huge) < (b.dist or math.huge)
   end)
   D.sort(out.turnin, "near")
+  D.sort(out.nearby, "near")
   D.sort(out.party, "near")
   D.sort(out.log, opts.sortLog or "near")
   D.sort(out.pickup, opts.sortPickup or "xp")

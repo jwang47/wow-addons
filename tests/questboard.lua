@@ -212,19 +212,26 @@ OBJ[122][1].numFulfilled = 3
 D.seen, D.activeAt, D.heldAt = {}, {}, {}
 D.HERE_YARDS = hereYards
 local here = D.collect({ time = 2000 })
-check("a quest whose objective is near is active", #here.active == 1 and here.active[1].id == 125 and here.active[1].dist == 200)
--- It stays while you hunt up to STAY_YARDS away, even long after.
-QUESTS[125].place[1] = 500
-D.collect({ time = 2000 + 300 })
-local hunting = D.collect({ time = 2000 + 900 })
-check("an active quest stays while you are within the wider range", #hunting.active == 1 and hunting.active[1].id == 125)
-QUESTS[125].place[1] = 800
-local away = D.collect({ time = 2000 + 900 + 601 })
-check("it leaves when you are far and the grace time is over", #away.active == 0)
-QUESTS[125].place[1] = 500
-local back = D.collect({ time = 2000 + 1600 })
-check("500 yards is not enough to enter Active", #back.active == 0)
+check("a quest whose objective is near is Nearby, not Active", #here.active == 0 and #here.nearby == 1 and here.nearby[1].id == 125)
+-- Progress makes it active; it stays while you hunt up to STAY_YARDS away.
+OBJ[125][1].numFulfilled = 0
+D.collect({ time = 2010 })
+OBJ[125][1].text = "Oslow's Toolbox: 0/1"
 QUESTS[125].place[1] = 200
+OBJ[122][1].numFulfilled = 4
+D.collect({ time = 2020 })
+QUESTS[122].place[1] = 500
+D.collect({ time = 2020 + 300 })
+local hunting = D.collect({ time = 2020 + 900 })
+check("an active quest stays while you are within the wider range", #hunting.active == 1 and hunting.active[1].id == 122)
+QUESTS[122].place[1] = 800
+local away = D.collect({ time = 2020 + 900 + 601 })
+check("it leaves when you are far and the grace time is over", #away.active == 0)
+QUESTS[122].place[1] = 900
+OBJ[122][1].numFulfilled = 3
+-- Alt-click marks a quest as one you are doing.
+local doing = D.collect({ time = 4000, doing = { [122] = true } })
+check("a quest you mark is Active", #doing.active == 1 and doing.active[1].id == 122 and doing.active[1].pinned)
 D.HERE_YARDS = 0
 D.seen, D.activeAt, D.heldAt = {}, {}, {}
 

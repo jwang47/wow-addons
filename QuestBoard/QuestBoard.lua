@@ -14,7 +14,7 @@ local defaults = {
   sortLog = "near",      -- near | xp
   sortPickup = "xp",     -- near | xp
   maxAbove = 3,          -- pick-ups at most this many levels over you
-  rows = { active = 4, area = 3, turnin = 6, log = 8, party = 5, pickup = 8 },
+  rows = { active = 4, nearby = 4, area = 3, turnin = 6, log = 8, party = 5, pickup = 8 },
   collapsed = {},
   combatAlpha = 0.35,
   hideTrackers = false,  -- hide the game's quest tracker (and Questie's)
@@ -36,8 +36,8 @@ ns.say = say
 ---------------------------------------------------------------------------
 local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6
 local FONT, FONT_DIM = "GameFontHighlightSmall", "GameFontDisableSmall"
-local HEADS = { active = "Active", area = "Areas", turnin = "Turn in", log = "In your log", party = "Party has", pickup = "Pick up" }
-local ORDER = { "active", "area", "turnin", "log", "party", "pickup" }
+local HEADS = { active = "Active", nearby = "Nearby", area = "Areas", turnin = "Turn in", log = "In your log", party = "Party has", pickup = "Pick up" }
+local ORDER = { "active", "nearby", "area", "turnin", "log", "party", "pickup" }
 
 local panel, rows, heads = nil, {}, {}
 local state = nil        -- last collect() result
@@ -86,7 +86,7 @@ function ns.nextStep(st)
   if best and #best.stops >= 3 then
     return "Go " .. best.name:lower() .. ": " .. D.areaText(best) .. "  " .. D.yards(best.dist), best
   end
-  local e = st.active[1] or st.turnin[1] or st.log[1]
+  local e = st.active[1] or st.turnin[1] or st.nearby[1] or st.log[1]
   if not e then return nil end
   local todo = ns.todo(e)
   if e.kind == "turnin" then todo = "Hand in " .. e.name .. (e.target and (" to " .. e.target) or "") end
@@ -160,6 +160,9 @@ local function tooltip(r)
   tip:AddLine("Click: show it on the map   Shift-click: link", 0.5, 0.5, 0.5)
   if e.party and #e.party > 0 then
     tip:AddLine((e.kind == "party" and "Your party has it: " or "With ") .. D.partyText(e.party), 0.6, 0.8, 1)
+  end
+  if e.kind == "log" or e.kind == "nearby" or e.kind == "active" then
+    tip:AddLine(e.pinned and "Alt-click: no longer doing it" or "Alt-click: I'm doing this (keep it in Active)", 0.5, 0.5, 0.5)
   end
   if e.kind ~= "pickup" and e.kind ~= "party" then tip:AddLine("Right-click: open the quest log", 0.5, 0.5, 0.5)
   else tip:AddLine("Right-click: show the giver on the map", 0.5, 0.5, 0.5) end
@@ -272,8 +275,24 @@ function ns.showGiver(e)
   ns.pin(e)
 end
 
+-- Alt-click marks a quest in your log as one you are doing (Active), or
+-- takes the mark off.
+function ns.toggleDoing(e)
+  ns.db.doing = ns.db.doing or {}
+  if ns.db.doing[e.id] then
+    ns.db.doing[e.id] = nil
+    D.heldAt[e.id] = nil
+  else
+    ns.db.doing[e.id] = true
+  end
+  ns.refresh()
+end
+
 function ns.click(e, button)
   if not e then return end
+  if rawget(_G, "IsAltKeyDown") and IsAltKeyDown() and (e.kind == "log" or e.kind == "nearby" or e.kind == "active") then
+    return ns.toggleDoing(e)
+  end
   if rawget(_G, "IsShiftKeyDown") and IsShiftKeyDown() then return ns.link(e) end
   if button == "RightButton" then
     if e.kind == "pickup" or e.kind == "party" then return ns.showGiver(e) end
@@ -413,7 +432,7 @@ function ns.render()
       local collapsed = ns.db.collapsed[kind]
       h.text:SetText((collapsed and "+ " or "") .. HEADS[kind] .. "  " .. #list)
       local sortKey = kind == "pickup" and "sortPickup" or kind == "log" and "sortLog"
-      h.right:SetText(kind == "active" and "recent or here" or kind == "area" and "best XP"
+      h.right:SetText(kind == "active" and "doing now" or kind == "nearby" and "within 300 yd" or kind == "area" and "best XP"
         or sortKey and (ns.db[sortKey] == "xp" and "best XP" or "nearest") or "nearest")
       h:Show()
       y = y - HEAD_H
@@ -471,7 +490,7 @@ function ns.refresh()
   if not (ns.db and ns.db.shown) then return end
   if job then again = true return end
   job = coroutine.create(function()
-    state = D.collect({ sortLog = ns.db.sortLog, sortPickup = ns.db.sortPickup, maxAbove = ns.db.maxAbove,
+    state = D.collect({ doing = ns.db.doing, sortLog = ns.db.sortLog, sortPickup = ns.db.sortPickup, maxAbove = ns.db.maxAbove,
       yield = coroutine.yield })
   end)
   runner:SetScript("OnUpdate", step)

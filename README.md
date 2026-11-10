@@ -268,7 +268,8 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
 
 | Group | What | Sorted by |
 | --- | --- | --- |
-| Active | quests in your log whose kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or whose nearest open objective is within 200 yards (`HERE_YARDS`). It stays while you are within 600 yards (`STAY_YARDS`) or make progress, and 10 minutes after the last of either (`GRACE_SECS`) | most recent first, then nearest |
+| Active | quests you are doing: the kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or you Alt-clicked it. It stays while you are within 600 yards (`STAY_YARDS`) or make progress, and 10 minutes after the last of either (`GRACE_SECS`) | most recent first, then nearest |
+| Nearby | other quests in your log whose open objective is within 300 yards (`HERE_YARDS`) | nearest |
 | Areas | places where 2 or more stops (objectives, hand-ins, givers) are within 250 yards of each other (`AREA_YARDS`), so one trip does several quests; the row says what is there ("2 hand in, 1 objective") | best XP per minute: the XP you earn there (hand-ins and objectives, not pick-ups) over the run there and the work |
 | Turn in | quests in your log that are complete | nearest quest giver |
 | In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
@@ -304,6 +305,8 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   link the quest in chat. Right-click: open the quest log (your quests) or
   show the giver with Questie's map icon (pick-ups). Hover: XP, the
   estimate, the giver or finisher, the open objectives.
+- Alt-click a quest in your log: "I'm doing this" (it stays in Active until
+  you Alt-click it again or hand it in).
 - Click a group name to fold it. Drag the board (anywhere on it) to move it;
   `/qb lock` stops that and `/qb reset`
   puts it back. In combat it fades to 35%.
