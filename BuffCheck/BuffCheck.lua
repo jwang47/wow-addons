@@ -15,6 +15,7 @@ local defaults = {
   nearby = true,    -- offer your buff to players near you
   point = nil,      -- saved position { point, x, y }
   lastSelf = nil,   -- the self buff you cast last (Frost Armor, Mage Armor)
+  ready = true,     -- say what is missing when you leave town (Ready.lua)
 }
 
 local NAME_W, CELL_W, ROW_H, PAD = 96, 34, 18, 6
@@ -670,6 +671,8 @@ SlashCmdList.BUFFCHECK = function(msg)
     ns.db.nearby = arg ~= "off"
     say("Nearby players: " .. (ns.db.nearby and "on" or "off") .. ".")
     st.dirty = true
+  elseif cmd == "ready" and ns.ready then
+    ns.ready.slash(arg)
   elseif cmd == "reset" then
     if inCombat() then say("Not in combat.") return end
     ns.db.point = nil
@@ -678,6 +681,7 @@ SlashCmdList.BUFFCHECK = function(msg)
     say("Panel moved back.")
   else
     say("/buffs: show or hide the panel. /buffs nearby on|off: offer your buff to players near you. " ..
-      "/buffs reset: move the panel back. Drag the header to move it.")
+      "/buffs reset: move the panel back. Drag the header to move it. " ..
+      "/buffs ready: what you are short of before you leave town (ready on|off).")
   end
 end

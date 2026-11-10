@@ -566,6 +566,19 @@ small grid (`/buffs`). It is not in the release yet.
   from the last read before the fight: a buff counts as on until its end
   time. Drag the header to move the grid; `/buffs reset` moves it back,
   `/buffs` hides or shows it.
+- **Ready check**: when you leave a rest area (an inn or a city) or enter
+  a dungeon, one line in chat and in the middle of the screen says what
+  you are short of ("Before you go: no Rune of Teleportation, 8 conjured
+  water, gear at 22% (repair)"). It says nothing when all is well, and it
+  does not repeat the same line within 5 minutes. It checks:
+  reagents for spells you know (under 2 Rune of Teleportation, Rune of
+  Portals, Arcane Powder or Light Feather for a mage; `R.REAGENTS` in
+  `Ready.lua` has the other classes), conjured water under 20 and food
+  under 10 when you know the Conjure spell, the most worn item at 30%
+  durability or less, fewer than 5 free bag slots, and unspent talent
+  points. `/buffs ready` runs it now; `/buffs ready off` turns the automatic
+  line off. The reagent table and item IDs are from Classic: a reagent
+  counts only when you know one of its spells.
 - It replaces the third-party Manners addon: turn Manners off in the
   AddOns list so that the two do not both prompt you.
 
