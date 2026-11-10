@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Omni, LootValue &amp; UpgradeFinder — addons for WoW Forever</title>
+<title>Omni, LootValue, UpgradeFinder &amp; QuestBoard — addons for WoW Forever</title>
 <meta name="description" content="Three small addons for WoW Forever: one search box for everything, a sell-or-keep line on every item, and the gear upgrades you can buy.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='13' cy='13' r='8' fill='none' stroke='%23e8b64c' stroke-width='3.5'/%3E%3Cpath d='M19 19l8 8' stroke='%23e8b64c' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
@@ -199,11 +199,12 @@
   <img src="omni-dusk.jpg" width="1291" height="756"
     alt="Omni in game: searching dusk lists Duskwood, items with their AH prices and price age, and Questie NPCs, with a tooltip for the selected place">
   <div class="tip hero-tip">
-    <div class="name">Omni, LootValue &amp; UpgradeFinder</div>
-    <div class="w">Three small addons for WoW Forever</div>
+    <div class="name">Omni, LootValue, UpgradeFinder &amp; QuestBoard</div>
+    <div class="w">Four small addons for WoW Forever</div>
     <div class="g"><b>Omni:</b> press <kbd>Ctrl</kbd>+<kbd>Space</kbd> and search your items, places, people, spells, NPCs and quests.</div>
     <div class="g"><b>LootValue:</b> shows on every item tooltip whether to vendor it, sell it on the AH, or disenchant it.</div>
     <div class="g"><b>UpgradeFinder:</b> <code>/uf</code> lists the gear in the AH, your bags and the dungeons that beats what you wear.</div>
+    <div class="g"><b>QuestBoard:</b> <code>/qb</code> shows the quests that matter now: what to do, hand in and pick up next.</div>
     <div class="r">LootValue needs <a href="https://www.curseforge.com/wow/addons/auctionator">Auctionator</a>. Install that first.</div>
     <div class="cta">
       <a class="btn" href="update.cmd" download>Download the installer <small>Windows · update.cmd</small></a>
@@ -213,10 +214,11 @@
 </section>
 
 <main class="wrap">
-  <nav class="jump" aria-label="The three addons">
+  <nav class="jump" aria-label="The four addons">
     <a href="#omni"><b>Omni</b> search everything</a>
     <a href="#lootvalue"><b>LootValue</b> sell or keep</a>
     <a href="#upgradefinder"><b>UpgradeFinder</b> gear upgrades</a>
+    <a href="#questboard"><b>QuestBoard</b> quests now</a>
   </nav>
 
   <section class="addon" id="omni">
@@ -303,6 +305,25 @@
     </div>
   </section>
 
+  <section class="addon" id="questboard">
+    <header>
+      <h2><span class="n">4</span>QuestBoard</h2>
+      <div class="meta"><span>Open: <code>/qb</code></span><span>Needs: nothing. Questie adds places, XP and quests to pick up.</span></div>
+    </header>
+    <div class="body">
+      <div>
+        <p class="lede"><b>The quests that matter now:</b> what you are doing, what is near, what to hand in and the best quests to pick up, in a small board under the minimap.</p>
+        <p>Each row says what to do next and how far it is. Hand-ins show their XP, reward and run time. Pick-ups are sorted by estimated XP per minute.
+          Areas group stops that are close together, so one trip does several quests. Quest items get a button beside their quest.</p>
+        <div class="how"><b>How to use it in game</b><ol>
+          <li>Type <code>/qb</code> to show or hide the board. Drag it to move it; drag the corner grip to set its height.</li>
+          <li>Click a row to open the map there. Right-click opens the quest log. <kbd>Alt</kbd>+click pins a quest you are doing.</li>
+          <li>In combat and dungeons the board shows only what you are doing. Point at it to see everything.</li>
+        </ol></div>
+      </div>
+    </div>
+  </section>
+
   <section class="faq" aria-label="Questions">
     <details>
       <summary>What Omni finds</summary>
@@ -337,7 +358,7 @@
       <summary>Windows warns me about the file</summary>
       <div>Windows asks before it runs any downloaded script. The installer downloads the addons from this project's
         <a href="https://github.com/jwang47/wow-addons/releases">GitHub releases</a>, checks each
-        file's SHA-256, and changes only the <code>Omni</code>, <code>LootValue</code> and <code>UpgradeFinder</code> folders in <code>Interface\AddOns</code>.
+        file's SHA-256, and changes only the <code>Omni</code>, <code>LootValue</code>, <code>UpgradeFinder</code> and <code>QuestBoard</code> folders in <code>Interface\AddOns</code>.
         It also keeps two small files in <code>%LOCALAPPDATA%\wow-addons</code> (your WoW folder and what it installed),
         and uses a short-lived <code>wow-addons-staging-…</code> folder in your WoW folder while it works.</div>
     </details>

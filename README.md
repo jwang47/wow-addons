@@ -1,6 +1,6 @@
-# wow-addons: LootValue, Omni and UpgradeFinder
+# wow-addons: LootValue, Omni, UpgradeFinder and QuestBoard
 
-Three small World of Warcraft addons for the WoW Forever client (a
+Four small World of Warcraft addons for the WoW Forever client (a
 Classic-based client, interface 16001). They should also work on other
 Classic clients with the same APIs, but we test them only on Forever.
 
@@ -12,6 +12,9 @@ Classic clients with the same APIs, but we test them only on Forever.
 - **UpgradeFinder**: a short list of gear from your Auctionator scan, your
   bags and the dungeon drops that beats what you wear, for any class and
   spec (`/uf`).
+- **QuestBoard**: a small board of the quests that matter now: what you
+  are doing, what to hand in and the best quests to pick up nearby, with
+  XP, rewards and distances (`/qb`). Questie adds places and pick-ups.
 
 Download page: https://jwang47.github.io/wow-addons/ (Windows installer).
 Releases: [GitHub releases](https://github.com/jwang47/wow-addons/releases)
@@ -29,8 +32,9 @@ folder. Run it again whenever you want updates.
 **By hand:** download the zips from the latest release and unzip each one
 into `Interface\AddOns\` in your client folder, so that you get
 `Interface\AddOns\LootValue\LootValue.toc`,
-`Interface\AddOns\Omni\Omni.toc` and
-`Interface\AddOns\UpgradeFinder\UpgradeFinder.toc`.
+`Interface\AddOns\Omni\Omni.toc`,
+`Interface\AddOns\UpgradeFinder\UpgradeFinder.toc` and
+`Interface\AddOns\QuestBoard\QuestBoard.toc`.
 
 Then restart the game fully. `/reload` does not find a new addon folder.
 
@@ -281,8 +285,169 @@ that is not in the `.toc` needs a full restart) and call
 only when it is turned off. Rename the spare file and add a new spare in
 the release that ships it.
 
+## QuestBoard
+
+A small floating list, under the minimap, of the quests that matter now.
+`/qb` shows or hides it.
+
+| Group | What | Sorted by |
+| --- | --- | --- |
+| Active | quests you are doing: the kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or you Alt-clicked it. It stays while you are within 600 yards (`STAY_YARDS`) or make progress, and 10 minutes after the last of either (`GRACE_SECS`) | most recent first, then nearest |
+| Nearby | other quests in your log whose open objective is within 300 yards (`HERE_YARDS`) | nearest |
+| Areas | places where 2 or more stops (objectives, hand-ins, givers) are within 250 yards of each other (`AREA_YARDS`), so one trip does several quests; the row says what is there ("2 hand in, 1 objective") | best XP per minute: the XP you earn there (hand-ins and objectives, not pick-ups) over the run there and the work |
+| Turn in | quests in your log that are complete | nearest quest giver |
+| In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
+| Party has | quests your party members have that you do not (Questie's party data, `QuestieComms.remoteQuestLogs`), with who and their progress ("Ann 2/8") | nearest giver |
+| Pick up | quests Questie shows as available ("!") that give XP and are at most 3 levels over you (`/qb range N`) | best estimated XP per minute (right-click the group: nearest) |
+
+- A quest in your log that a party member also has says so under it ("with
+  Ann 5/6"): the game's `IsUnitOnQuest`, plus Questie's party data for the
+  progress. Party members need Questie too for their progress and for the
+  Party has group.
+- Focus (on by default): in combat and inside a dungeon or other instance,
+  the board shows only the Next line and the Active group. Move the mouse
+  over it and the whole board opens; it closes again a moment after the
+  mouse leaves. Out in the world the whole board shows. `/qb focus` shows
+  the whole board everywhere (again to undo).
+- On a job (a quest in Active, by progress or your pin), the board shows
+  only Active plus Turn in, Pick up and Party has rows within 300 yards
+  (`ns.ON_WAY_YARDS`) of you or of an Active quest. Mouse-over shows the
+  whole board, as in focus; `/qb focus` turns both off.
+- The top line says what to do next: the open objective of a quest you
+  are on now (Active), else the best area when it has 3 or more stops, else
+  the nearest hand-in, else the nearest quest.
+- An item-started quest says where the item comes from (a mob that drops
+  it, a chest or crate that holds it, or a vendor) and who takes it in.
+  When Questie does not know (a world drop), the row says "drop unknown"
+  and the distance is to the one who takes it in
+  ("Loot Glowing Shard from Mutanus the Devourer, hand in to
+  Sputtervalve"). A quest with nothing to kill (a letter to deliver) points
+  to the NPC who takes it. A quest Questie has no place for says so once in
+  chat and a click opens the quest log.
+  Under each quest a dim line says what to do: the open objective and
+  Questie's nearest mob, object or NPC for it ("Underbelly Whelp Scale:
+  3/6 (Underbelly Whelp)"), or who takes it in. `/qb compact` drops that
+  line.
+- The level number is in the quest log colours (grey, green, yellow,
+  orange, red). Each row shows the distance and an arrow that turns with
+  you. The distance is green within 300 yards, yellow up to 1000 yards and
+  grey beyond (`D.NEAR_YARDS`, `D.MID_YARDS`).
+- A Turn in row shows the XP, the run time to the finisher (distance at
+  your current speed, at least run speed, `D.RUN_SPEED`) and the best item that the quest gives
+  ("[Murloc Charm] +1" when you choose one of two), or "no item". When the
+  chain goes on to better gear, the row says so ("chain -> [Axe]"). The
+  item index comes from Questie's item data (`questRewards`). Hover the
+  row for the XP per minute of the trip. Questie's distance is in world
+  yards, so a finisher in the next zone counts the full run; one on
+  another continent shows "far".
+- Time left: once you kill or loot for a quest, the board learns your pace
+  (seconds per kill or loot, on that quest and over all quests; a break
+  over 5 minutes is not counted). An Active row and the Next line show
+  about how long the rest takes ("~4 min"): the run there plus the kills
+  left at your pace. XP per minute uses the same estimate.
+- A quest in your log that is not done has a thin progress bar along the
+  bottom of its row (each objective weighs the same): gold in Active,
+  blue elsewhere.
+- A quest you Alt-clicked (pinned) has a gold star before its name.
+  Alt-click an area to pin every quest in your log there at once (again
+  to unpin them); the area gets the star when all of them are pinned.
+- "Nearest" sorting goes by distance only up to 1000 yards
+  (`D.MID_YARDS`). Quests further away, in another zone or on another
+  continent come after them, biggest XP first, because the travel guess
+  counts for little there.
+- Group order follows what you do: when no quest is Active and a hand-in
+  is within 600 yards (`ns.TURNIN_TOP_YARDS`), Turn in comes first. Else
+  Active and Nearby come first.
+- Max height: drag the grip at the bottom right corner, or `/qb height N`.
+  The title and the Next line stay; the groups scroll with the mouse wheel,
+  one line at a time, and a dim line says how many rows are above and
+  below. Right-click the grip or `/qb height off` for no limit.
+- Click a row: open the world map (M) at the place, and set and track the
+  game's map pin there. Shift-click:
+  link the quest in chat. Right-click: open the quest log (your quests) or
+  show the giver with Questie's map icon (pick-ups). Hover: XP, the
+  estimate, the giver or finisher, the open objectives.
+- Chains: the what-to-do line ends with what the quest leads to. "chain +2
+  -> [Ironforge Gladius]" (in the item's colour) means the best reward is
+  gear two quests further down the chain; "XP only" means no gear anywhere
+  in it, so the quest is fine to drop if the XP is not worth it. It walks
+  Questie's `nextQuestInChain` and, once per session, reads every Questie
+  item's `questRewards` (a slice per frame) to find each quest's rewards.
+  It does not yet say whether the gear is an upgrade for you.
+- Quest items: a button just left of each quest row that has a usable
+  quest item (the game's `GetQuestLogSpecialItemInfo`, else Questie's
+  `sourceItemId` when you carry it and it has a use); at most 6, Active
+  quests first. A quest whose row is hidden (trimmed, collapsed or
+  scrolled away) shows no button. Click one to use it; hover for the item
+  and its quest. The buttons are secure, so the game locks them in combat:
+  they are placed by screen position (not anchored to the board, which
+  would lock the board too), and a change made in combat waits for the
+  fight to end.
+- Alt-click a quest in your log: "I'm doing this" (it stays in Active until
+  you Alt-click it again or hand it in).
+- Click a group name to fold it. Drag the board (anywhere on it) to move it;
+  `/qb lock` stops that and `/qb reset`
+  puts it back. In combat it fades to 35%.
+- `/qb tracker off` hides the game's quest tracker (and Questie's, if it
+  is on); `/qb tracker on` brings it back. The game's tracker holds secure
+  quest-item buttons, so in combat it only turns see-through and hides when
+  combat ends.
+- `/qb far on` turns on enemy nameplates at the longest range the client
+  takes (it asks for 60 yards and reports what the game kept), so quest
+  monsters and Questie's nameplate icons (`/questie`, Nameplates) show from
+  further away. `/qb far off` puts the old settings back. Addons cannot mark
+  monsters in the world or target them, so nameplates are the way.
+- XP per minute is an estimate: the run to the place at 7 yards a second
+  (or your speed when faster), 90 s per open objective, 30 s at the giver
+  and 60 s back. The numbers are in `QuestBoard/Data.lua`.
+- Data: Questie, when it is loaded (`QuestieDB.GetQuest`,
+  `DistanceUtils`, `ActiveQuests`, `AvailableQuests.__availableQuests`,
+  `QuestXP`, `ZoneDB` and HereBeDragons). Questie has no public API, so every
+  call is guarded and a failing one only drops that piece. Without Questie
+  the board shows your log only, with no places or XP.
+- It refreshes on quest events and every 3 s for distances; each pass
+  works at most 3 ms a frame (`ns.data.BUDGET_MS`).
+
+## BuffCheck
+
+**BuffCheck: Party Buffs at a Glance** shows your buffs and your group's in a
+small grid (`/buffs`). It is not in the release yet.
+
+- One row for you and one for each party member (in a raid: your
+  subgroup). One column for each buff your group can give: Int (mage),
+  Fort (priest), Wild (druid), Bless (paladin, any Blessing). Your own row
+  also has an Armor column (mage armors, Inner Fire, Demon Armor).
+- Green: the buff is on. Yellow with minutes left: it ends in under 3
+  minutes. Red `x`: missing. Grey `?`: unknown (the member is too far, or
+  the client hides the aura). Warriors and rogues get no Int cell.
+- Click a row to cast your buff on that person (on your own row: your
+  armor when your buff is already on).
+- The **Next** line under the grid names the next person to buff and why,
+  and a click casts on them. Bind a key to it in Key Bindings > BuffCheck.
+  The order: a stranger who buffed you (return the favour), your group
+  (missing, then under 1 minute left), your armor, then players within
+  about 10 yards without your buff. It gives your target back after a
+  cast on a stranger. Right-click skips that person for 10 minutes.
+- Next is empty while you are mounted. It does not offer nearby players
+  below 30% mana. `/buffs nearby off` stops the nearby offers.
+- Nothing changes in combat (the game locks the buttons), but the colours
+  stay live. Drag the header to move the grid; `/buffs reset` moves it back,
+  `/buffs` hides or shows it.
+- It replaces the third-party Manners addon: turn Manners off in the
+  AddOns list so that the two do not both prompt you.
+
 ## Forever client notes
 
+- A secure button (a click that casts) works only when it is registered
+  for `AnyDown` with the attribute `pressAndHoldAction` set to true, as
+  Blizzard's own Forever buttons do. `/cast [@Name]` does not reach
+  players outside your group: target them by name, cast, then
+  `/targetlasttarget`. `UnitName` gives the surname as its second value:
+  `/target First Surname` finds the player.
+- The `UNIT_AURA` payload can be secret: reading `info.addedAuras` or
+  `info.isFullUpdate` raises "table expected, got secret". Do not read
+  it; rescan the unit's auras with `C_UnitAuras.GetAuraDataByIndex`
+  and pass each value through `issecretvalue` first.
 - Addons may not use the combat log: registering for
   `COMBAT_LOG_EVENT_UNFILTERED` brings up "blocked from an action only
   available to the Blizzard UI" right after login. UpgradeFinder leaves it
@@ -314,9 +479,11 @@ Checks, from the repo root (Lua 5.1 and Python 3):
 | `lua5.1 tests/lootvalue.lua` | LootValue against a mock of the game and Auctionator APIs |
 | `lua5.1 tests/omni.lua` | Omni against a mock of the game API |
 | `lua5.1 tests/upgradefinder.lua` | UpgradeFinder against a mock of the game API |
+| `lua5.1 tests/questboard.lua` | QuestBoard against a mock of the game API and Questie |
+| `lua5.1 tests/buffcheck.lua` | BuffCheck against a mock of the game API |
 | `python3 -m unittest tests/test_release.py` | Zips, manifest, version guard, changelog, page |
 
-The `tests` workflow runs all four on each push and pull request. The real
+The `tests` workflow runs all six on each push and pull request. The real
 check is in game.
 
 ### Dev mode: try a checkout in the game

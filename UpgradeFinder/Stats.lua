@@ -12,16 +12,17 @@ St.NAMES = {
   str = "Str", agi = "Agi", sta = "Sta", int = "Int", spi = "Spi", ap = "AP", sp = "Spell dmg", heal = "Healing",
   frost = "Frost dmg", fire = "Fire dmg", arcane = "Arcane dmg", shadow = "Shadow dmg", nature = "Nature dmg",
   holy = "Holy dmg", crit = "Crit", hit = "Hit", spcrit = "Spell crit", sphit = "Spell hit", mp5 = "Mp5",
-  armor = "Armor", def = "Defense", block = "Block", dps = "Weapon DPS",
+  armor = "Armor", def = "Defense", block = "Block", dps = "Weapon DPS", slay = "Dmg vs type",
 }
 -- Full names, for the one-stat-per-line tooltip.
 St.LONG = {
   str = "Strength", agi = "Agility", sta = "Stamina", int = "Intellect", spi = "Spirit", ap = "Attack power",
   sp = "Spell damage", frost = "Frost damage", fire = "Fire damage", arcane = "Arcane damage",
   shadow = "Shadow damage", nature = "Nature damage", holy = "Holy damage", mp5 = "Mana per 5 sec",
+  slay = "Spell damage vs one creature type",
 }
 St.ORDER = { "str", "agi", "sta", "int", "spi", "ap", "sp", "heal", "frost", "fire", "arcane", "shadow", "nature",
-  "holy", "crit", "hit", "spcrit", "sphit", "mp5", "dps", "armor", "def", "block" }
+  "holy", "slay", "crit", "hit", "spcrit", "sphit", "mp5", "dps", "armor", "def", "block" }
 St.PCT = { crit = true, hit = true, spcrit = true, sphit = true }
 local SCHOOLS = { "frost", "fire", "arcane", "shadow", "nature", "holy" }
 -- Spell school index for GetSpellBonusDamage / GetSpellCritChance.

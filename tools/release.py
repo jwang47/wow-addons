@@ -33,7 +33,7 @@ OUT = ROOT / "logs" / "wow-addons"
 REPO_URL = "https://github.com/jwang47/wow-addons"
 LATEST = REPO_URL + "/releases/latest/download/"
 # Folders shipped, in install order. A folder that does not exist is skipped.
-ADDONS = ["LootValue", "Omni", "UpgradeFinder"]
+ADDONS = ["LootValue", "Omni", "UpgradeFinder", "QuestBoard"]
 # Files that stay the player's own: shipped as a default, never overwritten.
 KEEP = {}
 # Addons that must be installed for an addon to load (its .toc
