@@ -263,9 +263,17 @@ end
 -- the 5% cut and the deposit you lose if it doesn't sell (about 30% of the
 -- vendor price for 24 h, as on the Classic AH), it pays 1.5x as much and at
 -- least 1s more (2x when the market looks slow). With no sure option it wins.
-function LV.ahWins(ah, vendor, sure, slow)
+-- With chance (0-1, from LootValue's full scans) the AH counts at its
+-- expected value: chance x the sale, less the lost deposit otherwise; it
+-- then needs 1.2x and 1s more.
+function LV.ahWins(ah, vendor, sure, slow, chance)
   if not sure or sure <= 0 then return true end
-  local net = math.floor(ah * 0.95) - math.floor((vendor or 0) * 0.3)
+  local deposit = math.floor((vendor or 0) * 0.3)
+  if chance then
+    local expected = chance * math.floor(ah * 0.95) - (1 - chance) * deposit
+    return expected >= sure * 1.2 and expected - sure >= 100
+  end
+  local net = math.floor(ah * 0.95) - deposit
   return net >= sure * (slow and 2 or 1.5) and net - sure >= 100
 end
 
@@ -304,8 +312,15 @@ function LV.adviceLine(link, isGear, ctx)
   table.sort(options, function(a, b) return a[2] > b[2] end)
   if ah and not (ctx and ctx.bound) then
     local market = LV.marketInfo(link)
-    local entry = { ctx and "AH" or "AH (if tradable)", math.floor(ah * 0.95), market.note }
-    if LV.ahWins(ah, vendor, options[1] and options[1][2] or 0, market.slow) then
+    -- How likely a listing at the fair price sells (Scan.lua).
+    local odds = LV.sellOdds and LV.sellOdds(link)
+    local note = market.note
+    if odds then
+      local text = LV.scan.oddsText(odds)
+      note = note and (text .. "; " .. note) or text
+    end
+    local entry = { ctx and "AH" or "AH (if tradable)", math.floor(ah * 0.95), note }
+    if LV.ahWins(ah, vendor, options[1] and options[1][2] or 0, market.slow, odds and odds.chance) then
       table.insert(options, 1, entry)
     else
       table.insert(options, 2, entry)

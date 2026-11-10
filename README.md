@@ -89,6 +89,13 @@ the 5% cut, the disenchant value).
   of the items listed, without a lone undercut or silly listing), and
   the AH advice uses it for a day after the scan instead of Auctionator's
   lowest price.
+- How likely an AH sale is: "AH 57s (80% sells in 24h, ~5h)". Buyers
+  take the cheapest first, so LootValue counts the items listed under
+  the fair price, plus your usual stack, against the rate items sold
+  between your scans (it needs 3+ hours of scans). With that chance the
+  AH wins when the sale times the chance, less the lost deposit
+  otherwise, is 1.2x the sure option and 1s more. It does not know who
+  posts after you, so it is rough.
 
 ### Auto-loot
 

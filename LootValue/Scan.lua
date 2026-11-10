@@ -521,6 +521,87 @@ function S.line(link)
 end
 LV.marketLine = S.line
 
+---------------------------------------------------------------------------
+-- How long a sale takes. Buyers take the cheapest first, so a listing at
+-- a price waits for every item listed cheaper ("ahead") to sell, then its
+-- own stack. Sales come at the rate the scans measured (items an hour);
+-- the wait is (ahead + stack) / rate, and the chance to sell within a 24 h
+-- listing is a Poisson tail with that rate. Rough: it does not know who
+-- posts after you.
+---------------------------------------------------------------------------
+
+S.LISTING = 24 * 3600
+S.MIN_SPAN = 3 * 3600   -- less scan time than this gives no rate
+
+-- P(N >= k) for N ~ Poisson(m).
+function S.tail(m, k)
+  if k <= 0 then return 1 end
+  if m <= 0 then return 0 end
+  if k > 400 then
+    -- Normal approximation with continuity correction.
+    local z = (k - 0.5 - m) / math.sqrt(m)
+    local t = 1 / (1 + 0.2316419 * math.abs(z))
+    local d = 0.3989423 * math.exp(-z * z / 2)
+    local p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))))
+    return z > 0 and p or 1 - p
+  end
+  local term, cdf = math.exp(-m), 0
+  for i = 0, k - 1 do
+    cdf = cdf + term
+    term = term * m / (i + 1)
+  end
+  return math.max(0, math.min(1, 1 - cdf))
+end
+
+-- Items listed under a price per item in the last full scan.
+function S.ahead(id, price)
+  local snap = db().snap
+  if not snap or not snap.items or not snap.items[id] then return 0 end
+  local n = 0
+  for _, e in ipairs(S.decode(snap.items[id], snap.owners or {})) do
+    if e[3] > 0 and e[3] / e[2] < price then n = n + e[2] end
+  end
+  return n
+end
+
+-- { hours, chance (within 24 h), ahead } for a listing of stack items at
+-- price per item, or nil when the scans have too little data.
+function S.odds(id, price, stack)
+  local s = S.stats(id)
+  if not s or s.span < S.MIN_SPAN or not price then return nil end
+  stack = math.max(1, stack or 1)
+  local ahead = S.ahead(id, price)
+  local rate = s.sold / s.span -- items a second
+  local need = ahead + stack
+  local o = { ahead = ahead, chance = S.tail(rate * S.LISTING, need) }
+  o.hours = rate > 0 and need / rate / 3600 or nil
+  return o
+end
+
+-- "80% in 24h, ~5h" for the AH entry, or nil.
+function S.oddsText(o)
+  if not o then return nil end
+  local pctText = math.floor(o.chance * 100 + 0.5) .. "% sells in 24h"
+  if o.hours and o.hours < 48 then
+    pctText = pctText .. ", ~" .. (o.hours < 1 and "<1" or math.floor(o.hours + 0.5)) .. "h"
+  end
+  return pctText
+end
+
+-- Odds for one item at its fair price: your last posted stack size
+-- (Sales.lua), else 1.
+function S.itemOdds(link)
+  local id = tonumber(link and link:match("item:(%d+)"))
+  local price = S.price(id)
+  if not price then return nil end
+  local stack = 1
+  local sales = LV.sales and LV.sales.db().sales[LV.sales.itemName(link) or ""]
+  if sales and sales.stack then stack = sales.stack end
+  return S.odds(id, price, stack)
+end
+LV.sellOdds = S.itemOdds
+
+
 -- "none sold in 1d" when the scans saw 10+ listed and no sales, else nil.
 function S.slowNote(link)
   local s = S.stats(tonumber(link and link:match("item:(%d+)")))

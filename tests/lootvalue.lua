@@ -429,6 +429,16 @@ check("fair price of nothing is nil", SC.fairPrice({ { "a", 1, 0, 4 } }) == nil)
 check("weighted median", SC.wmedian({ { 5, 1 }, { 9, 10 }, { 1, 1 } }) == 9)
 check("advice uses the fresh fair price", LV.fairPrice(2589) == 85
   and has(LV.adviceLine("|Hitem:2589:0|h[Linen Cloth]|h", false, CTX), "AH 80c"))
+check("poisson tail", math.abs(SC.tail(5, 5) - 0.5595) < 0.001 and SC.tail(0, 1) == 0 and SC.tail(3, 0) == 1
+  and math.abs(SC.tail(1000, 1000) - 0.5) < 0.02)
+local odds = LV.sellOdds("|Hitem:2589:0|h[Linen Cloth]|h")
+check("sell odds at the fair price", odds and odds.ahead == 0 and odds.chance > 0.99 and odds.hours < 1)
+check("sell odds text", SC.oddsText(odds) == "100% sells in 24h, ~<1h")
+local slowOdds = SC.odds(2589, 200, 400) -- far more than sells in a day
+check("a big stack above the price is unlikely", slowOdds.ahead == 60 and slowOdds.chance < 0.01)
+check("advice shows the odds", has(LV.adviceLine("|Hitem:2589:0|h[Linen Cloth]|h", false, CTX), "100% sells in 24h"))
+check("ahWins: expected value with odds", LV.ahWins(1000, 0, 200, false, 0.9)
+  and not LV.ahWins(1000, 0, 200, false, 0.2))
 local T2 = T
 T = T + 2 * 86400
 check("an old scan's fair price is not used", LV.fairPrice(2589) == nil)
