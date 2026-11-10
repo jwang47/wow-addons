@@ -17,7 +17,8 @@ the same, and a test checks that every `.toc` version has a section here.
 - The game's Edit Mode unlocks Glance too: move the bar and the minimap,
   size the minimap.
 - A Reload button under the minimap.
-- An XP buff chip: time left, rested XP on hover, "XP buff off" when it ends.
+- An XP buff chip: time left, rested XP on hover, and a reminder in the
+  middle of the screen when no XP buff is on (`/glance xpremind off`).
 - Alerts under the minimap: unspent talents, Legacy points, old ranks and
   full bags, each a chip that opens the window.
 - Old spell ranks: an amber corner on the key, and `/glance ranks` swaps

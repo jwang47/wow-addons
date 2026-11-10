@@ -119,11 +119,38 @@ local function xpChip()
     local first = buffs[1]
     return "XP " .. (first.left or "on") .. (#buffs > 1 and (" +" .. (#buffs - 1)) or ""), true, tip
   end
-  if next(seen) then
-    table.insert(tip, 1, "No XP buff active.")
-    return "XP buff off", false, tip
+  table.insert(tip, 1, "No XP buff active.")
+  return "No XP buff", false, tip
+end
+
+-- Reminder: a message in the middle of the screen when you have no XP buff,
+-- at login, when one runs out, and every 10 minutes while it stays off
+-- (out of combat, not in an instance). /glance xpremind off stops it.
+local REMIND_EVERY = 600
+function alerts.remindXP(force)
+  if ns.db.xpRemind == false then return end
+  local has = #alerts.xpBuffs() > 0
+  local now = GetTime and GetTime() or 0
+  local was = alerts.hadXP
+  alerts.hadXP = has
+  if has then return end
+  if InCombatLockdown() then return end
+  if IsInInstance and select(2, IsInInstance()) ~= "none" and select(2, IsInInstance()) ~= nil then return end
+  local due = force or was == true or not alerts.lastRemind or (now - alerts.lastRemind) >= REMIND_EVERY
+  if not due then return end
+  alerts.lastRemind = now
+  local msg = "No XP buff active"
+  if RaidNotice_AddMessage and RaidWarningFrame then
+    pcall(RaidNotice_AddMessage, RaidWarningFrame, msg, { r = 1, g = 0.8, b = 0.35 })
   end
-  return nil
+  ns.print(msg .. ". (/glance xpremind off to stop these.)")
+  if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
+end
+
+ns.commands.xpremind = function(rest)
+  rest = (rest or ""):lower()
+  if rest == "off" then ns.db.xpRemind = false elseif rest == "on" then ns.db.xpRemind = true end
+  ns.print("XP buff reminder " .. (ns.db.xpRemind == false and "off" or "on") .. ".")
 end
 
 local function open(fn, ...) if type(fn) == "function" then pcall(fn, ...) end end
@@ -221,7 +248,16 @@ ns.module("alerts", function()
       "ACTIONBAR_SLOT_CHANGED", "BAG_UPDATE_DELAYED", "PLAYER_REGEN_ENABLED" }) do
     ns.on(ev, alerts.refresh)
   end
-  ns.on("UNIT_AURA", function(unit) if unit == "player" then alerts.refresh() end end)
-  if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(5, alerts.refresh) end
+  ns.on("UNIT_AURA", function(unit)
+    if unit == "player" then alerts.refresh(); ns.safe("xp remind", alerts.remindXP) end
+  end)
+  if C_Timer and C_Timer.NewTicker then
+    C_Timer.NewTicker(5, alerts.refresh)
+    C_Timer.NewTicker(30, function() ns.safe("xp remind", alerts.remindXP) end)
+  end
+  -- At login, once the buffs have loaded.
+  if C_Timer and C_Timer.After then
+    C_Timer.After(10, function() ns.safe("xp remind", alerts.remindXP, true) end)
+  end
   alerts.refresh()
 end)

@@ -439,7 +439,20 @@ check("xp buff chip", A.chips.xp.shown and A.chips.xp.text.text == "XP 42m", A.c
 check("xp buff tooltip", A.chips.xp.tipLines[1] == "Rested Wisdom  42m left", A.chips.xp.tipLines and A.chips.xp.tipLines[1])
 buffs = { { name = "Arcane Intellect", spellId = 1459 } }
 A.refresh()
-check("xp buff off when it runs out", A.chips.xp.shown and A.chips.xp.text.text == "XP buff off", A.chips.xp.text.text)
+check("no xp buff chip", A.chips.xp.shown and A.chips.xp.text.text == "No XP buff", A.chips.xp.text.text)
+local warned
+RaidWarningFrame = {}
+RaidNotice_AddMessage = function(_, msg) warned = msg end
+A.hadXP = true
+A.remindXP()
+check("reminder when the xp buff runs out", warned == "No XP buff active")
+warned = nil
+A.remindXP()
+check("no repeat right away", warned == nil)
+SlashCmdList.GLANCE("xpremind off")
+A.remindXP(true)
+check("reminder can be turned off", warned == nil)
+SlashCmdList.GLANCE("xpremind on")
 
 -- Watch row: key spells by name from the spellbook.
 local NAMES = { [1953] = "Blink", [2139] = "Counterspell", [116] = "Frostbolt" }
