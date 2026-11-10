@@ -663,6 +663,24 @@ function S.hasSources(id)
     if #ids(call(qdb.QueryItemSingle, id, k[1])) > 0 then return true end
   end
   return #ids(call(qdb.QueryItemSingle, id, "relatedQuests")) > 0
+    or #ids(call(qdb.QueryItemSingle, id, "questRewards")) > 0
+end
+
+-- The quests before qid (preQuestSingle, else preQuestGroup), first quest
+-- first, qid last. Stops at S.CHAIN_MAX or a loop.
+S.CHAIN_MAX = 25
+function S.questChain(qdb, qid)
+  local chain, seen = { qid }, { [qid] = true }
+  local at = qid
+  for _ = 1, S.CHAIN_MAX do
+    local pre = ids(call(qdb.QueryQuestSingle, at, "preQuestSingle"))[1]
+      or ids(call(qdb.QueryQuestSingle, at, "preQuestGroup"))[1]
+    if not pre or seen[pre] then break end
+    seen[pre] = true
+    table.insert(chain, 1, pre)
+    at = pre
+  end
+  return chain
 end
 
 -- Groups of source entries for an item, nearest first.
@@ -736,6 +754,35 @@ function S.itemSources(id)
       end
       table.insert(groups, g)
     end
+  end
+  -- Quests that give it: the reward quest, and the first quest of its chain
+  -- (where you start). A vendor may sell it only after such a quest.
+  local rewards = {}
+  for _, qid in ipairs(ids(call(qdb.QueryItemSingle, id, "questRewards"))) do
+    local name = call(qdb.QueryQuestSingle, qid, "name")
+    if type(name) == "string" and name ~= "" then
+      local chain = S.questChain(qdb, qid)
+      if #chain > 1 then
+        local first = call(qdb.QueryQuestSingle, chain[1], "name")
+        if type(first) == "string" and first ~= "" then
+          table.insert(rewards, entry("quest", chain[1], first, { questie = true,
+            chainNote = string.format("chain start, %d quests", #chain) }))
+        end
+      end
+      table.insert(rewards, entry("quest", qid, name, { questie = true,
+        chainNote = #chain > 1 and string.format("gives it, quest %d of %d", #chain, #chain) or "gives it" }))
+    end
+  end
+  if #rewards > 0 then
+    local at = #groups + 1
+    for i, g in ipairs(groups) do
+      if g.title == "Sold by" then
+        g.title = "Sold by (may need the quest first)"
+        at = i
+        break
+      end
+    end
+    table.insert(groups, at, { kind = "quest", title = "Reward from", entries = rewards })
   end
   -- The quests that need it: their giver is often near where it is found.
   local quests = {}

@@ -371,6 +371,7 @@ function A.detail(e)
   elseif k == "quest" then
     local lvl = questieQuery("quest", e.id, "questLevel")
     local d = type(lvl) == "number" and ("level " .. lvl) or ""
+    if e.chainNote then d = "|cff9d9d9d" .. e.chainNote .. "|r  " .. d end
     local status = A.questStatus(e.id)
     if status == "log" then return "|cffffd100in your log|r  " .. d end
     if status == "done" then return "|cff9d9d9ddone|r  " .. d end
