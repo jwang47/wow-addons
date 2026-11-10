@@ -334,6 +334,30 @@ end
 check("Nearby: every stop within 1000 yd", shownRows == 4 and ns.tab() == "nearby")
 check("first row is the turn-in", firstRow.entry.id == 127 and firstRow.name.text == "Murloc Poachers")
 check("row shows what to do", firstRow.sub.text == "Hand in to Wiley")
+-- Alt-click a list's heading: pin every quest in it (an area's stops too).
+local setList = { { id = 501, kind = "log", name = "x" }, { kind = "area", stops = { { id = 502, kind = "pickup", name = "y" }, { id = 501, kind = "log", name = "x" } } },
+  { kind = "more", name = "+1 more" } }
+QuestBoardDB.doing = {}
+check("pin all: the quests of a list, area stops included, once each", #ns.listQuests(setList) == 2)
+ns.pinList(setList)
+check("pin all: every one pinned", QuestBoardDB.doing[501] and QuestBoardDB.doing[502] and ns.listPinned(setList))
+ns.pinList(setList)
+check("pin all: again unpins them", next(QuestBoardDB.doing) == nil)
+ns.refresh()
+for _ = 1, 50 do ns.step() end
+local nextHead
+for _, f in ipairs(frames) do if f.kind == "Button" and f.shown and f.list and f.text and (f.text.text or ""):find("^Chain next") then nextHead = f end end
+local realAlt = IsAltKeyDown
+IsAltKeyDown = function() return true end
+nextHead.scripts.OnClick(nextHead, "LeftButton")
+IsAltKeyDown = realAlt
+local pinnedN = 0
+for _ in pairs(QuestBoardDB.doing) do pinnedN = pinnedN + 1 end
+check("pin all: Alt-click on Chain next pins its rows", pinnedN == 4)
+QuestBoardDB.doing = {}
+D.heldAt = {}
+ns.refresh()
+for _ = 1, 50 do ns.step() end
 check("tabs: Nearby is picked and gold", QuestBoardFrame.tabs[2].text.text == "Nearby" and QuestBoardFrame.tabs[2].line.shown
   and QuestBoardFrame.tabs[4].text.text == "Log 3" and not QuestBoardFrame.next.shown)
 SlashCmdList.QUESTBOARD("compact")

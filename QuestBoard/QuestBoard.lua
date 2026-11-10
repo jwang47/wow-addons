@@ -486,6 +486,31 @@ function ns.areaPinned(a)
   return true
 end
 
+-- The quests in a list (an area's stops count as quests), for pin all.
+function ns.listQuests(list)
+  local out, seen = {}, {}
+  local function add(e) if ns.pinnable(e) and not seen[e.id] then seen[e.id] = true table.insert(out, e) end end
+  for _, e in ipairs(list or {}) do
+    if e.kind == "area" or e.kind == "zone" then for _, s in ipairs(e.stops or {}) do add(s) end else add(e) end
+  end
+  return out
+end
+function ns.listPinned(list)
+  local qs = ns.listQuests(list)
+  if #qs == 0 then return false end
+  for _, e in ipairs(qs) do if not (ns.db.doing and ns.db.doing[e.id]) then return false end end
+  return true
+end
+-- Alt-click on a list's heading: pin every quest in it; again to unpin.
+function ns.pinList(list)
+  ns.db.doing = ns.db.doing or {}
+  local off = ns.listPinned(list)
+  for _, e in ipairs(ns.listQuests(list)) do
+    if off then ns.db.doing[e.id] = nil D.heldAt[e.id] = nil else ns.db.doing[e.id] = true end
+  end
+  ns.refresh()
+end
+
 -- Alt-click on an area: mark every quest there as doing; again to unmark.
 function ns.toggleArea(a)
   ns.db.doing = ns.db.doing or {}
@@ -644,7 +669,20 @@ local function makeHead(kind)
   h.right = h:CreateFontString(nil, "OVERLAY", FONT_DIM)
   h.right:SetPoint("RIGHT", 0, 1)
   h:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  h:SetScript("OnEnter", function(self)
+    local tip = rawget(_G, "GameTooltip")
+    if not (tip and self.list) then return end
+    tip:SetOwner(self, "ANCHOR_LEFT")
+    local n = #ns.listQuests(self.list)
+    tip:AddLine("Click: fold or open", 1, 1, 1)
+    if n > 0 then
+      tip:AddLine(ns.listPinned(self.list) and ("Alt-click: unpin these " .. n .. " quests") or ("Alt-click: pin all " .. n .. " quests (keep them in Doing)"), 0.6, 0.8, 1)
+    end
+    tip:Show()
+  end)
+  h:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
   h:SetScript("OnClick", function(_, button)
+    if rawget(_G, "IsAltKeyDown") and IsAltKeyDown() and h.list then return ns.pinList(h.list) end
     if button == "RightButton" and (kind == "log" or kind == "pickup") then
       local key = kind == "pickup" and "sortPickup" or "sortLog"
       ns.db[key] = ns.db[key] == "xp" and "near" or "xp"
@@ -800,7 +838,7 @@ function ns.sections(st, tab)
     add(restLine(st, shown))
   elseif tab == "nearby" then
     local list = ns.nextList(st)
-    add({ key = "next", head = "Chain next", right = "best XP/min, walk counted", list = list })
+    add({ key = "next", head = "Chain next", right = "best XP/min, Alt-click: pin all", list = list })
     members()
     local cap = ns.db.rows.next or 8
     local shown = {}
@@ -864,6 +902,7 @@ function ns.render()
         local count = (#list > cap and not (ns.db.showAll and ns.db.showAll[kind])) and (cap .. " of " .. #list) or #list
         h.text:SetText((collapsed and "+ " or "") .. sec.head .. "  " .. count)
         h.right:SetText(sec.right or "")
+        h.list = ns.shownRows(kind, list, cap)   -- pin all takes the rows you see
         table.insert(items, { f = h, y = cy, h = HEAD_H, gap = 2 })
         cy = cy + HEAD_H + 2
       end

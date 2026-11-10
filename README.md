@@ -397,6 +397,10 @@ A small floating board, under the minimap, of the quests that matter now.
 | Areas | click it | "Where to go": every zone with stops you know (your log, hand-ins, pick-ups near and far), the ones you can reach first by XP per minute with the trip counted, far ones after by XP; each row says what is there ("3 in your log, 4 pick up"). Then "Travel": the nearest innkeeper and flight master |
 | Log | click it, or the "more in your log" line | every quest in your log under its log zone, one line each, never cut. A quest with no known place says "no place" |
 
+Alt-click a list's heading (Chain next, On the way, a Log zone) to pin
+every quest you see in it, the stops of its areas too; they go to Doing
+together. Alt-click it again to unpin them.
+
 A tab you click holds until the board's own pick changes (you start or
 finish a quest). Active means: the kill or loot count went up in the last
 5 minutes (`ACTIVE_SECS`), or you Alt-clicked the quest (any quest, also a
