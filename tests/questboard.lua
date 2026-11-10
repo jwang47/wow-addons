@@ -144,6 +144,9 @@ local D = ns.data
 -- "Here" makes quests near you active; the tests below turn it on themselves.
 local hereYards = D.HERE_YARDS
 D.HERE_YARDS = 0
+-- Areas too: the area tests turn them on.
+local areaYards = D.AREA_YARDS
+D.AREA_YARDS = 0
 local function fire(event) for _, f in ipairs(frames) do if f.events and f.events[event] and f.scripts.OnEvent then f.scripts.OnEvent(f, event) end end end
 
 ---------------------------------------------------------------------------
@@ -436,6 +439,19 @@ local before = #chat
 ns.pin({ id = 999, name = "Lost Letter", kind = "pickup" })
 ns.pin({ id = 999, name = "Lost Letter", kind = "pickup" })
 check("no place: one chat line, not one per click", #chat == before + 1 and chat[#chat]:find("Lost Letter", 1, true))
+
+-- Areas: stops close together make one area, scored by XP per minute.
+HBD.GetWorldCoordinatesFromZone = function(_, x, y) return x * 1000, y * 1000, 0 end
+D.AREA_YARDS = areaYards
+local withAreas = D.collect({})
+local area = withAreas.area[1]
+check("areas: nearby stops make one area", area and #area.stops >= 3)
+check("areas: what is there", D.areaText(area):find("hand in", 1, true) ~= nil)
+check("areas: XP per minute counts hand-ins and objectives, not pick-ups", area.xp == 1500 + 1800 + 2400)
+local nextArea = ns.nextStep(withAreas)
+check("next step: the best area when nothing is active", nextArea:find("^Go near ") ~= nil)
+D.AREA_YARDS = 0
+HBD.GetWorldCoordinatesFromZone = function() return 100, 0, 0 end
 
 ---------------------------------------------------------------------------
 -- Without Questie: the log only, no errors.

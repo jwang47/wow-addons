@@ -96,7 +96,7 @@ end
 
 D.COLORS = {
   red = { 1, 0.25, 0.2 }, orange = { 1, 0.55, 0.2 }, yellow = { 1, 0.85, 0.25 },
-  green = { 0.35, 0.8, 0.35 }, grey = { 0.55, 0.55, 0.55 },
+  green = { 0.35, 0.8, 0.35 }, grey = { 0.55, 0.55, 0.55 }, white = { 0.95, 0.95, 0.95 },
 }
 
 ---------------------------------------------------------------------------
@@ -123,14 +123,21 @@ function D.resetHBD() HBD = nil end
 
 -- Direction from the player to spawn = { x, y } (0-100) in Questie area zone:
 -- radians, 0 = north, counter-clockwise (the same as GetPlayerFacing).
-function D.bearing(spawn, zone)
+-- World position (yards) of a spawn: x, y, instance; nil if unknown.
+function D.world(spawn, zone)
   local lib, zdb = hbd(), D.module("ZoneDB")
   if not (lib and zdb and spawn and spawn[1] and spawn[1] >= 0) then return nil end
-  local px, py, pi = call(lib.GetPlayerWorldPosition, lib)
   local uiMap = call(zdb.GetUiMapIdByAreaId, zdb, zone)
-  if not (px and uiMap) then return nil end
-  local dx, dy, di = call(lib.GetWorldCoordinatesFromZone, lib, spawn[1] / 100, spawn[2] / 100, uiMap)
-  if not dx or di ~= pi then return nil end
+  if not uiMap then return nil end
+  return call(lib.GetWorldCoordinatesFromZone, lib, spawn[1] / 100, spawn[2] / 100, uiMap)
+end
+
+function D.bearing(spawn, zone)
+  local lib = hbd()
+  local dx, dy, di = D.world(spawn, zone)
+  if not (lib and dx) then return nil end
+  local px, py, pi = call(lib.GetPlayerWorldPosition, lib)
+  if not px or di ~= pi then return nil end
   return (call(lib.GetWorldVector, lib, pi, px, py, dx, dy))
 end
 
@@ -442,11 +449,86 @@ end
 -- Finishes one entry: colour, estimate, direction.
 function D.finish(e, level)
   e.color = D.difficulty(e.level, level)
-  local secs = e.kind == "pickup" and D.pickupSecs(e) or D.logSecs(e)
+  local secs = (e.kind == "pickup" or e.kind == "party") and D.pickupSecs(e) or D.logSecs(e)
   e.secs = e.far and nil or secs
   e.rate = (not e.far) and D.rate(e.xp, secs) or nil
   e.angle = e.dist and D.bearing(e.spawn, e.zone) or nil
+  if e.dist then e.wx, e.wy, e.inst = D.world(e.spawn, e.zone) end
   return e
+end
+
+---------------------------------------------------------------------------
+-- Areas: places where several quest stops (objectives, hand-ins, givers)
+-- are close together, so one trip does several quests. Travel is the big
+-- cost, so an area is scored by the XP you can earn there per minute of
+-- getting there and doing it.
+---------------------------------------------------------------------------
+D.AREA_YARDS = 250       -- stops this close to an area's first stop join it
+D.AREA_KINDS = { "active", "turnin", "log", "party", "pickup" }
+
+local function stopSecs(e)
+  if e.kind == "turnin" then return D.PICKUP_SECS end
+  if e.kind == "pickup" or e.kind == "party" then return D.PICKUP_SECS end
+  return math.max(1, #(e.left or {})) * D.OBJECTIVE_SECS
+end
+
+-- XP you earn at the stop itself (a pick-up earns it later, elsewhere).
+local function stopXP(e)
+  if e.kind == "pickup" or e.kind == "party" then return 0 end
+  return e.xp or 0
+end
+
+function D.areas(out)
+  if D.AREA_YARDS <= 0 then return {} end   -- 0 turns areas off
+  local pts = {}
+  for _, kind in ipairs(D.AREA_KINDS) do
+    for _, e in ipairs(out[kind] or {}) do
+      if e.wx and e.dist then table.insert(pts, e) end
+    end
+  end
+  table.sort(pts, function(a, b) return a.dist < b.dist end)
+  local used, list = {}, {}
+  for _, seed in ipairs(pts) do
+    if not used[seed] then
+      local a = { kind = "area", color = "white", stops = {}, counts = {}, xp = 0, work = 0, spawn = seed.spawn, zone = seed.zone,
+        dist = seed.dist, angle = seed.angle, target = seed.target, npc = seed.npc, id = "area" .. #list }
+      for _, e in ipairs(pts) do
+        if not used[e] and e.inst == seed.inst then
+          local dx, dy = e.wx - seed.wx, e.wy - seed.wy
+          if dx * dx + dy * dy <= D.AREA_YARDS * D.AREA_YARDS then
+            used[e] = true
+            table.insert(a.stops, e)
+            a.counts[e.kind] = (a.counts[e.kind] or 0) + 1
+            a.xp = a.xp + stopXP(e)
+            a.work = a.work + stopSecs(e)
+          end
+        end
+      end
+      if #a.stops >= 2 then
+        a.secs = D.travelSecs(a.dist) + a.work
+        a.rate = a.xp > 0 and D.rate(a.xp, a.secs) or nil
+        a.name = "Near " .. (seed.target or seed.name)
+        table.insert(list, a)
+      end
+    end
+  end
+  table.sort(list, function(x, y)
+    if (x.rate or 0) ~= (y.rate or 0) then return (x.rate or 0) > (y.rate or 0) end
+    return #x.stops > #y.stops
+  end)
+  return list
+end
+
+-- "2 hand in, 1 objective, 1 pick up" for an area.
+function D.areaText(a)
+  local c, parts = a.counts, {}
+  local hand = c.turnin or 0
+  local obj = (c.active or 0) + (c.log or 0)
+  local pick = (c.pickup or 0) + (c.party or 0)
+  if hand > 0 then table.insert(parts, hand .. " hand in") end
+  if obj > 0 then table.insert(parts, obj .. (obj == 1 and " objective" or " objectives")) end
+  if pick > 0 then table.insert(parts, pick .. " pick up") end
+  return table.concat(parts, ", ")
 end
 
 ---------------------------------------------------------------------------
@@ -548,6 +630,7 @@ function D.collect(opts)
   D.sort(out.party, "near")
   D.sort(out.log, opts.sortLog or "near")
   D.sort(out.pickup, opts.sortPickup or "xp")
+  out.area = D.areas(out)
   return out
 end
 

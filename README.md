@@ -269,6 +269,7 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
 | Group | What | Sorted by |
 | --- | --- | --- |
 | Active | quests in your log whose kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or whose nearest open objective is within 200 yards (`HERE_YARDS`). It stays while you are within 600 yards (`STAY_YARDS`) or make progress, and 10 minutes after the last of either (`GRACE_SECS`) | most recent first, then nearest |
+| Areas | places where 2 or more stops (objectives, hand-ins, givers) are within 250 yards of each other (`AREA_YARDS`), so one trip does several quests; the row says what is there ("2 hand in, 1 objective") | best XP per minute: the XP you earn there (hand-ins and objectives, not pick-ups) over the run there and the work |
 | Turn in | quests in your log that are complete | nearest quest giver |
 | In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
 | Party has | quests your party members have that you do not (Questie's party data, `QuestieComms.remoteQuestLogs`), with who and their progress ("Ann 2/8") | nearest giver |
@@ -283,7 +284,13 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   a moment after the mouse leaves. `/qb focus` shows the whole board all the
   time (again to undo).
 - The top line says what to do next: the open objective of a quest you
-  are on now (Active), else the nearest hand-in, else the nearest quest.
+  are on now (Active), else the best area when it has 3 or more stops, else
+  the nearest hand-in, else the nearest quest.
+- An item-started quest says where the item drops and who takes it in
+  ("Loot Glowing Shard from Mutanus the Devourer, hand in to
+  Sputtervalve"). A quest with nothing to kill (a letter to deliver) points
+  to the NPC who takes it. A quest Questie has no place for says so once in
+  chat and a click opens the quest log.
   Under each quest a dim line says what to do: the open objective and
   Questie's nearest mob, object or NPC for it ("Underbelly Whelp Scale:
   3/6 (Underbelly Whelp)"), or who takes it in. `/qb compact` drops that

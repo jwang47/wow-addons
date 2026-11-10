@@ -14,7 +14,7 @@ local defaults = {
   sortLog = "near",      -- near | xp
   sortPickup = "xp",     -- near | xp
   maxAbove = 3,          -- pick-ups at most this many levels over you
-  rows = { active = 4, turnin = 6, log = 8, party = 5, pickup = 8 },
+  rows = { active = 4, area = 3, turnin = 6, log = 8, party = 5, pickup = 8 },
   collapsed = {},
   combatAlpha = 0.35,
   hideTrackers = false,
@@ -36,8 +36,8 @@ ns.say = say
 ---------------------------------------------------------------------------
 local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6
 local FONT, FONT_DIM = "GameFontHighlightSmall", "GameFontDisableSmall"
-local HEADS = { active = "Active", turnin = "Turn in", log = "In your log", party = "Party has", pickup = "Pick up" }
-local ORDER = { "active", "turnin", "log", "party", "pickup" }
+local HEADS = { active = "Active", area = "Areas", turnin = "Turn in", log = "In your log", party = "Party has", pickup = "Pick up" }
+local ORDER = { "active", "area", "turnin", "log", "party", "pickup" }
 
 local panel, rows, heads = nil, {}, {}
 local state = nil        -- last collect() result
@@ -57,6 +57,7 @@ function ns.todo(e)
 end
 
 function ns.todoBase(e)
+  if e.kind == "area" then return D.areaText(e) end
   if e.kind == "turnin" then return e.target and ("Hand in to " .. e.target) or "Hand it in" end
   if e.fromItem then
     local what = e.item and ("Loot " .. e.item) or "Starts from an item"
@@ -80,6 +81,11 @@ end
 -- hand-in, else the nearest quest in your log.
 function ns.nextStep(st)
   if not st then return nil end
+  -- With nothing on the go, the best area (several stops in one trip).
+  local best = not st.active[1] and st.area and st.area[1]
+  if best and #best.stops >= 3 then
+    return "Go " .. best.name:lower() .. ": " .. D.areaText(best) .. "  " .. D.yards(best.dist), best
+  end
   local e = st.active[1] or st.turnin[1] or st.log[1]
   if not e then return nil end
   local todo = ns.todo(e)
@@ -95,7 +101,7 @@ function ns.meta(e)
     local p = D.progress(e)
     if p ~= "" then table.insert(parts, p) end
   end
-  if e.kind == "pickup" and e.rate then table.insert(parts, "~" .. D.short(e.rate) .. " xp/m") end
+  if (e.kind == "pickup" or e.kind == "area") and e.rate then table.insert(parts, "~" .. D.short(e.rate) .. " xp/m") end
   if e.dist then table.insert(parts, D.yards(e.dist))
   elseif e.far then table.insert(parts, "far")
   elseif e.fromItem then table.insert(parts, "item") end
@@ -117,6 +123,19 @@ local function tooltip(r)
   local e, tip = r.entry, rawget(_G, "GameTooltip")
   if not (e and tip) then return end
   tip:SetOwner(r, "ANCHOR_LEFT")
+  if e.kind == "area" then
+    tip:AddLine(e.name .. "  (" .. D.yards(e.dist) .. ")", 1, 1, 1)
+    tip:AddLine(D.areaText(e), 0.8, 0.8, 0.8)
+    if e.rate then tip:AddLine(string.format("~%s XP per minute, %s XP here", D.short(e.rate), D.short(e.xp)), 0.6, 0.8, 1) end
+    for _, s in ipairs(e.stops) do
+      local what = s.kind == "turnin" and "hand in" or (s.kind == "pickup" or s.kind == "party") and "pick up" or "objective"
+      tip:AddLine("- " .. s.name .. "  (" .. what .. ")", rgb(s.color))
+    end
+    tip:AddLine(" ")
+    tip:AddLine("Click: show it on the map", 0.5, 0.5, 0.5)
+    tip:Show()
+    return
+  end
   tip:AddLine(e.name, rgb(e.color))
   local lvl = "Level " .. (e.level or "?")
   if e.req and e.req ~= e.level then lvl = lvl .. " (needs " .. e.req .. ")" end
@@ -258,6 +277,7 @@ function ns.click(e, button)
   if rawget(_G, "IsShiftKeyDown") and IsShiftKeyDown() then return ns.link(e) end
   if button == "RightButton" then
     if e.kind == "pickup" or e.kind == "party" then return ns.showGiver(e) end
+    if e.kind == "area" then return ns.pin(e) end
     return ns.openLog(e)
   end
   if e.npc then ns.markNPC(e.npc) end
@@ -393,7 +413,7 @@ function ns.render()
       local collapsed = ns.db.collapsed[kind]
       h.text:SetText((collapsed and "+ " or "") .. HEADS[kind] .. "  " .. #list)
       local sortKey = kind == "pickup" and "sortPickup" or kind == "log" and "sortLog"
-      h.right:SetText(kind == "active" and "recent or here"
+      h.right:SetText(kind == "active" and "recent or here" or kind == "area" and "best XP"
         or sortKey and (ns.db[sortKey] == "xp" and "best XP" or "nearest") or "nearest")
       h:Show()
       y = y - HEAD_H
@@ -406,7 +426,7 @@ function ns.render()
           r:ClearAllPoints()
           r:SetPoint("TOPLEFT", PAD, y)
           r:SetPoint("TOPRIGHT", -PAD, y)
-          r.lvl:SetText(e.level or "?")
+          r.lvl:SetText(e.kind == "area" and #e.stops or e.level or "?")
           r.lvl:SetTextColor(rgb(e.color))
           r.name:SetText(e.name)
           if e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55) else r.name:SetTextColor(0.92, 0.92, 0.92) end
