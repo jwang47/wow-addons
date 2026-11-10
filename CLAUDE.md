@@ -3,14 +3,14 @@
 > **`AGENTS.md` and `CLAUDE.md` must be byte-identical.** Edit one, copy it
 > over the other, and check with `cmp AGENTS.md CLAUDE.md`.
 
-LootValue, Omni, UpgradeFinder, QuestBoard and BuffCheck, WoW addons for the Forever client (interface 16001).
+LootValue, Omni, UpgradeFinder, QuestBoard, BuffCheck and Glance (in testing), WoW addons for the Forever client (interface 16001).
 Read `README.md` first. Claude and Codex both work here, so durable facts
 live in this repository, not in agent memory. This repo is public: keep
 personal details (names of other people, machine paths, emails) out of it.
 
 ## Checks
 
-From the repo root: `lua5.1 tests/lootvalue.lua`, `lua5.1 tests/omni.lua`, `lua5.1 tests/upgradefinder.lua`, `lua5.1 tests/buffcheck.lua`, `lua5.1 tests/questboard.lua`, `lua5.1 tests/niceties.lua`,
+From the repo root: `lua5.1 tests/lootvalue.lua`, `lua5.1 tests/omni.lua`, `lua5.1 tests/upgradefinder.lua`, `lua5.1 tests/buffcheck.lua`, `lua5.1 tests/questboard.lua`, `lua5.1 tests/glance.lua`, `lua5.1 tests/niceties.lua`,
 `python3 -m unittest tests/test_release.py`. The `tests` workflow
 runs them on every push and PR. Say in the PR which checks you ran.
 To try a branch in the game, check it out in a wow-addons checkout and run

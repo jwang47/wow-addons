@@ -1,6 +1,6 @@
-# wow-addons: LootValue, Omni, UpgradeFinder and QuestBoard
+# wow-addons: LootValue, Omni, UpgradeFinder, QuestBoard and Glance
 
-Four small World of Warcraft addons for the WoW Forever client (a
+Small World of Warcraft addons for the WoW Forever client (a
 Classic-based client, interface 16001). They should also work on other
 Classic clients with the same APIs, but we test them only on Forever.
 
@@ -15,6 +15,9 @@ Classic clients with the same APIs, but we test them only on Forever.
 - **QuestBoard**: a small board of the quests that matter now: what you
   are doing, what to hand in and the best quests to pick up nearby, with
   XP, rewards and distances (`/qb`). Questie adds places and pick-ups.
+- **Glance** (in testing, not in the releases yet): a lighter HUD with a
+  keyboard-shaped action bar, a square minimap and small floating unit
+  frames (`/glance`).
 
 Download page: https://jwang47.github.io/wow-addons/ (Windows installer).
 Releases: [GitHub releases](https://github.com/jwang47/wow-addons/releases)
@@ -61,6 +64,32 @@ the 5% cut, the disenchant value).
 - With an AH price on the line, it says how old Auctionator's last scan is
   ("AH scan 3h ago").
 
+### Auto-loot
+
+LootValue also loots for you and leaves cheap junk (murloc fins and the
+like) on the body. It is on by default; `/lv` shows the settings.
+
+- Always taken: money, quest items, green or better, cloth, leather, ore,
+  herbs and other materials, consumables, recipes, bags, keys, reagents,
+  and any item the game has no info for yet.
+- Other items (grey junk, white meat and parts): taken when the stack is
+  worth at least 10c a character level (2s80c at level 28). The value is
+  the best of vendor, AH (only when the AH clearly pays more, as on the
+  tooltip) and disenchant. With 3 or fewer free bag slots the bar is 3x.
+  An item that fits on a stack you carry needs no slot, so any value takes
+  it. `/lv autoloot min 5s` sets your own bar; `min auto` goes back.
+- **review** mode (the default): the loot window stays open on what it
+  left, so you can click an item to take it after all. **quiet** mode
+  (`/lv autoloot quiet`): the window closes and one chat line lists what
+  it left. It never closes the window while a wanted item is still there
+  (bags full, a bind confirmation).
+- Shift+loot (the game's auto-loot key) takes everything. Fishing loot is
+  always taken whole.
+- `/lv skipped` lists the last 10 items it left (30 are kept).
+- `/lv autoloot off` turns it off. While it is on it keeps the game's own
+  Auto Loot option off (it can only choose when the game does not take
+  everything first), and `off` puts your old setting back.
+
 Its functions are on the global `LootValue` table (`adviceLine`,
 `marketInfo`, `ahWins`, `money`, `scanText`). Another addon can set
 `LootValue.deferTo = "<its name>"` and draw the line itself; LootValue's own
@@ -78,8 +107,9 @@ tooltips get Auctionator's and LootValue's lines from those addons.
 
 | Result | From | Enter | Shift+Enter |
 | --- | --- | --- | --- |
-| Items | bags (live), bank and mail (saved each time you open them), every item name in the Auctionator scan, `MageMentorDB.itemNames` (with MageMentor), and Questie quest items; the row shows the AH price and its age ("today", "3d old"), and the tooltip adds the last AH scan time | link in chat; at the Auction House, an Auctionator search; a Questie quest item you don't have: where it drops | link in chat |
+| Items | bags (live), bank and mail (saved each time you open them), every item name in the Auctionator scan, `MageMentorDB.itemNames` (with MageMentor), and Questie quest items; the row shows the AH price and its age ("today", "3d old"), and the tooltip adds the last AH scan time | where to get it (`from: Linen Cloth`, with Questie): the mobs that drop it, the objects that hold it and the vendors that sell it, nearest first with yards on your map, else the zone; Enter on one opens the map and pins it. At the Auction House, an Auctionator search. With no Questie source: link in chat | link in chat |
 | Places | every continent, zone, city and dungeon below the world map (`C_Map`); MageMentor's level range (green when it fits you) and hub | open the map there | |
+| Dungeons | the Classic dungeons by name or short name ("bfd", "sm gy", "brd"); the row shows the levels (green when they fit you), the short name and the boss count. Data: `Omni/Dungeons.lua`, a copy of `UpgradeFinder/Dungeons.lua` (a test checks that they match) | list its loot: `loot: BFD` shows one group per boss with its drops, then the dungeon's quests (with Questie) and their reward items. Hover an item for its tooltip, Enter links it; Enter on a quest shows where it starts | |
 | People | friends, guild, group, and the last 30 people you whispered with | whisper | invite |
 | Spells | your spell book, top rank, no passives | put it on the cursor (not in combat) | link in chat |
 | Commands | MageMentor's `/mm` commands (with MageMentor) | run it | |
@@ -102,6 +132,8 @@ nothing). Fuzzy hits rank below exact ones.
 
 Filters: `i:` items, `p:` places, `@` or `w:` people, `s:` spells, `n:` NPCs,
 `q:` quests (your log and Questie), `l:` your log only, `c:` commands,
+`d:` dungeons, `loot:` one dungeon's drops and quests (`loot: bfd`),
+`from:` where to get an item (`from: linen cloth`),
 `near:` or `nb:` nearby NPCs (alone: everything nearby, nearest first). The Nearby group always comes first. An empty box lists the 5 nearest NPCs, then what you used last.
 
 Ranking: a name that starts with the query first, then names where each
@@ -298,6 +330,7 @@ A small floating list, under the minimap, of the quests that matter now.
 | Turn in | quests in your log that are complete | nearest quest giver |
 | In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
 | Party has | quests your party members have that you do not (Questie's party data, `QuestieComms.remoteQuestLogs`), with who and their progress ("Ann 2/8") | nearest giver |
+| Town | the nearest innkeeper and flight master friendly to your side (Questie's NPC data, `npcFlags`); click or `/qb town` pins it on the map. Addons cannot walk you there | nearest |
 | Pick up | quests Questie shows as available ("!") that give XP and are at most 3 levels over you (`/qb range N`) | best estimated XP per minute (right-click the group: nearest) |
 
 - A quest in your log that a party member also has says so under it ("with
@@ -315,7 +348,8 @@ A small floating list, under the minimap, of the quests that matter now.
   whole board, as in focus; `/qb focus` turns both off.
 - The top line says what to do next: the open objective of a quest you
   are on now (Active), else the best area when it has 3 or more stops, else
-  the nearest hand-in, else the nearest quest.
+  the hand-in or quest with the best XP per minute from where you are
+  (travel included).
 - An item-started quest says where the item comes from (a mob that drops
   it, a chest or crate that holds it, or a vendor) and who takes it in.
   When Questie does not know (a world drop), the row says "drop unknown"
@@ -332,6 +366,18 @@ A small floating list, under the minimap, of the quests that matter now.
   orange, red). Each row shows the distance and an arrow that turns with
   you. The distance is green within 300 yards, yellow up to 1000 yards and
   grey beyond (`D.NEAR_YARDS`, `D.MID_YARDS`).
+- An Active quest with more to say gets a line per open objective (the
+  first with where to find it), a "Party:" line with each member's
+  progress, and the chain tag, up to 5 lines (`ns.ACTIVE_LINES`).
+- `/qb party off` hides party members' quests on the board and sets
+  Questie's `showPartyQuestObjectives` to off (its old value comes back
+  with `/qb party on`).
+- Minimap pointers: when Glance is loaded, QuestBoard gives its minimap
+  edge arrows the Next quest's place, the nearest hand-in and the Town
+  rows (`Glance.minimap.addPointerSource`, a list cached per refresh).
+- XP colours: in each group, the best third of the XP (Turn in) or XP per
+  minute (Pick up, Party has, Areas) is green and the worst third grey
+  (`D.tier`), so the better quests stand out.
 - A Turn in row shows the XP, the run time to the finisher (distance at
   your current speed, at least run speed, `D.RUN_SPEED`) and the best item that the quest gives
   ("[Murloc Charm] +1" when you choose one of two), or "no item". When the
@@ -430,11 +476,114 @@ small grid (`/buffs`). It is not in the release yet.
   cast on a stranger. Right-click skips that person for 10 minutes.
 - Next is empty while you are mounted. It does not offer nearby players
   below 30% mana. `/buffs nearby off` stops the nearby offers.
-- Nothing changes in combat (the game locks the buttons), but the colours
-  stay live. Drag the header to move the grid; `/buffs reset` moves it back,
+- Nothing changes in combat (the game locks the buttons), and Next says
+  "In combat". The game hides buff names in combat, so the colours come
+  from the last read before the fight: a buff counts as on until its end
+  time. Drag the header to move the grid; `/buffs reset` moves it back,
   `/buffs` hides or shows it.
 - It replaces the third-party Manners addon: turn Manners off in the
   AddOns list so that the two do not both prompt you.
+
+## Glance
+
+A lighter HUD (`/glance`), still in testing: it is not in the releases
+yet. Try it with `dev.ps1 Glance` (see "Dev mode"), then restart the game
+once. The design mockups are in [docs/glance.md](docs/glance.md).
+
+- **Keyboard bar** (bottom centre): one button per key of the left hand,
+  laid out like the keyboard: 1-6, Tab Q W E R T, A S D F G and
+  Z X (C, V and B stay with the game). At the first login Glance reads each key's binding. A key that
+  fires an action button (Blizzard's bars or Bartender4's) keeps that slot,
+  so your spells show on the keys they are already on. A free key gets an
+  empty slot. Movement keys (dashed, with an arrow) and keys with another
+  command (Tab: Target) keep their binding.
+  - Drag a spell from the spell book onto a key to put it on that key.
+    That is the whole binding: no Key Bindings window.
+  - Hold Shift: the bar shows the Shift layer, and a drop goes there. The
+    small icon in a key's corner is its spell on the other layer.
+  - Drag a spell from one key to another to move it; drop it on a key that
+    has a spell and the two swap. `/glance lock` makes drags need Alt, so a
+    stray drag cannot move anything.
+  - `/glance edit`: drag the gold area around the keys to move the bar;
+    `/glance reset` puts it back. Nothing moves in combat (the game locks
+    action buttons then).
+  - `/glance take F` puts a key with another command on the bar;
+    `/glance free F` gives it back. `/glance take all` takes every key with
+    another command (F: Assist, Z: Sheathe and so on), except
+    Tab, the bag keys and the character pane (B and C, with their Shift
+    layers, keep their commands) and the
+    movement keys. `/glance import` reads your bindings
+    again.
+  - A key that holds an old spell rank (you know a higher one) shows a
+    small amber corner, and its tooltip says so. `/glance ranks` puts your
+    best known rank on every action slot, out of combat.
+  - Glance's keys win over Bartender4's for the same key. Hide the
+    Bartender bars you no longer need in Bartender's options.
+- **Unit frames**: small player and target bars under your character and a
+  cast bar below them. They replace Blizzard's player, target and cast
+  frames (`/glance blizzard on` keeps those).
+- **Edge pointers**: arrows on the minimap's rim for things off the map,
+  with the name and yards: party members (class colours), your map pin and
+  your corpse. Other addons add points with
+  `Glance.minimap.addPointerSource(fn)`; `fn()` returns
+  `{ { mapID, x, y, r, g, b, label }, ... }` in map coordinates.
+- **Edit mode**: the game's Edit Mode (Esc, Edit Mode) also unlocks Glance,
+  the same as `/glance edit`: drag the keyboard bar or the minimap to move
+  them, and the minimap's gold corner to size it. `/glance reset` puts both
+  back.
+- **Minimap**: square, top-right, mouse-wheel zoom, right-click for
+  tracking. Drag the gold corner at its bottom left (it shows when the
+  mouse is over the map) to resize it, hold Shift and turn the mouse wheel
+  over it, or type `/glance map 250` (120 to 400). The zone, coordinates and clock are under it, and the
+  LibDBIcon addon buttons (Questie, Details and the rest) are in one
+  drawer behind the Addons tab. A Reload button sits under it, then amber chips show what you can spend
+  or fix: unspent talent points, Legacy points, keys with an old spell rank
+  and your free bag slots (always shown, amber at 2 or fewer). A green XP chip shows your XP buff and its time left (hover
+  for every XP buff and your rested XP); it turns amber, "No XP buff", when
+  none is on. Then a message in the middle of the screen reminds you, at
+  login, when a buff runs out and every 10 minutes (not in combat or
+  instances). `/glance xpremind off` stops the reminder. Glance finds an XP
+  buff by "experience" or "XP" in its name, spell text or tooltip. If it
+  misses one, click the XP chip and tick the buff (or `/glance xpbuff NAME`);
+  the mark is kept for all your characters. Click one to open that window; it hides when done.
+- **Enemy cast bar**: when your target casts, a large bar with the spell
+  name shows just above your unit frames. Orange when it can be
+  interrupted, grey when not; "COUNTERSPELL" and a gold edge while your
+  Counterspell is ready (from the watch row). In combat, click the bar or
+  the call-out to cast your interrupt (Counterspell, Kick, Pummel or Earth
+  Shock) on your target. The click area stays there in combat while you
+  target a living enemy, even between casts, because the game does not let
+  addons show or hide a spell button in combat.
+- **Watch row**: your key spells (for a mage: Blink, Counterspell, Frost
+  Nova, Ice Block, Cold Snap, Ice Barrier, Evocation) as large icons below
+  the cast bar. Bright when ready, dark with a sweep on cooldown, a short
+  flash when one comes back. `/glance watch add NAME`, `remove NAME`,
+  `reset`. Only spells you know show. Click an icon to cast it.
+- **Range**: the target frame gets a green edge while your longest-range
+  spell reaches the target, red when it does not. Under it is the
+  distance: exact yards for a party or raid member ("23 yd"), and for
+  anyone else a bracket from your spellbook's ranges and, out of combat,
+  the interact distances ("20-28 yd"). The game gives addons no position
+  for other units, so an exact number is not possible there.
+- **Party**: in a group, each party member gets a large class-coloured
+  name above their nameplate, and friendly player nameplates are on.
+  Your own nameplate settings come back when you leave the group.
+  `/glance party off` turns it off.
+- **Old bars**: `/glance bars hide` hides Bartender4's bottom action bars
+  (1, 2 and 5-10; the right-edge bars 3 and 4 stay),
+  Blizzard's bottom bars, the gryphon art and the old XP bar, and draws a
+  thin XP line along the bottom edge. The bag bar, micro menu, pet and
+  stance bars stay. Move click-only items (food, potions) onto Glance keys
+  first. `/glance bars show` brings everything back.
+- **Chat**: Blizzard's chat in the same look: a faint panel, tabs that show
+  under the mouse, no side buttons, a plain edit box, and text that fades
+  after 30 quiet seconds (scroll or hover brings it back).
+- `/glance keybar off`, `/glance units off`, `/glance minimap off` and
+  `/glance chat off` turn a part off (the game reloads).
+
+The bar uses the game's secure action buttons and override bindings
+(`SetOverrideBindingClick`), so it only reads bindings; it never changes
+your saved Key Bindings.
 
 ## Forever client notes
 
@@ -444,6 +593,9 @@ small grid (`/buffs`). It is not in the release yet.
   players outside your group: target them by name, cast, then
   `/targetlasttarget`. `UnitName` gives the surname as its second value:
   `/target First Surname` finds the player.
+- In combat, aura names (and times) are secret, even your own. BuffCheck
+  keeps the last full read of each unit and counts its buffs as on until
+  their end time; a buff removed early in a fight still shows until then.
 - The `UNIT_AURA` payload can be secret: reading `info.addedAuras` or
   `info.isFullUpdate` raises "table expected, got secret". Do not read
   it; rescan the unit's auras with `C_UnitAuras.GetAuraDataByIndex`
@@ -469,6 +621,30 @@ small grid (`/buffs`). It is not in the release yet.
 - The Auction House window is the modern `AuctionHouseFrame`. It is
   load-on-demand, so it can be nil when an `AUCTION_HOUSE_SHOW` handler
   runs first: look again a moment later.
+- Forever has the newer "secret values": `UnitHealth` always, and
+  `UnitPowerMax`, `UnitLevel`, cast times and cooldowns at times, come back
+  hidden. Pass them straight to a status bar or `SetText`; any compare or
+  sum on one is an error ("attempt to compare ... a secret number value").
+  Test with `issecretvalue(v)` first. A cast bar runs on
+  `StatusBar:SetTimerDuration(UnitCastingDuration("player"))`.
+- `Cooldown:SetCooldown` is a protected function. On a cooldown frame that
+  is a child of a secure button, addon code cannot set it (no sweep shows).
+  Put the cooldown on a plain frame laid over the button.
+- A secure button's modified attribute needs its button part:
+  `shift-action1` (or `shift-action*`). A bare `shift-action` is never read,
+  so Shift+key fired the unmodified action.
+- Health (and sometimes power) is secret, but `AbbreviateLargeNumbers` takes
+  secret values and the result can be joined into a string for `SetText`.
+  Wrap it in `pcall` and fall back to the bare value.
+- `UnitDistanceSquared` works only for party and raid members. For any
+  other unit, bracket the distance with `C_Spell.IsSpellInRange` over the
+  spellbook and `CheckInteractDistance` (out of combat).
+- Do not rely on modified attributes for a Shift+key binding. The game reads
+  Shift again when it runs the click (on key up, unless
+  `ActionButtonUseKeyDown` is on), so a Shift let go early fires the plain
+  action. Bind `SHIFT-<key>` to its own hidden secure button instead, and
+  set the override bindings with priority: Bartender4 keeps its own override
+  bindings on the number keys while its bars are hidden.
 
 ## Develop
 
