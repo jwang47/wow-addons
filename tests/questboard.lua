@@ -691,6 +691,22 @@ check("party off: collect skips the party", #D.collect({ party = false }).party 
 Questie, mods.QuestiePartyObjectives = nil, nil
 D.resetModules()
 
+-- Item objectives: where to get them, not the turn-in.
+check("objective name", D.objectiveName("Perfect Razormaw Egg: 8/12") == "Perfect Razormaw Egg"
+  and D.objectiveName("8/12 Perfect Razormaw Egg") == "Perfect Razormaw Egg")
+local realGetItem, realGetObject, realNearest2 = mods.QuestieDB.GetItem, mods.QuestieDB.GetObject, mods.DistanceUtils.GetNearestSpawn
+mods.QuestieDB.GetItem = function(_, id) if id == 777 then return { name = "Perfect Razormaw Egg", objectDrops = { 55 } } end end
+mods.QuestieDB.GetObject = function(_, id) if id == 55 then return { name = "Razormaw Nest", spawns = { x = 1 } } end end
+mods.DistanceUtils.GetNearestSpawn = function() return { 60, 40 }, 11, 420 end
+D.resetModules()
+D.itemsByName = { ["Perfect Razormaw Egg"] = 777 }
+local egg = { left = { { text = "8/12 Perfect Razormaw Egg", have = 8, need = 12 } } }
+D.placeObjectiveItem(egg, {})
+check("item objective: found by name, in a nest", egg.target == "Razormaw Nest" and egg.dist == 420 and egg.getHow == "object")
+mods.QuestieDB.GetItem, mods.QuestieDB.GetObject, mods.DistanceUtils.GetNearestSpawn = realGetItem, realGetObject, realNearest2
+D.itemsByName = nil
+D.resetModules()
+
 -- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
 local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },
   { name = "c", xp = 2000 }, { name = "d", dist = 5000, xp = 1500 }, { name = "e", dist = 800, xp = 50 } }, "near")

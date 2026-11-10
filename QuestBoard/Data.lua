@@ -256,13 +256,26 @@ function D.placeLog(e)
   elseif quest.Objectives then
     place(e, call(du.GetNearestSpawnForQuest, quest))
   end
+  -- No spawn for the quest: where its items come from.
+  if not e.spawn and not e.done then D.placeObjectiveItem(e, quest) end
   -- No place for the objectives (a letter or item to deliver, or Questie
   -- has no spawns for them): the place is the NPC who takes it in.
+  -- Only when there is nothing left to get: an open count (8/12 eggs)
+  -- whose source Questie does not know gets no place, not the turn-in.
   if not e.spawn and quest.Finisher then
-    place(e, call(du.GetNearestFinisherOrStarter, quest.Finisher))
-    if e.spawn then
-      e.npc = D.npcNamed(quest.Finisher.NPC, e.target)
-      e.deliver = true
+    local toGet = false
+    for _, o in ipairs(e.left or {}) do
+      if o.need and o.need > 0 and (o.have or 0) < o.need then toGet = true end
+    end
+    if e.done or not toGet then
+      place(e, call(du.GetNearestFinisherOrStarter, quest.Finisher))
+      if e.spawn then
+        e.npc = D.npcNamed(quest.Finisher.NPC, e.target)
+        e.deliver = true
+      end
+    else
+      local _, _, name = call(du.GetNearestFinisherOrStarter, quest.Finisher)
+      e.finisher, e.unknownPlace = name, true
     end
   end
   return e
@@ -270,15 +283,13 @@ end
 
 -- Where the item that starts a quest drops: the nearest spawn of a
 -- monster that drops it. Fills e.item, e.dropFrom and the place.
-function D.placeItemStart(e, quest)
+-- Where an item comes from: the nearest mob that drops it, object (chest,
+-- crate, nest) that holds it, or vendor that sells it. Nil if unknown.
+function D.itemSource(itemID)
   local qdb, du = D.module("QuestieDB"), D.module("DistanceUtils")
-  local itemID = quest.Starts and quest.Starts.Item and quest.Starts.Item[1]
-  if not (qdb and du and itemID) then return end
+  if not (qdb and du and itemID) then return nil end
   local item = call(qdb.GetItem, qdb, itemID)
-  if type(item) ~= "table" then return end
-  e.item = item.name
-  -- Where the item comes from: mobs that drop it, objects (chests, crates)
-  -- that hold it, or vendors that sell it. The nearest of all of them.
+  if type(item) ~= "table" then return nil end
   local best
   local function try(thing, id, how)
     if type(thing) == "table" and type(thing.spawns) == "table" then
@@ -293,9 +304,48 @@ function D.placeItemStart(e, quest)
   for _, id in ipairs(list(item.npcDrops)) do try(call(qdb.GetNPC, qdb, id), id, "drop") end
   for _, id in ipairs(list(item.objectDrops)) do try(call(qdb.GetObject, qdb, id), id, "object") end
   for _, id in ipairs(list(item.vendors)) do try(call(qdb.GetNPC, qdb, id), id, "vendor") end
+  return best, item
+end
+
+function D.placeItemStart(e, quest)
+  local itemID = quest.Starts and quest.Starts.Item and quest.Starts.Item[1]
+  local best, item = D.itemSource(itemID)
+  if item then e.item = item.name end
   if best then
     e.dropFrom, e.dropHow = best.name, best.how
     place(e, best.spawn, best.zone, best.name, best.dist)
+  end
+end
+
+-- The item name in an objective text: "Perfect Razormaw Egg: 8/12" or
+-- "8/12 Perfect Razormaw Egg".
+function D.objectiveName(text)
+  if type(text) ~= "string" then return nil end
+  local name = text:gsub(":%s*%d+%s*/%s*%d+%s*$", ""):gsub("^%s*%d+%s*/%s*%d+%s+", "")
+  return name ~= "" and name or nil
+end
+
+-- An open item objective's source, when Questie has no spawn for the quest
+-- itself: by the quest's item ids, else by the item's name.
+function D.placeObjectiveItem(e, quest)
+  local ids = {}
+  local raw = type(quest.objectives) == "table" and quest.objectives[3]
+  for _, o in ipairs(type(raw) == "table" and raw or {}) do
+    if type(o) == "table" and type(o[1]) == "number" then table.insert(ids, o[1]) end
+  end
+  for _, o in ipairs(e.left or {}) do
+    local id = D.itemsByName and D.itemsByName[D.objectiveName(o.text) or ""]
+    if id then table.insert(ids, id) end
+  end
+  local best
+  for _, id in ipairs(ids) do
+    local src = D.itemSource(id)
+    if src and (not best or src.dist < best.dist) then best = src end
+  end
+  if best then
+    e.getFrom, e.getHow = best.name, best.how
+    place(e, best.spawn, best.zone, best.name, best.dist)
+    e.npc = best.how ~= "object" and best.id or nil
   end
 end
 

@@ -19,6 +19,10 @@ the same, and a test checks that every `.toc` version has a section here.
 - Areas count only real stops: no item-started pick-ups (their place is a
   drop or the finisher) and no party quests you cannot take. Inside an
   area its name says "Around you", and Next no longer says to go there.
+- A quest you are not done with points to where you get its items (the
+  mob that drops them, the object that holds them or a vendor), found by
+  item id or name, never to the turn-in. When Questie does not know the
+  source, the row has no distance and the tooltip says so.
 - `/qb party off` hides party members' quests on the board (Party has,
   "with" and Party lines) and turns off Questie's party objectives on
   the map; `/qb party on` brings both back.
