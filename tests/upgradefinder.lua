@@ -1004,6 +1004,25 @@ check("known: a profession window recipe with rank and skill-up colour", bar and
 check("known: a trainer recipe with its skill and price", bolt and bolt.source == "trainer" and bolt.prof == "Tailoring"
   and bolt.req == 125 and bolt.price == 900 and bolt.cost == 4000 and bolt.profit == 750)
 check("known: a trainer recipe you know is left out", #kn == 2)
+-- The modern profession window (C_TradeSkillUI), as on Forever.
+C_TradeSkillUI = {
+  GetAllRecipeIDs = function() return { 1, 2 } end,
+  GetRecipeInfo = function(id) return ({ { name = "Bolt of Silk Cloth", learned = true, relativeDifficulty = 1 },
+    { name = "Silk Headband", learned = false, relativeDifficulty = 0 } })[id] end,
+  GetRecipeSchematic = function(id) return ({ { outputItemID = 4305, quantityMin = 1,
+    reagentSlotSchematics = { { quantityRequired = 4, reagents = { { itemID = 4306 } } } } },
+    { outputItemID = 7050, reagentSlotSchematics = { { quantityRequired = 3, reagents = { { itemID = 4306 } } } } } })[id] end,
+  GetBaseProfessionInfo = function() return { professionName = "Tailoring", skillLevel = 130, maxSkillLevel = 150 } end,
+}
+Cr.readTradeSkills()
+kn, byName = UpgradeFinderAPI.known(), {}
+for _, r in ipairs(kn or {}) do byName[r.prof .. ":" .. r.name] = r end
+local bolt2, band = byName["Tailoring:Bolt of Silk Cloth"], byName["Tailoring:Silk Headband"]
+check("modern window: a learned recipe is known, with its colour and rank", bolt2 and bolt2.source == "known"
+  and bolt2.kind == "medium" and bolt2.rank == 130 and bolt2.profit == 750)
+check("modern window: an unlearned recipe goes with the ones to learn", band and band.source == "trainer"
+  and band.cost == 3000)
+C_TradeSkillUI = nil
 tt = fakeTooltip("FakeTipK", "item:2770")
 Cr.onTooltip(tt)
 check("transform: a loss shows red", tt:find("Make into Copper Bar (1 each)") == "-50c (1s 00c -> 50c)")

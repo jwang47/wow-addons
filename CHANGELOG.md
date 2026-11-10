@@ -45,7 +45,8 @@ the same, and a test checks that every `.toc` version has a section here.
   profit first. Hover a row for the recipe tooltip with the full craft lines.
 - A profession word ("tailoring", "tailoring bag") lists that
   profession's recipes: the ones you know (with the skill-up colour), the
-  ones your trainer teaches (the skill it needs and the cost to learn),
+  ones to learn (from the trainer window with the skill it needs and the
+  cost to learn, and the unlearned ones in Forever's profession window),
   then recipe items. Each group puts the best profit first. Open the
   profession window and its trainer once, so Omni knows them.
 - Where to get an item (`from:`) also lists the quests that give it as a

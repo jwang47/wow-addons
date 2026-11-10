@@ -655,7 +655,7 @@ function S.recipes(lists, q)
   local mineTitle = (prof or "Recipes") .. " you know"
     .. (p and p.rank and (" (skill " .. p.rank .. (p.max and ("/" .. p.max) or "") .. ")") or "") .. ", best profit first"
   if #mine > 0 then table.insert(groups, group(mineTitle, mine)) end
-  if #trainer > 0 then table.insert(groups, group("From your trainer, best profit first", trainer)) end
+  if #trainer > 0 then table.insert(groups, group("To learn (trainer, profession window), best profit first", trainer)) end
   if #items > 0 then
     local title = recipe and "Recipe items (bags, bank, mail, AH), best profit first"
       or "Recipe items (load UpgradeFinder for the profit)"

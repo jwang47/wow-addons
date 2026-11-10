@@ -351,8 +351,41 @@ function C.saveRecipe(product, reagents, made)
   recipesDB()[product] = r
 end
 
+-- The modern profession window (Forever uses it): C_TradeSkillUI lists
+-- every recipe of the open profession, learned or not. relativeDifficulty
+-- 0-3 is the skill-up colour.
+C.DIFFICULTY = { [0] = "optimal", [1] = "medium", [2] = "easy", [3] = "trivial" }
+function C.readProfession()
+  local ids = call(api("C_TradeSkillUI.GetAllRecipeIDs"))
+  if type(ids) ~= "table" or #ids == 0 then return false end
+  local list, unlearned = {}, {}
+  for _, rid in ipairs(ids) do
+    local r = call(api("C_TradeSkillUI.GetRecipeInfo"), rid)
+    local sch = call(api("C_TradeSkillUI.GetRecipeSchematic"), rid, false)
+    if type(r) == "table" and r.name and type(sch) == "table" then
+      local product = sch.outputItemID
+      local reagents = {}
+      for _, slot in ipairs(sch.reagentSlotSchematics or {}) do
+        local first = slot.reagents and slot.reagents[1]
+        if first and first.itemID then table.insert(reagents, { first.itemID, slot.quantityRequired or 1 }) end
+      end
+      C.saveRecipe(product, reagents, ((sch.quantityMin or 1) + (sch.quantityMax or sch.quantityMin or 1)) / 2)
+      local entry = { product = product, kind = C.DIFFICULTY[r.relativeDifficulty] }
+      if r.learned == false then unlearned[r.name] = entry else list[r.name] = entry end
+    end
+  end
+  local p = call(api("C_TradeSkillUI.GetBaseProfessionInfo")) or call(api("C_TradeSkillUI.GetChildProfessionInfo"))
+  if type(p) ~= "table" then
+    local name, rank, max = call(rawget(_G, "GetTradeSkillLine"))
+    p = { professionName = name, skillLevel = rank, maxSkillLevel = max }
+  end
+  C.saveKnown(p.professionName, p.skillLevel, p.maxSkillLevel, list, unlearned)
+  return true
+end
+
 -- Every recipe of the open profession window.
 function C.readTradeSkills()
+  if C.readProfession() then return end
   local g = function(n) return rawget(_G, n) end
   local list = {}
   for i = 1, call(g("GetNumTradeSkills")) or 0 do
@@ -361,10 +394,10 @@ function C.readTradeSkills()
       local product = idOf(call(g("GetTradeSkillItemLink"), i))
       local reagents = {}
       for r = 1, call(g("GetTradeSkillNumReagents"), i) or 0 do
-        local name, _, count = call(g("GetTradeSkillReagentInfo"), i, r)
+        local rname, _, count = call(g("GetTradeSkillReagentInfo"), i, r)
         local id = idOf(call(g("GetTradeSkillReagentItemLink"), i, r))
-        if id and name then C.learn(name, id) end
-        table.insert(reagents, { id or name, count or 1 })
+        if id and rname then C.learn(rname, id) end
+        table.insert(reagents, { id or rname, count or 1 })
       end
       local lo, hi = call(g("GetTradeSkillNumMade"), i)
       C.saveRecipe(product, reagents, ((lo or 1) + (hi or lo or 1)) / 2)
@@ -422,13 +455,22 @@ end
 -- Saves the open profession window's line (name, rank) and its recipes:
 -- name -> { product, kind } (kind is the skill-up colour: optimal, medium,
 -- easy, trivial). Recipes merge in, so a filtered window loses nothing.
-function C.saveKnown(prof, rank, max, list)
+-- unlearned: recipes the modern window lists that you do not know yet;
+-- they go with the trainer's (UpgradeFinderDB.trainer).
+function C.saveKnown(prof, rank, max, list, unlearned)
   if type(prof) ~= "string" or prof == "" then return end
   local all = dbTable("known")
   local p = all[prof] or { recipes = {} }
   p.rank, p.max = rank, max
   for name, r in pairs(list) do p.recipes[name] = r end
   all[prof] = p
+  if unlearned and next(unlearned) then
+    local t = dbTable("trainer")
+    t[prof] = t[prof] or {}
+    for name, r in pairs(unlearned) do
+      if not t[prof][name] then t[prof][name] = { product = r.product, kind = r.kind } end
+    end
+  end
 end
 
 function C.readTrainer()
@@ -490,7 +532,9 @@ function C.known()
     for name, r in pairs(list) do
       if not (have[prof] and have[prof][name]) then
         table.insert(out, priced({ prof = prof, name = name, product = r.product, source = "trainer", req = r.req,
-          price = r.price, rank = p and p.rank, max = p and p.max }, r.reagents, r.product, 1))
+          price = r.price, rank = p and p.rank, max = p and p.max },
+          (r.reagents and #r.reagents > 0 and r.reagents) or (recipes[r.product] and recipes[r.product].reagents) or {}, r.product,
+          recipes[r.product] and recipes[r.product].made or 1))
       end
     end
   end
