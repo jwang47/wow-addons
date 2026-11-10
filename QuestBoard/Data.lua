@@ -11,7 +11,8 @@ ns.data = D
 -- in one place: a run to the place, a fixed cost per unfinished objective,
 -- and a fixed cost for the way back to the quest giver.
 D.RUN_SPEED = 7          -- yards per second on foot
-D.OBJECTIVE_SECS = 90    -- one unfinished objective (kill or collect)
+D.OBJECTIVE_SECS = 90    -- one objective of a quest you do not have yet
+D.UNIT_SECS = 30         -- one kill or loot, until the board knows your pace
 D.RETURN_SECS = 60       -- back to the finisher after the objectives
 D.PICKUP_SECS = 30       -- talk to the giver
 D.FAR = 500000           -- Questie's distance for another continent or instance
@@ -256,13 +257,27 @@ function D.placeLog(e)
   elseif quest.Objectives then
     place(e, call(du.GetNearestSpawnForQuest, quest))
   end
+  -- No spawn for the quest: where its items come from.
+  if not e.spawn and not e.done then D.placeObjectiveItem(e, quest) end
   -- No place for the objectives (a letter or item to deliver, or Questie
   -- has no spawns for them): the place is the NPC who takes it in.
+  -- Only when there is nothing left to get: an open count (8/12 eggs)
+  -- whose source Questie does not know gets no place, not the turn-in.
   if not e.spawn and quest.Finisher then
-    place(e, call(du.GetNearestFinisherOrStarter, quest.Finisher))
-    if e.spawn then
-      e.npc = D.npcNamed(quest.Finisher.NPC, e.target)
-      e.deliver = true
+    local toGet = false
+    for _, o in ipairs(e.left or {}) do
+      if o.need and o.need > 0 and (o.have or 0) < o.need then toGet = true end
+    end
+    if e.done or not toGet then
+      place(e, call(du.GetNearestFinisherOrStarter, quest.Finisher))
+      if e.spawn then
+        e.npc = D.npcNamed(quest.Finisher.NPC, e.target)
+        e.deliver = true
+      end
+    else
+      local _, _, name = call(du.GetNearestFinisherOrStarter, quest.Finisher)
+      e.finisher, e.unknownPlace = name, true
+      D.placeSpot(e)
     end
   end
   return e
@@ -270,15 +285,13 @@ end
 
 -- Where the item that starts a quest drops: the nearest spawn of a
 -- monster that drops it. Fills e.item, e.dropFrom and the place.
-function D.placeItemStart(e, quest)
+-- Where an item comes from: the nearest mob that drops it, object (chest,
+-- crate, nest) that holds it, or vendor that sells it. Nil if unknown.
+function D.itemSource(itemID)
   local qdb, du = D.module("QuestieDB"), D.module("DistanceUtils")
-  local itemID = quest.Starts and quest.Starts.Item and quest.Starts.Item[1]
-  if not (qdb and du and itemID) then return end
+  if not (qdb and du and itemID) then return nil end
   local item = call(qdb.GetItem, qdb, itemID)
-  if type(item) ~= "table" then return end
-  e.item = item.name
-  -- Where the item comes from: mobs that drop it, objects (chests, crates)
-  -- that hold it, or vendors that sell it. The nearest of all of them.
+  if type(item) ~= "table" then return nil end
   local best
   local function try(thing, id, how)
     if type(thing) == "table" and type(thing.spawns) == "table" then
@@ -293,9 +306,48 @@ function D.placeItemStart(e, quest)
   for _, id in ipairs(list(item.npcDrops)) do try(call(qdb.GetNPC, qdb, id), id, "drop") end
   for _, id in ipairs(list(item.objectDrops)) do try(call(qdb.GetObject, qdb, id), id, "object") end
   for _, id in ipairs(list(item.vendors)) do try(call(qdb.GetNPC, qdb, id), id, "vendor") end
+  return best, item
+end
+
+function D.placeItemStart(e, quest)
+  local itemID = quest.Starts and quest.Starts.Item and quest.Starts.Item[1]
+  local best, item = D.itemSource(itemID)
+  if item then e.item = item.name end
   if best then
     e.dropFrom, e.dropHow = best.name, best.how
     place(e, best.spawn, best.zone, best.name, best.dist)
+  end
+end
+
+-- The item name in an objective text: "Perfect Razormaw Egg: 8/12" or
+-- "8/12 Perfect Razormaw Egg".
+function D.objectiveName(text)
+  if type(text) ~= "string" then return nil end
+  local name = text:gsub(":%s*%d+%s*/%s*%d+%s*$", ""):gsub("^%s*%d+%s*/%s*%d+%s+", "")
+  return name ~= "" and name or nil
+end
+
+-- An open item objective's source, when Questie has no spawn for the quest
+-- itself: by the quest's item ids, else by the item's name.
+function D.placeObjectiveItem(e, quest)
+  local ids = {}
+  local raw = type(quest.objectives) == "table" and quest.objectives[3]
+  for _, o in ipairs(type(raw) == "table" and raw or {}) do
+    if type(o) == "table" and type(o[1]) == "number" then table.insert(ids, o[1]) end
+  end
+  for _, o in ipairs(e.left or {}) do
+    local id = D.itemsByName and D.itemsByName[D.objectiveName(o.text) or ""]
+    if id then table.insert(ids, id) end
+  end
+  local best
+  for _, id in ipairs(ids) do
+    local src = D.itemSource(id)
+    if src and (not best or src.dist < best.dist) then best = src end
+  end
+  if best then
+    e.getFrom, e.getHow = best.name, best.how
+    place(e, best.spawn, best.zone, best.name, best.dist)
+    e.npc = best.how ~= "object" and best.id or nil
   end
 end
 
@@ -309,13 +361,14 @@ function D.unitsLeft(e)
   return n
 end
 
--- Time for the work left on a quest. Once you have made progress, it uses
--- your own pace (seconds per kill or loot, on this quest, else on any
--- quest); before that, OBJECTIVE_SECS per open objective.
+-- Time for the work left on a quest: the kills or loots left times your
+-- pace on this quest (drop rates included, since it is measured). Before
+-- you make progress on it, the pace over all quests or UNIT_SECS, and the
+-- second value says it is a guess.
 function D.workSecs(e)
-  local pace = D.pace[e.id] or D.anyPace
-  if pace then return D.unitsLeft(e) * pace end
-  return math.max(1, #(e.left or {})) * D.OBJECTIVE_SECS
+  local own = D.pace[e.id]
+  local pace = own or math.max(D.anyPace or 0, D.UNIT_SECS)
+  return D.unitsLeft(e) * pace, not own
 end
 
 function D.logSecs(e)
@@ -504,9 +557,49 @@ function D.finish(e, level)
   local secs = (e.kind == "pickup" or e.kind == "party") and D.pickupSecs(e) or D.logSecs(e)
   e.secs = e.far and nil or secs
   e.rate = (not e.far) and D.rate(e.xp, secs) or nil
+  if e.spot then
+    -- Placed by where you last made progress: world position already known.
+    local lib = hbd()
+    local px, py, pi
+    if lib then px, py, pi = call(lib.GetPlayerWorldPosition, lib) end
+    e.wx, e.wy, e.inst = e.spot.wx, e.spot.wy, e.spot.inst
+    e.angle = (px and pi == e.inst) and (call(lib.GetWorldVector, lib, pi, px, py, e.wx, e.wy)) or nil
+    return e
+  end
   e.angle = e.dist and D.bearing(e.spawn, e.zone) or nil
   if e.dist then e.wx, e.wy, e.inst = D.world(e.spawn, e.zone) end
   return e
+end
+
+-- Where you last made progress on each quest: { wx, wy, inst, mapID, x, y }.
+-- The board uses it when Questie does not know where the objective is.
+-- QuestBoard.lua points this at the saved variables.
+D.lastSpot = {}
+function D.noteSpot(id)
+  local lib = hbd()
+  local px, py, pi
+  if lib then px, py, pi = call(lib.GetPlayerWorldPosition, lib) end
+  if not px then return end
+  local spot = { wx = px, wy = py, inst = pi }
+  local mapID = call(api("C_Map.GetBestMapForUnit"), "player")
+  local pos = mapID and call(api("C_Map.GetPlayerMapPosition"), mapID, "player")
+  if type(pos) == "table" and pos.GetXY then
+    local ok, x, y = pcall(pos.GetXY, pos)
+    if ok and x then spot.mapID, spot.x, spot.y = mapID, x, y end
+  end
+  D.lastSpot[id] = spot
+end
+
+-- Places e at the spot where you last made progress, if there is one on
+-- this continent.
+function D.placeSpot(e)
+  local spot = D.lastSpot[e.id]
+  local lib = hbd()
+  local px, py, pi
+  if lib then px, py, pi = call(lib.GetPlayerWorldPosition, lib) end
+  if not (spot and px and pi == spot.inst) then return end
+  local dx, dy = spot.wx - px, spot.wy - py
+  e.spot, e.dist, e.target = spot, math.sqrt(dx * dx + dy * dy), "where you last got one"
 end
 
 ---------------------------------------------------------------------------
@@ -521,7 +614,7 @@ D.AREA_KINDS = { "active", "nearby", "turnin", "log", "party", "pickup" }
 local function stopSecs(e)
   if e.kind == "turnin" then return D.PICKUP_SECS end
   if e.kind == "pickup" or e.kind == "party" then return D.PICKUP_SECS end
-  return math.max(1, #(e.left or {})) * D.OBJECTIVE_SECS
+  return (D.workSecs(e))
 end
 
 -- XP you earn at the stop itself (a pick-up earns it later, elsewhere).
@@ -535,7 +628,11 @@ function D.areas(out)
   local pts = {}
   for _, kind in ipairs(D.AREA_KINDS) do
     for _, e in ipairs(out[kind] or {}) do
-      if e.wx and e.dist then table.insert(pts, e) end
+      -- Only real stops: not an item-started quest (no giver to visit; its
+      -- place is a drop or the finisher), not a party quest you cannot take.
+      local stop = not (e.fromItem and (e.kind == "pickup" or e.kind == "party"))
+        and not (e.kind == "party" and not e.canTake)
+      if stop and e.wx and e.dist then table.insert(pts, e) end
     end
   end
   table.sort(pts, function(a, b) return a.dist < b.dist end)
@@ -559,7 +656,8 @@ function D.areas(out)
       if #a.stops >= 2 then
         a.secs = D.travelSecs(a.dist) + a.work
         a.rate = a.xp > 0 and D.rate(a.xp, a.secs) or nil
-        a.name = "Near " .. (seed.target or seed.name)
+        -- Inside it: say so, the stops can be anywhere within AREA_YARDS.
+        a.name = (a.dist <= D.AREA_YARDS and "Around you, by " or "Near ") .. (seed.target or seed.name)
         table.insert(list, a)
       end
     end
@@ -612,6 +710,7 @@ function D.noteProgress(e, clock)
   D.seen[e.id] = e.count
   if before and e.count and e.count > before then
     D.activeAt[e.id] = clock
+    D.noteSpot(e.id)
     local last = D.lastGain[e.id]
     if last and clock - last <= D.PACE_GAP_SECS and clock > last then
       local per = (clock - last) / (e.count - before)
@@ -662,9 +761,11 @@ function D.collect(opts)
     end
     tick()
   end
+  -- Spots of quests no longer in your log go.
+  for id in pairs(D.lastSpot) do if not inLog[id] then D.lastSpot[id] = nil end end
   -- Your party: who shares each quest in your log, and the quests they have
   -- that you do not (Questie's party data), nearest giver first.
-  local members = D.partyMembers()
+  local members = opts.party == false and {} or D.partyMembers()
   if #members > 0 then
     for _, list in ipairs({ out.active, out.nearby, out.turnin, out.log }) do
       for _, e in ipairs(list) do e.party = D.partyOn(e.id, members) end
@@ -686,6 +787,9 @@ function D.collect(opts)
     end
   end
   if out.questie then
+    local avail = {}
+    for _, id in ipairs(D.availableIDs()) do avail[id] = true end
+    for _, e in ipairs(out.party) do e.canTake = avail[e.id] or nil end
     for _, id in ipairs(D.availableIDs()) do
       if not inLog[id] then
         local e = D.pickup(id, level, opts.maxAbove)
@@ -705,8 +809,15 @@ function D.collect(opts)
   D.sort(out.log, opts.sortLog or "near")
   D.sort(out.pickup, opts.sortPickup or "xp")
   out.area = D.areas(out)
+  -- XP colours: each group's best third green, worst third grey.
+  D.tier(out.turnin, "xp")
+  D.tier(out.pickup, "rate")
+  D.tier(out.party, "rate")
+  D.tier(out.area, "rate")
   -- Chains: the reward index is read once (spread over frames), then each
   -- quest gets what its chain leads to.
+  -- Town: the nearest innkeeper and flight master of your side.
+  out.town = out.questie and D.townList(opts.yield and tick) or {}
   if out.questie and D.buildRewards and D.buildRewards(opts.yield and tick) then
     for _, kind in ipairs({ "active", "nearby", "turnin", "log", "party", "pickup" }) do
       for _, e in ipairs(out[kind]) do e.chain = D.chainInfo(e.id) end
@@ -722,6 +833,28 @@ function D.yards(d)
   if not d then return "" end
   if d >= 1000 then return string.format("%.1fk yd", d / 1000) end
   return string.format("%d yd", math.floor(d / 10 + 0.5) * 10)
+end
+
+-- Marks each entry's value (field) against the others in its group:
+-- e.tier "good" (top third), "low" (bottom third) or nil. Needs 3 values.
+function D.tier(list, field)
+  local vals = {}
+  for _, e in ipairs(list or {}) do e.tier = nil if e[field] then table.insert(vals, e[field]) end end
+  if #vals < 3 then return end
+  table.sort(vals)
+  local lowCut = vals[math.max(1, math.floor(#vals / 3))]
+  local highCut = vals[#vals - math.max(1, math.floor(#vals / 3)) + 1]
+  for _, e in ipairs(list) do
+    local v = e[field]
+    if v and v >= highCut and v > lowCut then e.tier = "good"
+    elseif v and v <= lowCut and v < highCut then e.tier = "low" end
+  end
+end
+
+D.TIER_HEX = { good = "60d060", low = "909090" }
+function D.tierText(e, text)
+  local hex = e.tier and D.TIER_HEX[e.tier]
+  return hex and ("|cff" .. hex .. text .. "|r") or text
 end
 
 -- Travel time in a few characters: "<1 min", "4 min".
@@ -759,4 +892,87 @@ function D.progress(e)
   local o = e.left and e.left[1]
   if o and o.have and o.need and o.need > 1 then return o.have .. "/" .. o.need end
   return ""
+end
+
+---------------------------------------------------------------------------
+-- Town: the nearest innkeeper and flight master friendly to your side, from
+-- Questie's NPC data (read once, a slice per frame). Addons cannot walk you
+-- there; the row gives the map pin, the arrow and the distance.
+---------------------------------------------------------------------------
+D.NPC_FLAGS = { inn = 65536, flight = 8192 }   -- UNIT_NPC_FLAG_INNKEEPER, _FLIGHTMASTER
+D.townBuild = { state = "idle", i = 1 }
+D.townNPCs = nil                -- { inn = { ids }, flight = { ids } } once read
+
+local function hasFlag(flags, bit)
+  flags = tonumber(flags) or 0
+  return math.floor(flags / bit) % 2 == 1
+end
+
+local function mySide()
+  local f = call(rawget(_G, "UnitFactionGroup"), "player")
+  return f == "Horde" and "H" or f == "Alliance" and "A" or nil
+end
+
+function D.buildTown(tick)
+  local b = D.townBuild
+  if b.state == "done" then return true end
+  local qdb = D.module("QuestieDB")
+  if not (qdb and type(qdb.QueryNPCSingle) == "function" and type(qdb.NPCPointers) == "table") then return false end
+  if not b.ids then
+    b.ids, b.found = {}, { inn = {}, flight = {} }
+    for id in pairs(qdb.NPCPointers) do if type(id) == "number" then table.insert(b.ids, id) end end
+    table.sort(b.ids)
+  end
+  local side = mySide()
+  while b.i <= #b.ids do
+    local id = b.ids[b.i]
+    local flags = call(qdb.QueryNPCSingle, id, "npcFlags")
+    if flags and (hasFlag(flags, D.NPC_FLAGS.inn) or hasFlag(flags, D.NPC_FLAGS.flight)) then
+      local friend = call(qdb.QueryNPCSingle, id, "friendlyToFaction")
+      if not side or not friend or friend == "AH" or friend == side then
+        if hasFlag(flags, D.NPC_FLAGS.inn) then table.insert(b.found.inn, id) end
+        if hasFlag(flags, D.NPC_FLAGS.flight) then table.insert(b.found.flight, id) end
+      end
+    end
+    b.i = b.i + 1
+    if tick and b.i % 200 == 0 then tick() end
+  end
+  D.townNPCs, b.state, b.ids = b.found, "done", nil
+  return true
+end
+
+local function nearestOf(ids)
+  local qdb, du = D.module("QuestieDB"), D.module("DistanceUtils")
+  if not (qdb and du) then return nil end
+  local best
+  for _, id in ipairs(ids or {}) do
+    local spawns = call(qdb.QueryNPCSingle, id, "spawns")
+    if type(spawns) == "table" then
+      local spawn, zone, dist = call(du.GetNearestSpawn, spawns)
+      dist = plain(dist)
+      if spawn and dist and dist < D.FAR and (not best or dist < best.dist) then
+        best = { id = id, spawn = spawn, zone = zone, dist = dist }
+      end
+    end
+  end
+  return best
+end
+
+-- Rows for the Town group: the nearest inn and flight master.
+function D.townList(tick)
+  if not D.buildTown(tick) then return {} end
+  local qdb, out = D.module("QuestieDB"), {}
+  for _, what in ipairs({ "inn", "flight" }) do
+    local n = nearestOf(D.townNPCs[what])
+    if n then
+      local name = call(qdb.QueryNPCSingle, n.id, "name") or ("NPC " .. n.id)
+      local e = { kind = "town", id = -n.id, npc = n.id, name = name, role = what, color = "white", left = {} }
+      e.spawn, e.zone, e.target, e.dist = n.spawn, n.zone, name, n.dist
+      e.angle = D.bearing(n.spawn, n.zone)
+      e.wx, e.wy, e.inst = D.world(n.spawn, n.zone)
+      table.insert(out, e)
+    end
+  end
+  D.sort(out, "near")
+  return out
 end
