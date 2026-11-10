@@ -707,6 +707,22 @@ mods.QuestieDB.GetItem, mods.QuestieDB.GetObject, mods.DistanceUtils.GetNearestS
 D.itemsByName = nil
 D.resetModules()
 
+-- No known source: the place is where you last made progress.
+local realPos = HBD.GetPlayerWorldPosition
+HBD.GetPlayerWorldPosition = function() return 300, 400, 0 end
+C_Map.GetBestMapForUnit = function() return 1437 end
+C_Map.GetPlayerMapPosition = function() return { GetXY = function() return 0.3, 0.4 end } end
+D.noteSpot(950)
+HBD.GetPlayerWorldPosition = function() return 0, 0, 0 end
+local spotQ = { id = 950, left = {} }
+D.placeSpot(spotQ)
+check("spot: distance to where you last got one", spotQ.dist == 500 and spotQ.spot.mapID == 1437 and spotQ.spot.x == 0.3)
+D.finish(spotQ, 27)
+check("spot: arrow and world place", spotQ.angle == 0.5 and spotQ.wx == 300)
+HBD.GetPlayerWorldPosition = realPos
+C_Map.GetBestMapForUnit, C_Map.GetPlayerMapPosition = nil, nil
+D.lastSpot[950] = nil
+
 -- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
 local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },
   { name = "c", xp = 2000 }, { name = "d", dist = 5000, xp = 1500 }, { name = "e", dist = 800, xp = 50 } }, "near")

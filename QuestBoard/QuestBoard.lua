@@ -223,7 +223,7 @@ local function tooltip(r)
     if e.toFinisher then tip:AddLine("Questie does not know where it drops; the distance is to " .. e.finisher, 0.8, 0.5, 0.5) end
     if e.finisher then tip:AddLine("Hand in to " .. e.finisher, 0.8, 0.8, 0.8) end
   end
-  if not e.spawn then tip:AddLine("Questie has no place for this quest", 0.8, 0.5, 0.5) end
+  if not e.spawn and not e.spot then tip:AddLine("Questie has no place for this quest", 0.8, 0.5, 0.5) end
   for _, o in ipairs(e.left or {}) do
     if o.text then tip:AddLine("- " .. o.text, 0.8, 0.8, 0.8) end
   end
@@ -293,6 +293,16 @@ end
 -- map pin there.
 function ns.pin(e)
   local zdb = D.module("ZoneDB")
+  -- Placed by where you last made progress: pin that spot.
+  if e.spot and e.spot.mapID then
+    ns.openMap(e.spot.mapID)
+    local id, px, py = pinPoint(e.spot.mapID, e.spot.x, e.spot.y)
+    local point, set = api("UiMapPoint.CreateFromCoordinates"), api("C_Map.SetUserWaypoint")
+    if id and point and set and pcall(set, call(point, id, px, py)) then
+      call(api("C_SuperTrack.SetSuperTrackedUserWaypoint"), true)
+      return true
+    end
+  end
   local s = e.spawn
   if not (zdb and s and s[1] and s[1] >= 0) then
     -- No place: open the quest log at it instead (your quests), and say so
@@ -1069,6 +1079,8 @@ events:SetScript("OnEvent", function(_, event)
       if QuestBoardDB.rows[k] == nil then QuestBoardDB.rows[k] = v end
     end
     ns.db = QuestBoardDB
+    ns.db.spots = ns.db.spots or {}
+    D.lastSpot = ns.db.spots
     build()
     ns.registerPointers()
     ns.show(ns.db.shown)

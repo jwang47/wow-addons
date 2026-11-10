@@ -276,6 +276,7 @@ function D.placeLog(e)
     else
       local _, _, name = call(du.GetNearestFinisherOrStarter, quest.Finisher)
       e.finisher, e.unknownPlace = name, true
+      D.placeSpot(e)
     end
   end
   return e
@@ -554,9 +555,49 @@ function D.finish(e, level)
   local secs = (e.kind == "pickup" or e.kind == "party") and D.pickupSecs(e) or D.logSecs(e)
   e.secs = e.far and nil or secs
   e.rate = (not e.far) and D.rate(e.xp, secs) or nil
+  if e.spot then
+    -- Placed by where you last made progress: world position already known.
+    local lib = hbd()
+    local px, py, pi
+    if lib then px, py, pi = call(lib.GetPlayerWorldPosition, lib) end
+    e.wx, e.wy, e.inst = e.spot.wx, e.spot.wy, e.spot.inst
+    e.angle = (px and pi == e.inst) and (call(lib.GetWorldVector, lib, pi, px, py, e.wx, e.wy)) or nil
+    return e
+  end
   e.angle = e.dist and D.bearing(e.spawn, e.zone) or nil
   if e.dist then e.wx, e.wy, e.inst = D.world(e.spawn, e.zone) end
   return e
+end
+
+-- Where you last made progress on each quest: { wx, wy, inst, mapID, x, y }.
+-- The board uses it when Questie does not know where the objective is.
+-- QuestBoard.lua points this at the saved variables.
+D.lastSpot = {}
+function D.noteSpot(id)
+  local lib = hbd()
+  local px, py, pi
+  if lib then px, py, pi = call(lib.GetPlayerWorldPosition, lib) end
+  if not px then return end
+  local spot = { wx = px, wy = py, inst = pi }
+  local mapID = call(api("C_Map.GetBestMapForUnit"), "player")
+  local pos = mapID and call(api("C_Map.GetPlayerMapPosition"), mapID, "player")
+  if type(pos) == "table" and pos.GetXY then
+    local ok, x, y = pcall(pos.GetXY, pos)
+    if ok and x then spot.mapID, spot.x, spot.y = mapID, x, y end
+  end
+  D.lastSpot[id] = spot
+end
+
+-- Places e at the spot where you last made progress, if there is one on
+-- this continent.
+function D.placeSpot(e)
+  local spot = D.lastSpot[e.id]
+  local lib = hbd()
+  local px, py, pi
+  if lib then px, py, pi = call(lib.GetPlayerWorldPosition, lib) end
+  if not (spot and px and pi == spot.inst) then return end
+  local dx, dy = spot.wx - px, spot.wy - py
+  e.spot, e.dist, e.target = spot, math.sqrt(dx * dx + dy * dy), "where you last got one"
 end
 
 ---------------------------------------------------------------------------
@@ -667,6 +708,7 @@ function D.noteProgress(e, clock)
   D.seen[e.id] = e.count
   if before and e.count and e.count > before then
     D.activeAt[e.id] = clock
+    D.noteSpot(e.id)
     local last = D.lastGain[e.id]
     if last and clock - last <= D.PACE_GAP_SECS and clock > last then
       local per = (clock - last) / (e.count - before)
@@ -717,6 +759,8 @@ function D.collect(opts)
     end
     tick()
   end
+  -- Spots of quests no longer in your log go.
+  for id in pairs(D.lastSpot) do if not inLog[id] then D.lastSpot[id] = nil end end
   -- Your party: who shares each quest in your log, and the quests they have
   -- that you do not (Questie's party data), nearest giver first.
   local members = opts.party == false and {} or D.partyMembers()
