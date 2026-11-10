@@ -719,6 +719,12 @@ your saved Key Bindings.
   [Gethe/wow-ui-source](https://github.com/Gethe/wow-ui-source/tree/forever).
   `Blizzard_APIDocumentationGenerated/` documents the `C_` functions.
   Check every new call there first.
+- The profession window is the modern `ProfessionsFrame`
+  (`Blizzard_Professions`, `C_TradeSkillUI`), restyled. `TradeSkillFrame`
+  and the old `GetTradeSkill*` functions do not exist. The recipe pane is
+  `ProfessionsFrame.CraftingPage.SchematicForm` (`.Reagents.Label` is the
+  "Reagents:" text) and the Create box is
+  `ProfessionsFrame.CraftingPage.CreateMultipleInputBox`.
 - The Auction House window is the modern `AuctionHouseFrame`. It is
   load-on-demand, so it can be nil when an `AUCTION_HOUSE_SHOW` handler
   runs first: look again a moment later.

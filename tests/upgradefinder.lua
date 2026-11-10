@@ -1047,6 +1047,44 @@ SlashCmdList.UPGRADEFINDER("shop debug")
 check("/uf shop debug says where the button is", tostring(chat[nChat + 1]):find("UpgradeFinderShopButton: shown", 1, true) ~= nil
   and tostring(chat[#chat]):find("last error", 1, true) ~= nil)
 TradeSkillFrame, TradeSkillReagentLabel = nil, nil
+-- Forever's modern profession window: ProfessionsFrame and C_TradeSkillUI.
+GetTradeSkillSelectionIndex, GetTradeSkillInfo = nil, nil
+Cr.forgetShopButton()
+UpgradeFinderDB.shop = nil
+BAGS[4306], BAGS[901] = 6, 10
+local form = widget("SchematicForm")
+form.Reagents = widget("Reagents")
+form.Reagents.Label = widget("ReagentsLabel")
+function form:GetRecipeInfo() return { recipeID = 3914, name = "Earthen Silk Hood" } end
+function form:GetCurrentRecipeLevel() return 1 end
+local inits = {}
+function form:Init() end
+hooksecurefunc = hooksecurefunc or function(t, k, fn) inits[#inits + 1] = fn end
+local multi = widget("CreateMultipleInputBox")
+function multi:GetValue() return 3 end
+ProfessionsFrame = { CraftingPage = { SchematicForm = form, CreateMultipleInputBox = multi } }
+Enum = Enum or {}
+Enum.CraftingReagentType = { Basic = 0, Optional = 1 }
+C_TradeSkillUI = { GetRecipeSchematic = function(id)
+  if id ~= 3914 then return nil end
+  return { reagentSlotSchematics = {
+    { reagentType = 0, quantityRequired = 4, reagents = { { itemID = 4306 } } },
+    { reagentType = 0, quantityRequired = 1, reagents = { { itemID = 901 } } },
+    { reagentType = 1, quantityRequired = 1, reagents = { { itemID = 2770 } } }, -- optional: not bought
+  } }
+end }
+local rn, rr = Cr.selectedRecipe()
+check("professions: the selected recipe and its basic reagents", rn == "Earthen Silk Hood" and #rr == 2
+  and rr[1][1] == 4306 and rr[1][2] == 4 and rr[1][3] == "Silk Cloth")
+local pb = Cr.shopButton()
+check("professions: the Shop button on the recipe pane", pb and pb:GetText() == "Shop x3")
+nChat = #chat
+pb.scripts.OnClick(pb)
+said = table.concat(chat, "\n", nChat + 1)
+check("professions: shop for 3 crafts", said:find("Shopping for 3x Earthen Silk Hood", 1, true)
+  and said:find("Silk Cloth: buy 6 (need 12, have 6)", 1, true) ~= nil)
+ProfessionsFrame, C_TradeSkillUI = nil, nil
+Cr.forgetShopButton()
 Cr.bankSeen(false)
 Auctionator.API.v1.CreateShoppingList, Auctionator.API.v1.ConvertToSearchString = nil, nil
 GetItemCount, TradeSkillInputBox = nil, nil

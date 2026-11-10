@@ -549,24 +549,68 @@ function C.shopLines(crafts, rows, ah, vendor, missing)
   return out
 end
 
+-- The modern profession window (Blizzard_Professions). Forever uses it,
+-- not the old TradeSkillFrame: there is no TradeSkillFrame global at all.
+local function schematicForm()
+  local f = rawget(_G, "ProfessionsFrame")
+  return f and f.CraftingPage and f.CraftingPage.SchematicForm or nil, f
+end
+C.schematicForm = schematicForm
+
 -- The count in the profession window's Create box (at least 1).
 local function createCount()
-  local box = rawget(_G, "TradeSkillInputBox")
-  local n = box and box.GetNumber and call(box.GetNumber, box)
+  local _, pf = schematicForm()
+  local box = pf and pf.CraftingPage and pf.CraftingPage.CreateMultipleInputBox
+  local n = box and ((box.GetValue and call(box.GetValue, box)) or (box.GetNumber and call(box.GetNumber, box)))
+  if not box then
+    box = rawget(_G, "TradeSkillInputBox")
+    n = box and box.GetNumber and call(box.GetNumber, box)
+  end
   return (type(n) == "number" and n >= 1) and math.floor(n) or 1
 end
 C.createCount = createCount
 
--- Shop for times crafts of the selected recipe (index), or add them to the
--- list you have (add). Says the list in chat and makes the Auctionator list.
-function C.shop(times, add, index)
+-- The selected recipe: name and reagents { { id or name, count, name } },
+-- from the modern profession window, or else the old one (index).
+function C.selectedRecipe(index)
+  local form = schematicForm()
+  local recipe = form and form.GetRecipeInfo and call(form.GetRecipeInfo, form)
+  if not index and type(recipe) == "table" and recipe.recipeID then
+    local level = form.GetCurrentRecipeLevel and call(form.GetCurrentRecipeLevel, form)
+    local sch = call(api("C_TradeSkillUI.GetRecipeSchematic"), recipe.recipeID, false, level)
+    local basic = api("Enum.CraftingReagentType.Basic")
+    local reagents = {}
+    for _, slot in ipairs(type(sch) == "table" and sch.reagentSlotSchematics or {}) do
+      local first = slot.reagents and slot.reagents[1]
+      if first and first.itemID and (basic == nil or slot.reagentType == basic) then
+        local it = info(first.itemID)
+        if not it then call(api("C_Item.RequestLoadItemDataByID"), first.itemID) end
+        if it and it.name then C.learn(it.name, first.itemID) end
+        table.insert(reagents, { first.itemID, slot.quantityRequired or 1, it and it.name or nil })
+      end
+    end
+    return recipe.name, reagents
+  end
   local g = function(n) return rawget(_G, n) end
   index = index or call(g("GetTradeSkillSelectionIndex"))
   local name, kind = call(g("GetTradeSkillInfo"), index or 0)
-  local reagents = (index and index > 0 and name and kind ~= "header") and tradeSkillReagents(index) or {}
+  if not (index and index > 0 and name and kind ~= "header") then return nil, {} end
+  return name, tradeSkillReagents(index)
+end
+
+-- Shop for times crafts of the selected recipe (index), or add them to the
+-- list you have (add). Says the list in chat and makes the Auctionator list.
+function C.shop(times, add, index)
+  local name, reagents = C.selectedRecipe(index)
   if #reagents == 0 then
     if ns.say then ns.say("open your profession window and pick a recipe to shop for") end
     return nil
+  end
+  for _, r in ipairs(reagents) do
+    if not r[3] then
+      if ns.say then ns.say("reagent names are still loading; click Shop again in a moment") end
+      return nil
+    end
   end
   times = math.max(1, math.floor(tonumber(times) or createCount()))
   local db = ns.db()
@@ -601,25 +645,16 @@ local function shopText()
   if shopButton then shopButton:SetText("Shop x" .. createCount()) end
 end
 C.shopText = shopText
-function C.shopButton()
-  if shopButton or not rawget(_G, "TradeSkillFrame") then return shopButton end
-  -- Parented to TradeSkillFrame itself, as Auctionator's crafting info is:
-  -- Forever's profession window does not show the old detail scroll child,
-  -- so a button inside it never appeared. The frame level keeps it above
-  -- the detail pane's art.
-  local frame, label = rawget(_G, "TradeSkillFrame"), rawget(_G, "TradeSkillReagentLabel")
-  shopButton = CreateFrame("Button", "UpgradeFinderShopButton", frame, "UIPanelButtonTemplate")
-  shopButton:SetSize(72, 20)
-  if shopButton.SetFrameLevel and frame.GetFrameLevel then shopButton:SetFrameLevel((frame:GetFrameLevel() or 0) + 20) end
-  if label and label.IsVisible and label:IsVisible() then shopButton:SetPoint("LEFT", label, "RIGHT", 10, 0)
-  else shopButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -40, -50) end
-  if shopButton.SetNormalFontObject and rawget(_G, "GameFontNormalSmall") then
-    shopButton:SetNormalFontObject(rawget(_G, "GameFontNormalSmall"))
-  end
-  shopButton:SetScript("OnClick", function()
+function C.forgetShopButton() shopButton = nil end -- tests
+local function makeButton(parent)
+  local b = CreateFrame("Button", "UpgradeFinderShopButton", parent, "UIPanelButtonTemplate")
+  b:SetSize(72, 20)
+  if b.SetFrameLevel and parent.GetFrameLevel then b:SetFrameLevel((parent:GetFrameLevel() or 0) + 30) end
+  if b.SetNormalFontObject and rawget(_G, "GameFontNormalSmall") then b:SetNormalFontObject(rawget(_G, "GameFontNormalSmall")) end
+  b:SetScript("OnClick", function()
     C.guard(C.shop, nil, call(rawget(_G, "IsShiftKeyDown")) and true or false)
   end)
-  shopButton:SetScript("OnEnter", function(self)
+  b:SetScript("OnEnter", function(self)
     local tt = rawget(_G, "GameTooltip")
     tt:SetOwner(self, "ANCHOR_RIGHT")
     tt:AddLine("Shop for these crafts")
@@ -627,8 +662,36 @@ function C.shopButton()
     tt:AddLine("Shift-click adds this recipe to the list you have.", 0.6, 0.6, 0.6, true)
     tt:Show()
   end)
-  shopButton:SetScript("OnLeave", function() local tt = rawget(_G, "GameTooltip") if tt then tt:Hide() end end)
-  shopButton:SetScript("OnShow", shopText)
+  b:SetScript("OnLeave", function() local tt = rawget(_G, "GameTooltip") if tt then tt:Hide() end end)
+  b:SetScript("OnShow", shopText)
+  return b
+end
+
+function C.shopButton()
+  if shopButton then return shopButton end
+  local form, pf = schematicForm()
+  if form then
+    -- Beside the "Reagents:" label of the recipe pane, like Auctionator's
+    -- crafting info (AuctionatorCraftingInfoProfessionsFrame) below it.
+    shopButton = makeButton(form)
+    local reagents = form.Reagents
+    local label = reagents and reagents.Label
+    if label then shopButton:SetPoint("LEFT", label, "RIGHT", 10, 0)
+    elseif reagents then shopButton:SetPoint("BOTTOMLEFT", reagents, "TOPLEFT", 90, -18)
+    else shopButton:SetPoint("TOPRIGHT", form, "TOPRIGHT", -20, -110) end
+    local secure = rawget(_G, "hooksecurefunc")
+    if secure and form.Init then secure(form, "Init", function() pcall(shopText) end) end
+    local box = pf.CraftingPage and pf.CraftingPage.CreateMultipleInputBox
+    local edit = box and (type(box.NumericInputBox) == "table" and box.NumericInputBox or box)
+    if edit and edit.HookScript then edit:HookScript("OnTextChanged", function() pcall(shopText) end) end
+    shopText()
+    return shopButton
+  end
+  local frame, label = rawget(_G, "TradeSkillFrame"), rawget(_G, "TradeSkillReagentLabel")
+  if not frame then return nil end
+  shopButton = makeButton(frame)
+  if label and label.IsVisible and label:IsVisible() then shopButton:SetPoint("LEFT", label, "RIGHT", 10, 0)
+  else shopButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -40, -50) end
   local box = rawget(_G, "TradeSkillInputBox")
   if box and box.HookScript then box:HookScript("OnTextChanged", function() pcall(shopText) end) end
   shopText()
@@ -639,7 +702,7 @@ end
 -- does not show it.
 function C.shopDebug()
   local function region(n, r)
-    r = r or rawget(_G, n)
+    if r == nil then r = rawget(_G, n) end
     if not r then return n .. ": none" end
     local function m(f) local ok, v = pcall(r[f], r) if ok then return v end end
     local x, y = m("GetLeft"), m("GetTop")
@@ -648,10 +711,15 @@ function C.shopDebug()
       tostring(r.GetParent and r:GetParent() and r:GetParent().GetName and r:GetParent():GetName()))
   end
   local out = { region("UpgradeFinderShopButton", shopButton) }
-  for _, n in ipairs({ "TradeSkillFrame", "TradeSkillReagentLabel", "TradeSkillDescription",
-    "TradeSkillDetailScrollChildFrame", "TradeSkillInputBox", "TradeSkillCreateAllButton", "AuctionatorCraftingInfo" }) do
-    table.insert(out, region(n))
-  end
+  local form, pf = schematicForm()
+  table.insert(out, region("ProfessionsFrame", pf or false))
+  table.insert(out, region("SchematicForm", form or false))
+  table.insert(out, region("SchematicForm.Reagents", form and form.Reagents or false))
+  table.insert(out, region("Reagents.Label", form and form.Reagents and form.Reagents.Label or false))
+  table.insert(out, region("CreateMultipleInputBox", pf and pf.CraftingPage and pf.CraftingPage.CreateMultipleInputBox or false))
+  for _, n in ipairs({ "AuctionatorCraftingInfoProfessionsFrame", "TradeSkillFrame" }) do table.insert(out, region(n)) end
+  local rname, rr = C.selectedRecipe()
+  table.insert(out, "recipe: " .. tostring(rname) .. ", " .. #rr .. " reagents")
   table.insert(out, "last error: " .. tostring(C.lastError))
   return out
 end
@@ -686,7 +754,7 @@ function C.hook()
       C.guard(C.shopButton)
       pcall(shopText)
     elseif ev == "BANKFRAME_OPENED" then C.bankSeen(true)
-    elseif name == "Blizzard_TradeSkillUI" then C.hookRows() C.guard(C.shopButton) end
+    elseif name == "Blizzard_TradeSkillUI" or name == "Blizzard_Professions" then C.hookRows() C.guard(C.shopButton) end
   end)
   pcall(f.RegisterEvent, f, "ADDON_LOADED")
   pcall(f.RegisterEvent, f, "PLAYER_EQUIPMENT_CHANGED")
