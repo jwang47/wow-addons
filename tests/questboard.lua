@@ -551,6 +551,13 @@ check("turn-in: tooltip names the reward", rewardLine)
 check("distance colours", D.yardsText(120):find("^|cff") and D.yardsText(120) ~= D.yardsText(700)
   and D.yardsText(700) ~= D.yardsText(3000) and strip(D.yardsText(700)) == "700 yd")
 
+-- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
+local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },
+  { name = "c", xp = 2000 }, { name = "d", dist = 5000, xp = 1500 }, { name = "e", dist = 800, xp = 50 } }, "near")
+local names = {}
+for _, e in ipairs(sorted) do table.insert(names, e.name) end
+check("sort: near by distance, then far by XP", table.concat(names) == "becda")
+
 -- Group order: hand-ins first when nothing is active and one is near;
 -- Active first while you are on a quest.
 local function order(st) return table.concat(ns.order(st), ",") end

@@ -313,6 +313,10 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
   yards, so a finisher in the next zone counts the full run; one on
   another continent shows "far".
 - A quest you Alt-clicked (pinned) has a gold star before its name.
+- "Nearest" sorting goes by distance only up to 1000 yards
+  (`D.MID_YARDS`). Quests further away, in another zone or on another
+  continent come after them, biggest XP first, because the travel guess
+  counts for little there.
 - Group order follows what you do: when no quest is Active and a hand-in
   is within 600 yards (`ns.TURNIN_TOP_YARDS`), Turn in comes first. Else
   Active and Nearby come first.

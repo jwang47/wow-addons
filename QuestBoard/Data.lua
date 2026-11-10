@@ -17,6 +17,7 @@ D.PICKUP_SECS = 30       -- talk to the giver
 D.FAR = 500000           -- Questie's distance for another continent or instance
 D.BUDGET_MS = 3          -- work per frame when reading the available quests
 D.ACTIVE_SECS = 300      -- a quest whose count went up this recently is "active"
+D.NEAR_YARDS, D.MID_YARDS = 300, 1000   -- distance colours; past MID the XP sorts
 D.HERE_YARDS = 300       -- "Nearby": a log quest whose open objective is this close
 -- Once active, a quest stays: while you are within STAY_YARDS of its open
 -- objective or make progress, and for GRACE_SECS after the last of either.
@@ -442,12 +443,21 @@ end
 ---------------------------------------------------------------------------
 -- Sorting
 ---------------------------------------------------------------------------
--- near: nearest first (unknown and far last); xp: best XP per minute first.
+-- near: nearest first up to D.MID_YARDS; past that (and for far or unknown
+-- places) the travel guess counts for little, so the biggest XP comes
+-- first. xp: best XP per minute first, then the same.
 function D.sort(list, by)
+  local function far(e) return not e.dist or e.dist > D.MID_YARDS end
   table.sort(list, function(a, b)
     if by == "xp" then
       local ra, rb = a.rate or -1, b.rate or -1
       if ra ~= rb then return ra > rb end
+    end
+    local fa, fb = far(a), far(b)
+    if fa ~= fb then return fb end
+    if fa then
+      local xa, xb = a.xp or 0, b.xp or 0
+      if xa ~= xb then return xa > xb end
     end
     local da, db = a.dist or math.huge, b.dist or math.huge
     if da ~= db then return da < db end
@@ -677,7 +687,6 @@ end
 
 -- Distance in a colour by how far: green within the Nearby range, yellow
 -- up to a short ride, grey beyond.
-D.NEAR_YARDS, D.MID_YARDS = 300, 1000
 function D.yardsText(d)
   if not d then return "" end
   local hex = d <= D.NEAR_YARDS and "60d060" or d <= D.MID_YARDS and "e0c040" or "909090"
