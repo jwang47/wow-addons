@@ -69,8 +69,9 @@ function ns.todoBase(e)
   if e.kind == "area" then return D.areaText(e) end
   if e.kind == "turnin" then return e.target and ("Hand in to " .. e.target) or "Hand it in" end
   if e.fromItem then
-    local what = e.item and ("Loot " .. e.item) or "Starts from an item"
-    return what .. (e.dropFrom and (" from " .. e.dropFrom) or "") .. (e.finisher and (", hand in to " .. e.finisher) or "")
+    local what = e.item and ((e.dropHow == "vendor" and "Buy " or "Loot ") .. e.item) or "Starts from an item"
+    local from = e.dropFrom and (" from " .. e.dropFrom) or (e.kind == "pickup" or e.kind == "party") and " (drop unknown)" or ""
+    return what .. from .. (e.finisher and (", hand in to " .. e.finisher) or "")
   end
   if e.deliver and e.target then
     local o = e.left and e.left[1]
@@ -166,7 +167,9 @@ local function tooltip(r)
     tip:AddLine(verb .. e.target .. (e.dist and ("  " .. D.yards(e.dist) .. " " .. D.compass(e.angle)) or ""), 1, 1, 1)
   end
   if e.fromItem then
-    tip:AddLine("Starts from an item" .. (e.item and (": " .. e.item) or "") .. (e.dropFrom and (", drops from " .. e.dropFrom) or ""), 0.8, 0.8, 0.8)
+    local how = e.dropHow == "vendor" and ", sold by " or e.dropHow == "object" and ", found in " or ", drops from "
+    tip:AddLine("Starts from an item" .. (e.item and (": " .. e.item) or "") .. (e.dropFrom and (how .. e.dropFrom) or ""), 0.8, 0.8, 0.8)
+    if e.toFinisher then tip:AddLine("Questie does not know where it drops; the distance is to " .. e.finisher, 0.8, 0.5, 0.5) end
     if e.finisher then tip:AddLine("Hand in to " .. e.finisher, 0.8, 0.8, 0.8) end
   end
   if not e.spawn then tip:AddLine("Questie has no place for this quest", 0.8, 0.5, 0.5) end

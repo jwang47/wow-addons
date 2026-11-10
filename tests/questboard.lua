@@ -464,6 +464,17 @@ local shard = D.pickup(207, 27, 3)
 check("item quest: where the item drops", shard.fromItem and shard.item == "Glowing Shard" and shard.dropFrom == "Mutanus the Devourer" and shard.dist == 900)
 check("item quest: who takes it in", shard.finisher == "Sputtervalve")
 check("item quest: what to do", ns.todo(shard) == "Loot Glowing Shard from Mutanus the Devourer, hand in to Sputtervalve")
+-- In a chest: the object's place.
+mods.QuestieDB.GetItem = function(_, id) if id == 10441 then return { name = "Glowing Shard", objectDrops = { 77 } } end end
+mods.QuestieDB.GetObject = function(_, id) if id == 77 then return { name = "Old Crate", spawns = { [718] = { { 1, 1 } } } } end end
+local crate = D.pickup(207, 27, 3)
+check("item quest: an object that holds it", crate.dropFrom == "Old Crate" and crate.dropHow == "object" and crate.dist == 900)
+-- A world drop: the distance is to the one who takes it in.
+mods.QuestieDB.GetItem = function(_, id) if id == 10441 then return { name = "Glowing Shard" } end end
+local loose = D.pickup(207, 27, 3)
+check("item quest: unknown drop has the finisher's distance", loose.dist == 2000 and loose.toFinisher and loose.target == "Sputtervalve")
+check("item quest: unknown drop says so", ns.todo(loose) == "Loot Glowing Shard (drop unknown), hand in to Sputtervalve")
+mods.QuestieDB.GetObject = nil
 mods.QuestieDB.GetQuest = realGetQuest
 mods.DistanceUtils.GetNearestFinisherOrStarter = realFinisher
 QUESTS[207] = nil

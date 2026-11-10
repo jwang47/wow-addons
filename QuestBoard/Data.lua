@@ -264,19 +264,24 @@ function D.placeItemStart(e, quest)
   local item = call(qdb.GetItem, qdb, itemID)
   if type(item) ~= "table" then return end
   e.item = item.name
+  -- Where the item comes from: mobs that drop it, objects (chests, crates)
+  -- that hold it, or vendors that sell it. The nearest of all of them.
   local best
-  for _, npcID in ipairs(type(item.npcDrops) == "table" and item.npcDrops or {}) do
-    local npc = call(qdb.GetNPC, qdb, npcID)
-    if type(npc) == "table" and type(npc.spawns) == "table" then
-      local spawn, zone, dist = call(du.GetNearestSpawn, npc.spawns)
+  local function try(thing, id, how)
+    if type(thing) == "table" and type(thing.spawns) == "table" then
+      local spawn, zone, dist = call(du.GetNearestSpawn, thing.spawns)
       dist = plain(dist)
       if spawn and dist and (not best or dist < best.dist) then
-        best = { spawn = spawn, zone = zone, dist = dist, name = npc.name, id = npcID }
+        best = { spawn = spawn, zone = zone, dist = dist, name = thing.name, id = id, how = how }
       end
     end
   end
+  local function list(t) return type(t) == "table" and t or {} end
+  for _, id in ipairs(list(item.npcDrops)) do try(call(qdb.GetNPC, qdb, id), id, "drop") end
+  for _, id in ipairs(list(item.objectDrops)) do try(call(qdb.GetObject, qdb, id), id, "object") end
+  for _, id in ipairs(list(item.vendors)) do try(call(qdb.GetNPC, qdb, id), id, "vendor") end
   if best then
-    e.dropFrom = best.name
+    e.dropFrom, e.dropHow = best.name, best.how
     place(e, best.spawn, best.zone, best.name, best.dist)
   end
 end
@@ -341,8 +346,14 @@ function D.pickup(id, level, maxAbove, kind)
     e.fromItem = true
     D.placeItemStart(e, quest)
     if du and quest.Finisher then
-      local _, _, name = call(du.GetNearestFinisherOrStarter, quest.Finisher)
+      local spawn, zone, name, dist = call(du.GetNearestFinisherOrStarter, quest.Finisher)
       e.finisher = name
+      -- Questie does not know where the item comes from (a world drop):
+      -- the distance is to the one who takes it in.
+      if not e.spawn then
+        place(e, spawn, zone, name, dist)
+        e.toFinisher = e.spawn and true or nil
+      end
     end
   end
   return e

@@ -288,7 +288,11 @@ with `dev.ps1 QuestBoard`. `/qb` shows or hides it.
 - The top line says what to do next: the open objective of a quest you
   are on now (Active), else the best area when it has 3 or more stops, else
   the nearest hand-in, else the nearest quest.
-- An item-started quest says where the item drops and who takes it in
+- An item-started quest says where the item comes from (a mob that drops
+  it, a chest or crate that holds it, or a vendor) and who takes it in.
+  When Questie does not know (a world drop), the row says "drop unknown"
+  and the distance is to the one who takes it in. An item-started quest
+  says where the item drops and who takes it in
   ("Loot Glowing Shard from Mutanus the Devourer, hand in to
   Sputtervalve"). A quest with nothing to kill (a letter to deliver) points
   to the NPC who takes it. A quest Questie has no place for says so once in
