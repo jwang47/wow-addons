@@ -36,6 +36,9 @@ ns.say = say
 -- frame art, small text, colour only for quest level.
 ---------------------------------------------------------------------------
 local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6
+-- Spacing that shows the grouping: a quest's two lines sit close, quests
+-- have a small gap between them, groups a bigger one.
+local SUB_UP, ROW_GAP, GROUP_GAP = 3, 4, 10
 local FONT, FONT_DIM = "GameFontHighlightSmall", "GameFontDisableSmall"
 local HEADS = { active = "Active", nearby = "Nearby", area = "Areas", turnin = "Turn in", log = "In your log", party = "Party has", pickup = "Pick up" }
 local ORDER = { "active", "nearby", "area", "turnin", "log", "party", "pickup" }
@@ -441,8 +444,8 @@ local function makeRow(i)
   if r.name.SetWordWrap then r.name:SetWordWrap(false) end
   -- The "what to do" line under the name.
   r.sub = r:CreateFontString(nil, "OVERLAY", FONT_DIM)
-  r.sub:SetPoint("TOPLEFT", 26, -ROW_H + 1)
-  r.sub:SetPoint("TOPRIGHT", -16, -ROW_H + 1)
+  r.sub:SetPoint("TOPLEFT", 26, -ROW_H + SUB_UP)
+  r.sub:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP)
   r.sub:SetJustifyH("LEFT")
   if r.sub.SetWordWrap then r.sub:SetWordWrap(false) end
   r.pin = r:CreateTexture(nil, "OVERLAY")
@@ -481,10 +484,17 @@ end
 local function makeHead(kind)
   local h = CreateFrame("Button", nil, panel)
   h:SetHeight(HEAD_H)
-  h.text = h:CreateFontString(nil, "OVERLAY", FONT_DIM)
-  h.text:SetPoint("LEFT", 0, 0)
+  h.text = h:CreateFontString(nil, "OVERLAY", FONT)
+  h.text:SetPoint("LEFT", 0, 1)
+  h.text:SetTextColor(0.95, 0.8, 0.45)
+  -- A thin rule under the group name marks where the group starts.
+  h.line = h:CreateTexture(nil, "ARTWORK")
+  h.line:SetColorTexture(0.95, 0.8, 0.45, 0.25)
+  h.line:SetHeight(1)
+  h.line:SetPoint("BOTTOMLEFT", 0, 0)
+  h.line:SetPoint("BOTTOMRIGHT", 0, 0)
   h.right = h:CreateFontString(nil, "OVERLAY", FONT_DIM)
-  h.right:SetPoint("RIGHT", 0, 0)
+  h.right:SetPoint("RIGHT", 0, 1)
   h:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   h:SetScript("OnClick", function(_, button)
     if button == "RightButton" and (kind == "log" or kind == "pickup") then
@@ -570,8 +580,8 @@ function ns.render()
       local sortKey = kind == "pickup" and "sortPickup" or kind == "log" and "sortLog"
       h.right:SetText(kind == "active" and "doing now" or kind == "nearby" and "within 300 yd" or kind == "area" and "best XP"
         or sortKey and (ns.db[sortKey] == "xp" and "best XP" or "nearest") or "nearest")
-      table.insert(items, { f = h, y = cy, h = HEAD_H })
-      cy = cy + HEAD_H
+      table.insert(items, { f = h, y = cy, h = HEAD_H, gap = 2 })
+      cy = cy + HEAD_H + 2
       if not collapsed then
         for i = 1, math.min(#list, ns.db.rows[kind] or 6) do
           used = used + 1
@@ -592,19 +602,22 @@ function ns.render()
           ns.setBar(r, e, kind)
           local todo = (not ns.db.compact) and (e.kind ~= "pickup" and ns.todo(e) or e.kind == "pickup" and D.chainTag(e.chain))
           r.sub:SetText(todo or "")
-          local rh = todo and ROW_H * 2 - 2 or ROW_H
+          local rh = todo and ROW_H * 2 - SUB_UP or ROW_H
           r:SetHeight(rh)
-          table.insert(items, { f = r, y = cy, h = rh, row = true })
-          cy = cy + rh
+          local gap = todo and ROW_GAP or 1
+          table.insert(items, { f = r, y = cy, h = rh, row = true, gap = gap })
+          cy = cy + rh + gap
         end
       end
-      cy = cy + 4
-      if items[#items] then items[#items].gap = 4 end
+      -- The group's last line gets the bigger gap instead of its own.
+      local last = items[#items]
+      if last then cy = cy - (last.gap or 0) + GROUP_GAP last.gap = GROUP_GAP end
     end
   end
   for i = used + 1, #rows do rows[i]:Hide() rows[i].entry = nil end
   -- Second pass: the part that fits under the max height.
-  local full = cy
+  -- No group gap under the last group.
+  local full = items[#items] and (cy - (items[#items].gap or 0) + 4) or cy
   local view = full
   local maxH = ns.db.maxHeight
   if maxH then

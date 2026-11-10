@@ -9,6 +9,9 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - XP colours: in each group, the best third of the XP (Turn in) or XP per
   minute (Pick up, Party has, Areas) is green and the worst third grey.
+- Clearer grouping: a quest's two lines sit closer, quests have a small gap
+  between them, and each group name is gold with a thin rule under it and
+  more space above it.
 
 ## QuestBoard 0.1.0
 
