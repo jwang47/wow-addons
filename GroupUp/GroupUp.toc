@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: GroupUp: Solo vs Group XP
+## Notes: Should you group up? Which of your quests a group speeds up, your measured XP per hour solo and grouped, and how kill XP is split. /gu
+## Author: jwang47
+## Version: 0.1.0
+## OptionalDeps: Questie
+## SavedVariables: GroupUpDB
+
+Logic.lua
+GroupUp.lua

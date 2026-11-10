@@ -5,6 +5,15 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## GroupUp 0.1.0
+
+- New: a panel that helps you decide whether to group up (`/gu`). It
+  shows which quests in your log a group speeds up, your measured XP per
+  hour solo and in each group size at about your level, and how kill XP is
+  split in a group. When someone invites you, two summary lines go to chat.
+- A "Thanks & leave" button while you are in a group (`/gu bye`): it thanks
+  the party in chat and leaves 5 seconds later.
+
 ## Niceties 0.1.0
 
 - New: a home for small nice-to-haves (`/nice`). The first one zooms the
