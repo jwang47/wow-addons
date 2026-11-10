@@ -35,10 +35,15 @@ function D.buildRewards(tick)
   if not (qdb and type(qdb.QueryItemSingle) == "function" and qdb.ItemPointers) then
     return false
   end
-  if not b.ids then b.ids, b.map = ids(qdb.ItemPointers), {} end
+  if not b.ids then b.ids, b.map, b.names = ids(qdb.ItemPointers), {}, {} end
   while b.i <= #b.ids do
     local item = b.ids[b.i]
     local quests = call(qdb.QueryItemSingle, item, "questRewards")
+    -- Quest items by name too, for objectives Questie has no place for.
+    if call(qdb.QueryItemSingle, item, "class") == 12 then
+      local name = call(qdb.QueryItemSingle, item, "name")
+      if type(name) == "string" then b.names[name] = b.names[name] or item end
+    end
     if type(quests) == "table" then
       for _, q in ipairs(quests) do
         b.map[q] = b.map[q] or {}
@@ -48,7 +53,7 @@ function D.buildRewards(tick)
     b.i = b.i + 1
     if tick and b.i % 200 == 0 then tick() end
   end
-  D.rewardsByQuest, b.state, b.ids = b.map, "done", nil
+  D.rewardsByQuest, D.itemsByName, b.state, b.ids = b.map, b.names, "done", nil
   return true
 end
 

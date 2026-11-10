@@ -118,5 +118,119 @@ check("quiet when MageMentor draws the line", #lines == 1)
 LV.deferTo = nil
 check("isGear: robe yes, trade good no", LV.isGear("item:9001") and not LV.isGear("item:9003"))
 
+-- Auto-loot -------------------------------------------------------------------
+local handlers, cvars, chat = {}, { autoLootDefault = "1" }, {}
+CreateFrame = function()
+  local fr = {}
+  function fr:RegisterEvent(e) handlers[e] = true end
+  function fr:SetScript(_, fn) fr.onEvent = fn end
+  _G.LAST_FRAME = fr
+  return fr
+end
+C_CVar = { GetCVar = function(n) return cvars[n] end, SetCVar = function(n, v) cvars[n] = v end }
+DEFAULT_CHAT_FRAME = { AddMessage = function(_, m) table.insert(chat, m) end }
+local level, free = 28, 10
+UnitLevel = function() return level end
+local BAG = {} -- bag 0 slots: { itemID, stackCount }
+C_Container = {
+  GetContainerNumFreeSlots = function(bag) return bag == 0 and free or 0, 0 end,
+  GetContainerNumSlots = function(bag) return bag == 0 and #BAG or 0 end,
+  GetContainerItemInfo = function(bag, slot) return bag == 0 and BAG[slot] or nil end,
+}
+-- id -> { quality, item level, sell price, class, stack, equip slot, subclass }
+ITEMS[1468] = { 0, 15, 6, 15, 10, "", 0 }         -- murloc fin, grey junk
+ITEMS[730] = { 1, 15, 14, 7, 10, "", 8 }          -- murloc eye, white meat
+ITEMS[2589] = { 1, 5, 13, 7, 20, "", 5 }          -- linen cloth
+ITEMS[4306] = { 1, 25, 150, 7, 20, "", 0 }        -- silk, subclass 0 on some clients
+ITEMS[3000] = { 0, 27, 900, 2, 1, "INVTYPE_WEAPON", 0 } -- grey sword, 9s
+ITEMS[3001] = { 1, 25, 25, 0, 20, "", 0 }         -- white potion
+local baseInfo = C_Item.GetItemInfo
+C_Item.GetItemInfo = function(link)
+  local it = ITEMS[idOf(link)]
+  if not it then return nil end
+  return "Item", link, it[1], it[2], 1, "", "", it[5], it[6], 0, it[3], it[4], it[7] or 0
+end
+assert(baseInfo)
+LootValueDB = nil
+assert(loadfile(root .. "LootValue/AutoLoot.lua"))("LootValue", {})
+local AL = LV.autoLoot
+local frame = LAST_FRAME
+local function link(id) return "|Hitem:" .. id .. ":0|h[x]|h" end
+local CTX28 = { level = 28, free = 10 }
+local function decide(id, q, extra)
+  local s = { link = link(id), quantity = q or 1, quality = ITEMS[id] and ITEMS[id][1] or 1 }
+  for k, v in pairs(extra or {}) do s[k] = v end
+  return AL.decide(s, CTX28)
+end
+check("threshold is 10c a level", AL.threshold(28, 10) == 280 and AL.threshold(28, 3) == 840)
+check("money and quest items always", AL.decide({ coin = true }, CTX28) and decide(1468, 1, { quest = true }))
+check("locked slots are left", not AL.decide({ coin = true, locked = true }, CTX28))
+check("murloc fin left", not decide(1468, 2))
+check("murloc eye left", not decide(730, 3))
+check("cloth taken by ID", decide(2589) and decide(4306))
+check("green taken", decide(9001, 1, { quality = 2 }))
+check("grey sword worth 9s taken", decide(3000))
+check("white potion taken", decide(3001))
+check("unknown item taken", decide(5555))
+BAG[1] = { itemID = 1468, stackCount = 4 }
+check("fits on a carried stack: taken", decide(1468, 2))
+BAG[1] = { itemID = 1468, stackCount = 9 }
+check("full stack: left", not decide(1468, 2))
+BAG[1] = nil
+local _, why = AL.decide({ link = link(3000), quantity = 1, quality = 0 }, { level = 28, free = 0 })
+check("bags full: left with a reason", why == "bags full")
+AH[730] = 2000
+check("AH price that clearly wins counts", decide(730, 1))
+AH[730] = nil
+check("money parse", AL.parseMoney("1g50s") == 15000 and AL.parseMoney("75c") == 75 and AL.parseMoney("3s") == 300
+  and AL.parseMoney("x") == nil)
+
+-- Event flow: login turns the game's Auto Loot off; a loot window takes the
+-- good slots and leaves the rest.
+check("listens to loot events", handlers.LOOT_READY and handlers.LOOT_SLOT_CLEARED and handlers.PLAYER_LOGIN)
+frame.onEvent(frame, "PLAYER_LOGIN")
+check("login turns the game's Auto Loot off and saves it", cvars.autoLootDefault == "0"
+  and LootValueDB.autoLoot.savedCVar == "1")
+local LOOT, looted, closed = {}, {}, 0
+GetNumLootItems = function() return #LOOT end
+GetLootSlotInfo = function(i) local l = LOOT[i]
+  return "tex", l.name or "Item", l.q or 1, nil, l.quality or 1, false, l.quest or false, nil, true, l.coin or false end
+GetLootSlotLink = function(i) return LOOT[i].link end
+LootSlot = function(i) table.insert(looted, i) end
+CloseLoot = function() closed = closed + 1 end
+IsFishingLoot = function() return false end
+local function loot(list)
+  LOOT, looted = list, {}
+  frame.onEvent(frame, "LOOT_READY", false)
+  frame.onEvent(frame, "LOOT_OPENED", false)
+end
+loot({ { coin = true, name = "5 Silver" }, { link = link(1468), quality = 0, q = 2 }, { link = link(2589), q = 2 } })
+check("takes money and cloth, leaves fins, once per window", #looted == 2 and looted[1] == 1 and looted[2] == 3)
+frame.onEvent(frame, "LOOT_SLOT_CLEARED", 1)
+frame.onEvent(frame, "LOOT_SLOT_CLEARED", 3)
+check("review mode keeps the window open", closed == 0)
+check("skipped is remembered", LootValueDB.autoLoot.skipped[1].link == link(1468))
+frame.onEvent(frame, "LOOT_CLOSED")
+AL.slash("autoloot quiet")
+loot({ { coin = true, name = "5 Silver" }, { link = link(1468), quality = 0, q = 2 } })
+check("quiet mode waits for the taken slot", closed == 0)
+frame.onEvent(frame, "LOOT_SLOT_CLEARED", 1)
+check("quiet mode closes and says what it left", closed == 1 and has(chat[#chat], "left |Hitem:1468"))
+frame.onEvent(frame, "LOOT_CLOSED")
+LOOT, looted = { { link = link(1468), quality = 0 } }, {}
+frame.onEvent(frame, "LOOT_READY", true)
+check("autoloot flag: takes nothing itself", #looted == 0)
+frame.onEvent(frame, "LOOT_CLOSED")
+AL.slash("autoloot min 1c")
+loot({ { link = link(1468), quality = 0 } })
+check("own minimum", #looted == 1)
+frame.onEvent(frame, "LOOT_CLOSED")
+AL.slash("autoloot off")
+check("off puts the game's Auto Loot back", cvars.autoLootDefault == "1")
+loot({ { link = link(1468), quality = 0 } })
+check("off: takes nothing", #looted == 0)
+AL.slash("skipped")
+check("/lv skipped lists items", has(chat[#chat], "last skipped:"))
+
 if failures > 0 then error(failures .. " LootValue test(s) failed") end
 print("all LootValue tests passed")

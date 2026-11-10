@@ -64,6 +64,32 @@ the 5% cut, the disenchant value).
 - With an AH price on the line, it says how old Auctionator's last scan is
   ("AH scan 3h ago").
 
+### Auto-loot
+
+LootValue also loots for you and leaves cheap junk (murloc fins and the
+like) on the body. It is on by default; `/lv` shows the settings.
+
+- Always taken: money, quest items, green or better, cloth, leather, ore,
+  herbs and other materials, consumables, recipes, bags, keys, reagents,
+  and any item the game has no info for yet.
+- Other items (grey junk, white meat and parts): taken when the stack is
+  worth at least 10c a character level (2s80c at level 28). The value is
+  the best of vendor, AH (only when the AH clearly pays more, as on the
+  tooltip) and disenchant. With 3 or fewer free bag slots the bar is 3x.
+  An item that fits on a stack you carry needs no slot, so any value takes
+  it. `/lv autoloot min 5s` sets your own bar; `min auto` goes back.
+- **review** mode (the default): the loot window stays open on what it
+  left, so you can click an item to take it after all. **quiet** mode
+  (`/lv autoloot quiet`): the window closes and one chat line lists what
+  it left. It never closes the window while a wanted item is still there
+  (bags full, a bind confirmation).
+- Shift+loot (the game's auto-loot key) takes everything. Fishing loot is
+  always taken whole.
+- `/lv skipped` lists the last 10 items it left (30 are kept).
+- `/lv autoloot off` turns it off. While it is on it keeps the game's own
+  Auto Loot option off (it can only choose when the game does not take
+  everything first), and `off` puts your old setting back.
+
 Its functions are on the global `LootValue` table (`adviceLine`,
 `marketInfo`, `ahWins`, `money`, `scanText`). Another addon can set
 `LootValue.deferTo = "<its name>"` and draw the line itself; LootValue's own
@@ -283,6 +309,7 @@ A small floating list, under the minimap, of the quests that matter now.
 | Turn in | quests in your log that are complete | nearest quest giver |
 | In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
 | Party has | quests your party members have that you do not (Questie's party data, `QuestieComms.remoteQuestLogs`), with who and their progress ("Ann 2/8") | nearest giver |
+| Town | the nearest innkeeper and flight master friendly to your side (Questie's NPC data, `npcFlags`); click or `/qb town` pins it on the map. Addons cannot walk you there | nearest |
 | Pick up | quests Questie shows as available ("!") that give XP and are at most 3 levels over you (`/qb range N`) | best estimated XP per minute (right-click the group: nearest) |
 
 - A quest in your log that a party member also has says so under it ("with
@@ -300,7 +327,8 @@ A small floating list, under the minimap, of the quests that matter now.
   whole board, as in focus; `/qb focus` turns both off.
 - The top line says what to do next: the open objective of a quest you
   are on now (Active), else the best area when it has 3 or more stops, else
-  the nearest hand-in, else the nearest quest.
+  the hand-in or quest with the best XP per minute from where you are
+  (travel included).
 - An item-started quest says where the item comes from (a mob that drops
   it, a chest or crate that holds it, or a vendor) and who takes it in.
   When Questie does not know (a world drop), the row says "drop unknown"
@@ -317,6 +345,18 @@ A small floating list, under the minimap, of the quests that matter now.
   orange, red). Each row shows the distance and an arrow that turns with
   you. The distance is green within 300 yards, yellow up to 1000 yards and
   grey beyond (`D.NEAR_YARDS`, `D.MID_YARDS`).
+- An Active quest with more to say gets a line per open objective (the
+  first with where to find it), a "Party:" line with each member's
+  progress, and the chain tag, up to 5 lines (`ns.ACTIVE_LINES`).
+- `/qb party off` hides party members' quests on the board and sets
+  Questie's `showPartyQuestObjectives` to off (its old value comes back
+  with `/qb party on`).
+- Minimap pointers: when Glance is loaded, QuestBoard gives its minimap
+  edge arrows the Next quest's place, the nearest hand-in and the Town
+  rows (`Glance.minimap.addPointerSource`, a list cached per refresh).
+- XP colours: in each group, the best third of the XP (Turn in) or XP per
+  minute (Pick up, Party has, Areas) is green and the worst third grey
+  (`D.tier`), so the better quests stand out.
 - A Turn in row shows the XP, the run time to the finisher (distance at
   your current speed, at least run speed, `D.RUN_SPEED`) and the best item that the quest gives
   ("[Murloc Charm] +1" when you choose one of two), or "no item". When the
