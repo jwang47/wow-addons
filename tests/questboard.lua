@@ -668,6 +668,27 @@ turnRow.scripts.OnEnter(turnRow)
 mods.QuestieDB.QueryQuestSingle = function(id, key) if key == "nextQuestInChain" then return NEXT[id] or 0 end end
 D.resetModules()
 
+-- A group past its row limit ends in a "+N more" line, never a silent cut.
+local saveRows = QuestBoardDB.rows.log
+QuestBoardDB.rows.log = 1
+local longList = { { name = "A" }, { name = "B" }, { name = "Stopping the Cycle" } }
+local cut = ns.shownRows("log", longList)
+check("rows: a cut group ends in a more line", #cut == 2 and cut[2].kind == "more" and cut[2].name == "+2 more: B, Stopping the Cycle")
+ns.click(cut[2])
+local open = ns.shownRows("log", longList)
+check("rows: click shows the whole group", #open == 4 and open[4].name == "show fewer")
+ns.click(open[4])
+check("rows: again folds it", #ns.shownRows("log", longList) == 2 and not ns.pinnable(cut[2]))
+check("rows: a short group has no more line", #ns.shownRows("log", { { name = "A" } }) == 1)
+QuestBoardDB.rows.log = saveRows
+-- /qb why: where a quest is, or why not.
+local whyState = { active = {}, nearby = {}, turnin = {}, log = { { name = "A" }, { name = "Stopping the Cycle" } }, party = {}, pickup = {} }
+check("why: past the row limit", D.whyQuest("stopping", whyState, { log = 1 }, { log = "In your log" }, 3)
+  == "Stopping the Cycle is in In your log at row 2, but the group shows 1 rows (/qb rows 2 shows it)")
+check("why: on the board", D.whyQuest("Stopping the Cycle", whyState, { log = 8 }, { log = "In your log" }, 3) == "Stopping the Cycle is in In your log, row 2")
+check("why: a level too high", D.unfitReason({ level = 20 }, 10, 3):find("level 20, more than 3 over you", 1, true) ~= nil)
+check("why: unknown name", D.whyQuest("no such quest", whyState, {}, {}, 3):find("no quest named", 1, true) ~= nil)
+
 -- Distances take a colour: green near, yellow a walk, grey far.
 check("distance colours", D.yardsText(120):find("^|cff") and D.yardsText(120) ~= D.yardsText(700)
   and D.yardsText(700) ~= D.yardsText(3000) and strip(D.yardsText(700)) == "700 yd")

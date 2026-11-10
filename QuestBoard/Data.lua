@@ -402,6 +402,71 @@ function D.availableIDs()
   return ids
 end
 
+-- Why a quest you can take is not on the board: nil when it fits, else
+-- a short reason.
+function D.unfitReason(quest, level, maxAbove)
+  level = level or D.playerLevel()
+  if quest.isHidden then return "Questie marks it hidden" end
+  if quest.requiredLevel and quest.requiredLevel > level then return "it needs level " .. quest.requiredLevel end
+  if D.difficulty(quest.level, level) == "grey" then return "it is grey for you (no XP), so Pick up leaves it out" end
+  if (quest.level or level) - level > (maxAbove or 3) then
+    return string.format("it is level %d, more than %d over you (/qb range %d shows it)", quest.level, maxAbove or 3, quest.level - level)
+  end
+  return nil
+end
+
+-- Finds a quest by name (part of it, any case) and says where it is on the
+-- board or why it is not there. st: the last pass; rows: rows per group;
+-- heads: group names; maxAbove: the /qb range.
+function D.whyQuest(query, st, rows, heads, maxAbove)
+  local q = (query or ""):lower()
+  if q == "" then return "name a quest: /qb why Stopping the Cycle" end
+  local function hit(name) return type(name) == "string" and name:lower():find(q, 1, true) ~= nil end
+  for _, kind in ipairs({ "active", "nearby", "turnin", "log", "party", "pickup" }) do
+    for i, e in ipairs(st and st[kind] or {}) do
+      if hit(e.name) then
+        local group = heads and heads[kind] or kind
+        local cap = rows and rows[kind] or 6
+        if i > cap then
+          return string.format("%s is in %s at row %d, but the group shows %d rows (/qb rows %d shows it)", e.name, group, i, cap, i)
+        end
+        return string.format("%s is in %s, row %d%s", e.name, group, i,
+          (kind ~= "active" and st.active and #st.active > 0) and " (while you are on a job, point at the board to see every group)" or "")
+      end
+    end
+  end
+  for _, e in ipairs(D.logQuests()) do
+    if hit(e.name) then return e.name .. " is in your log; the board shows it after its next update (a few seconds)" end
+  end
+  local qdb = D.module("QuestieDB")
+  if not qdb then return "no quest named \"" .. query .. "\" in your log, and Questie is not loaded to look for pick-ups" end
+  local level = D.playerLevel()
+  for _, id in ipairs(D.availableIDs()) do
+    local quest = call(qdb.GetQuest, id)
+    if type(quest) == "table" and hit(quest.name) then
+      local why = D.unfitReason(quest, level, maxAbove)
+      if why then return quest.name .. " is available, but " .. why end
+      local e = D.pickup(id, level, maxAbove)
+      if e and e.far then return quest.name .. " is available, but its giver is far away (another continent), so Pick up leaves it out" end
+      return quest.name .. " is available; it should show in Pick up after the next update"
+    end
+  end
+  for _, id in ipairs(D.ids and D.ids(qdb.QuestPointers) or {}) do
+    local name = call(qdb.QueryQuestSingle, id, "name")
+    if hit(name) then
+      local pre = D.preQuest and D.preQuest(id)
+      local f = api("C_QuestLog.IsQuestFlaggedCompleted") or rawget(_G, "IsQuestFlaggedCompleted")
+      if f and call(f, id) == true then return name .. ": you have done it already" end
+      if pre and not (f and call(f, pre) == true) then
+        local preName = call(qdb.QueryQuestSingle, pre, "name")
+        return name .. ": Questie says you cannot take it yet; do " .. (type(preName) == "string" and preName or ("quest " .. pre)) .. " first"
+      end
+      return name .. ": Questie does not show it as available to you (done, your class, race or faction, or the level)"
+    end
+  end
+  return "Questie has no quest named \"" .. query .. "\" (a quest new on Forever?); the board can show it only once it is in your log"
+end
+
 -- An entry for one available quest, or nil when it does not fit.
 -- kind "party": a quest a party member has; any level you can take.
 function D.pickup(id, level, maxAbove, kind)

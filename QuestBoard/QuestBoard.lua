@@ -16,6 +16,7 @@ local defaults = {
   maxAbove = 3,          -- pick-ups at most this many levels over you
   rows = { active = 4, nearby = 4, area = 3, turnin = 6, log = 8, party = 5, pickup = 8, town = 2, members = 4 },
   collapsed = {},
+  showAll = {},      -- groups opened past their row limit ("+N more")
   combatAlpha = 0.35,
   hideTrackers = false,  -- hide the game's quest tracker (and Questie's)
   locked = false,        -- /qb lock: no dragging
@@ -200,6 +201,12 @@ local function tooltip(r)
   local e, tip = r.entry, rawget(_G, "GameTooltip")
   if not (e and tip) then return end
   tip:SetOwner(r, "ANCHOR_LEFT")
+  if e.kind == "more" then
+    tip:AddLine(ns.db.showAll and ns.db.showAll[e.group] and "Click: back to the first rows" or "Click: show the whole group", 1, 1, 1)
+    for _, n in ipairs(e.hidden or {}) do tip:AddLine("- " .. n, 0.8, 0.8, 0.8) end
+    tip:Show()
+    return
+  end
   if e.kind == "member" then
     tip:AddLine(e.name .. (e.level and ("  level " .. e.level) or ""), 1, 1, 1)
     local where = e.dist and (D.yards(e.dist) .. (e.angle and (" " .. D.compass(e.angle)) or "")) or e.zoneName or "place unknown"
@@ -381,7 +388,7 @@ function ns.sayOnce(key, msg)
 end
 
 function ns.link(e)
-  if e.kind == "town" or e.kind == "area" or e.kind == "member" then return end
+  if e.kind == "town" or e.kind == "area" or e.kind == "member" or e.kind == "more" then return end
   local link = call(rawget(_G, "GetQuestLink"), e.id) or e.name
   if not call(rawget(_G, "ChatEdit_InsertLink"), link) then call(rawget(_G, "ChatFrame_OpenChat"), link) end
 end
@@ -435,7 +442,7 @@ function ns.toggleDoing(e)
 end
 
 -- Quest entries (not areas or town rows) can be marked as doing.
-function ns.pinnable(e) return e and e.id and e.kind ~= "area" and e.kind ~= "town" and e.kind ~= "member" and true or false end
+function ns.pinnable(e) return e and e.id and e.kind ~= "more" and e.kind ~= "area" and e.kind ~= "town" and e.kind ~= "member" and true or false end
 
 -- The quests in an area that you can mark as doing: every stop there
 -- (objectives, hand-ins and pick-ups).
@@ -465,6 +472,11 @@ end
 
 function ns.click(e, button)
   if not e then return end
+  if e.kind == "more" then
+    ns.db.showAll = ns.db.showAll or {}
+    ns.db.showAll[e.group] = not ns.db.showAll[e.group] or nil
+    return ns.render()
+  end
   if e.kind == "member" then
     if e.spot and e.spot.mapID then return ns.pin(e) end
     ns.sayOnce("noplace:" .. e.name, e.name .. ": the game does not say where they are (a dungeon or too far)")
@@ -641,6 +653,22 @@ function ns.setBar(r, e, kind)
   r.fill:Show()
 end
 
+-- The rows a group shows: the first ns.db.rows[kind], then a "+N more"
+-- line (click: the whole group, then a "show fewer" line), so a quest past
+-- the limit never vanishes without a word.
+function ns.shownRows(kind, list)
+  local cap = ns.db.rows[kind] or 6
+  if #list <= cap then return list end
+  local out = {}
+  local all = ns.db.showAll and ns.db.showAll[kind]
+  for i = 1, all and #list or cap do out[i] = list[i] end
+  local hidden = {}
+  for i = cap + 1, #list do table.insert(hidden, list[i].name) end
+  table.insert(out, { kind = "more", group = kind, left = {}, color = "white", hidden = hidden,
+    name = all and "show fewer" or ("+" .. (#list - cap) .. " more: " .. table.concat(hidden, ", ")) })
+  return out
+end
+
 -- Lays out the groups from the last result. The title and the Next line
 -- stay at the top; the groups below scroll when the board is taller than
 -- the max height you set (drag the grip at the bottom right).
@@ -680,22 +708,26 @@ function ns.render()
     h:Hide()
     if show then
       local collapsed = ns.db.collapsed[kind]
-      h.text:SetText((collapsed and "+ " or "") .. HEADS[kind] .. "  " .. #list)
+      local cap = ns.db.rows[kind] or 6
+      local count = (#list > cap and not (ns.db.showAll and ns.db.showAll[kind])) and (cap .. " of " .. #list) or #list
+      h.text:SetText((collapsed and "+ " or "") .. HEADS[kind] .. "  " .. count)
       local sortKey = kind == "pickup" and "sortPickup" or kind == "log" and "sortLog"
       h.right:SetText(kind == "active" and "doing now" or kind == "nearby" and "within 300 yd" or kind == "area" and "best XP" or kind == "town" and "click: map pin" or kind == "members" and "click: map pin"
         or sortKey and (ns.db[sortKey] == "xp" and "best XP" or "nearest") or "nearest")
       table.insert(items, { f = h, y = cy, h = HEAD_H, gap = 2 })
       cy = cy + HEAD_H + 2
       if not collapsed then
-        for i = 1, math.min(#list, ns.db.rows[kind] or 6) do
+        local shown = ns.shownRows(kind, list)
+        for i = 1, #shown do
           used = used + 1
           local r = rows[used] or makeRow(used)
-          local e = list[i]
+          local e = shown[i]
           r.entry = e
-          r.lvl:SetText(e.kind == "area" and #e.stops or e.kind == "town" and (e.role == "inn" and "Inn" or "Fly") or e.level or "?")
+          r.lvl:SetText(e.kind == "more" and "" or e.kind == "area" and #e.stops or e.kind == "town" and (e.role == "inn" and "Inn" or "Fly") or e.level or "?")
           r.lvl:SetTextColor(rgb(e.color))
           r.name:SetText(e.name)
-          if e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55)
+          if e.kind == "more" then r.name:SetTextColor(0.6, 0.6, 0.6)
+          elseif e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55)
           elseif e.classColor then r.name:SetTextColor(e.classColor[1], e.classColor[2], e.classColor[3])
           else r.name:SetTextColor(0.92, 0.92, 0.92) end
           -- Your Alt-click mark: a gold star before the name.
@@ -1180,6 +1212,7 @@ local help = {
   "/qb range N - pick-ups at most N levels over you (now %d)",
   "/qb rows N - rows per group (now %d)",
   "/qb height N - at most N pixels tall, scroll for the rest (off: no limit; or drag the grip)",
+  "/qb why NAME - where a quest is on the board, or why it is not there",
   "/qb town - pin the nearest innkeeper or flight master on the map (/qb inn: innkeeper only)",
   "/qb party off - hide party members' quests here and Questie's party objectives on the map (on brings them back)",
   "/qb reset - put the board back under the minimap",
@@ -1236,6 +1269,8 @@ SlashCmdList.QUESTBOARD = function(text)
     ns.setMaxHeight(n)
     say(n and ("max height " .. ns.db.maxHeight .. ", scroll for the rest") or "no max height")
     return
+  elseif cmd == "why" or cmd == "find" then
+    say(D.whyQuest(rest, state, ns.db.rows, HEADS, ns.db.maxAbove))
   elseif cmd == "town" or cmd == "inn" then
     local st = ns.state()
     local e

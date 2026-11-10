@@ -50,6 +50,12 @@ the same, and a test checks that every `.toc` version has a section here.
   and how many they are behind on. Point at a row for their progress on
   each shared quest; click pins where they are on the map. `/qb party off`
   hides it.
+- A group with more quests than its rows no longer drops the rest without
+  a word: its head says "8 of 12", and a last "+4 more: ..." line names
+  them. Click that line for the whole group ("show fewer" folds it).
+- `/qb why NAME` says where a quest is on the board, or why it is not
+  there (row limit, level, far away, a pre-quest first, or not in
+  Questie's data).
 
 ## GroupUp 0.1.0
 

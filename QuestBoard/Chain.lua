@@ -25,6 +25,8 @@ local function ids(t)
   return list
 end
 
+D.ids = ids
+
 -- Builds the reward index; tick() may yield (it runs inside collect).
 -- Returns true when the index is ready.
 function D.buildRewards(tick)
