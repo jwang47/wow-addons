@@ -315,6 +315,9 @@ A small floating list, under the minimap, of the quests that matter now.
 - An Active quest with more to say gets a line per open objective (the
   first with where to find it), a "Party:" line with each member's
   progress, and the chain tag, up to 5 lines (`ns.ACTIVE_LINES`).
+- `/qb party off` hides party members' quests on the board and sets
+  Questie's `showPartyQuestObjectives` to off (its old value comes back
+  with `/qb party on`).
 - Minimap pointers: when Glance is loaded, QuestBoard gives its minimap
   edge arrows the Next quest's place, the nearest hand-in and the Town
   rows (`Glance.minimap.addPointerSource`, a list cached per refresh).

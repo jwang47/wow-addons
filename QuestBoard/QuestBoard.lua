@@ -20,6 +20,7 @@ local defaults = {
   hideTrackers = false,  -- hide the game's quest tracker (and Questie's)
   locked = false,        -- /qb lock: no dragging
   compact = false,       -- /qb compact: one line per quest, no "what to do" line
+  party = true,          -- /qb party off: no party quests here, nor Questie's party objectives on the map
   focus = true,          -- in combat and instances: only Next and Active until mouse-over
   point = nil,           -- saved position { point, x, y }
   maxHeight = nil,       -- drag the grip (or /qb height N): scroll past it
@@ -804,6 +805,27 @@ function ns.registerPointers()
   return false
 end
 
+-- /qb party off|on. Questie's own map icons for party objectives follow its
+-- "Show party members' tracked quest objectives" option
+-- (profile.showPartyQuestObjectives); its old value comes back with on.
+function ns.setParty(on)
+  ns.db.party = on
+  local q = rawget(_G, "Questie")
+  local prof = type(q) == "table" and type(q.db) == "table" and q.db.profile
+  if type(prof) == "table" then
+    if on then
+      if ns.db.questiePartyWas ~= nil then prof.showPartyQuestObjectives = ns.db.questiePartyWas end
+      ns.db.questiePartyWas = nil
+    else
+      if ns.db.questiePartyWas == nil then ns.db.questiePartyWas = prof.showPartyQuestObjectives and true or false end
+      prof.showPartyQuestObjectives = false
+    end
+    local po = D.module("QuestiePartyObjectives")
+    if po and type(po.Update) == "function" then call(po.Update, po) end
+  end
+  ns.refresh()
+end
+
 ---------------------------------------------------------------------------
 -- Refresh: one collect() pass at a time, spread over frames.
 ---------------------------------------------------------------------------
@@ -829,7 +851,7 @@ function ns.refresh()
   if not (ns.db and ns.db.shown) then return end
   if job then again = true return end
   job = coroutine.create(function()
-    state = D.collect({ doing = ns.db.doing, sortLog = ns.db.sortLog, sortPickup = ns.db.sortPickup, maxAbove = ns.db.maxAbove,
+    state = D.collect({ party = ns.db.party, doing = ns.db.doing, sortLog = ns.db.sortLog, sortPickup = ns.db.sortPickup, maxAbove = ns.db.maxAbove,
       yield = coroutine.yield })
   end)
   runner:SetScript("OnUpdate", step)
@@ -1088,6 +1110,7 @@ local help = {
   "/qb rows N - rows per group (now %d)",
   "/qb height N - at most N pixels tall, scroll for the rest (off: no limit; or drag the grip)",
   "/qb town - pin the nearest innkeeper or flight master on the map (/qb inn: innkeeper only)",
+  "/qb party off - hide party members' quests here and Questie's party objectives on the map (on brings them back)",
   "/qb reset - put the board back under the minimap",
   "/qb tracker off - hide the game's quest tracker (on brings it back)",
   "/qb far on - show enemy nameplates from as far as the game allows (off puts it back)",
@@ -1118,6 +1141,10 @@ SlashCmdList.QUESTBOARD = function(text)
       end
     end
     say(rest == "off" and "the game's quest tracker is hidden" or "the game's quest tracker is back")
+    return
+  elseif cmd == "party" and (rest == "on" or rest == "off") then
+    ns.setParty(rest == "on")
+    say(rest == "on" and "party quests shown again" or "party quests hidden (here and Questie's party objectives on the map)")
     return
   elseif cmd == "far" and (rest == "on" or rest == "off") then
     ns.far(rest == "on")

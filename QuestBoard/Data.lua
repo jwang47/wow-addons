@@ -669,7 +669,7 @@ function D.collect(opts)
   end
   -- Your party: who shares each quest in your log, and the quests they have
   -- that you do not (Questie's party data), nearest giver first.
-  local members = D.partyMembers()
+  local members = opts.party == false and {} or D.partyMembers()
   if #members > 0 then
     for _, list in ipairs({ out.active, out.nearby, out.turnin, out.log }) do
       for _, e in ipairs(list) do e.party = D.partyOn(e.id, members) end

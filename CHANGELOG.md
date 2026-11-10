@@ -19,6 +19,9 @@ the same, and a test checks that every `.toc` version has a section here.
 - Areas count only real stops: no item-started pick-ups (their place is a
   drop or the finisher) and no party quests you cannot take. Inside an
   area its name says "Around you", and Next no longer says to go there.
+- `/qb party off` hides party members' quests on the board (Party has,
+  "with" and Party lines) and turns off Questie's party objectives on
+  the map; `/qb party on` brings both back.
 - With Glance loaded, its minimap edge arrows also point to the Next
   quest's place, the nearest hand-in and the inn and flight master.
 

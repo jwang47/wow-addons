@@ -678,6 +678,19 @@ local al = ns.activeLines({ target = "Kobold", left = { { text = "Candle: 2/8" }
 check("active detail: one line each", #al == 3 and al[1] == "Candle: 2/8  (Kobold)" and al[2] == "Kobold Miner slain: 1/6"
   and strip(al[3]) == "Party: Ann 5/8")
 
+-- /qb party off: no party data here, Questie's party objectives off, back on with on.
+local poCalls = 0
+Questie = { db = { profile = { showPartyQuestObjectives = true } } }
+mods.QuestiePartyObjectives = { Update = function() poCalls = poCalls + 1 end }
+D.resetModules()
+SlashCmdList.QUESTBOARD("party off")
+check("party off: Questie's party objectives off", Questie.db.profile.showPartyQuestObjectives == false and poCalls == 1 and QuestBoardDB.party == false)
+SlashCmdList.QUESTBOARD("party on")
+check("party on: Questie's setting comes back", Questie.db.profile.showPartyQuestObjectives == true and QuestBoardDB.party == true)
+check("party off: collect skips the party", #D.collect({ party = false }).party == 0)
+Questie, mods.QuestiePartyObjectives = nil, nil
+D.resetModules()
+
 -- Sorting: near ones by distance, far ones (past MID_YARDS) by XP.
 local sorted = D.sort({ { name = "a", dist = 3000, xp = 500 }, { name = "b", dist = 200, xp = 100 },
   { name = "c", xp = 2000 }, { name = "d", dist = 5000, xp = 1500 }, { name = "e", dist = 800, xp = 50 } }, "near")
