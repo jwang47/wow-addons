@@ -14,13 +14,12 @@ the same, and a test checks that every `.toc` version has a section here.
   off.
 - Hovering a row in the profession window's recipe list now shows the made
   item's tooltip.
+- Reagents the client has not seen yet get their AH price too: UpgradeFinder
+  learns the item names in the Auctionator scan once and saves them.
 
 ## LootValue 0.2.1
 
-- The AH scan time on the tooltip names the kind of scan: "AH full scan 3h
-  ago", or "AH search 13m ago, no full scan" when Auctionator only saw
-  searches. Before, any AH search counted as a scan, so a price could look
-  a day old just after a "scan".
+- The AH scan time on the tooltip says "AH full scan 3h ago".
 - An item that today's full scan did not see says "not in today's full
   scan" instead of yesterday's listings and price trend.
 - On a pattern or other recipe, the line prices the recipe itself. Before,
@@ -29,8 +28,8 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## Omni 0.1.3
 
-- The item tooltip uses the same AH scan wording as LootValue, and says
-  "not in today's full scan" next to an old price.
+- The item tooltip says "AH full scan 3h ago" like LootValue, and "not in
+  today's full scan" next to an old price.
 
 ## GroupUp 0.1.0
 

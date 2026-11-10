@@ -62,12 +62,11 @@ the 5% cut, the disenchant value).
   materials ("disenchant: no price" when no value is known).
 - A soulbound copy gets no AH option.
 - With an AH price on the line, it says how old Auctionator's last full
-  scan is ("AH full scan 3h ago"). With no full scan it names the last AH
-  search instead ("AH search 13m ago, no full scan"): Auctionator updates
-  that time on every AH search or browse page, and a search sees only the
-  items it shows. An item that a full scan today did not see says "not in
-  today's full scan": its price is from an older day, so the listings and
-  the trend are old too.
+  scan is ("AH full scan 3h ago"). An item that a full scan today did not
+  see says "not in today's full scan": nobody lists it now, and its price,
+  listings and trend are from an older day. Auctionator counts price days
+  from local midnight, so an item seen only last night is "1 day old" in
+  the morning.
 
 ### Auto-loot
 
@@ -190,9 +189,13 @@ the price to buy the made item on the AH instead.
   made), **Profit** or **Loss**, and for gear the **Score of the made item**
   against what you wear (MageMentor's score for a mage with MageMentor).
   A bind on pickup item sells only to the vendor. An enchanting formula
-  makes no item, so it gets the cost only. A recipe item can name its made
-  item only by name, so the sale price needs an item the client has seen;
-  else it says "no price". `/uf craft` turns the lines off and on.
+  makes no item, so it gets the cost only. On a recipe tooltip the game
+  reports the made item, so that gives its price. A recipe names its
+  reagents only by name, and the game finds an item by name only once the
+  client has seen it; so UpgradeFinder learns the names of the items in the
+  Auctionator scan in the background (150 per 1.5 s) and saves them in
+  `UpgradeFinderDB.names`. A reagent that shows "No price" at first gets
+  its price on the next hover. `/uf craft` turns the lines off and on.
 - Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
   **Any price / Can afford**, and **All sources / AH only / Dungeons / Bags

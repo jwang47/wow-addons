@@ -913,6 +913,44 @@ tt = fakeTooltip("FakeTipG", "|Hitem:117::|h[Silk Robe]|h")
 tt:AddLine("Silk Robe")
 Cr.onTooltip(tt)
 check("craft: the made item itself gets no lines", #tt.lines == 1)
+-- The made item from the game's recipe tooltip, when its name is unknown to the client.
+ITEMS[120] = { loc = "", class = 9, lines = { "Pattern: Earthen Hood", "Earthen Hood", "Binds when equipped", "Head",
+  "+10 Spirit", "Use: Teaches you how to craft Earthen Hood.", "Fine Thread (2), Elemental Earth (2)",
+  "Requires Tailoring (150)" } }
+INFO["Pattern: Earthen Hood"] = { 120, 2, 30, "", 300, 9 }
+byId[120] = "Pattern: Earthen Hood"
+byId[121] = "Earthen Hood"
+INFO["Earthen Hood"] = { 121, 2, 30, "INVTYPE_HEAD", 500, 4, 2 }
+local hoodInfo = INFO["Earthen Hood"]
+INFO["Earthen Hood"] = nil -- not seen by name
+local ahById = Auctionator.API.v1.GetAuctionPriceByItemID
+Auctionator.API.v1.GetAuctionPriceByItemID = function(c, id)
+  return ({ [121] = 9000, [7067] = 2000 })[id] or ahById(c, id) end
+local function byIdInfo(id) local n = byId[id] return n and (INFO[n] or (id == 121 and hoodInfo)) and n end
+local infoNow = C_Item.GetItemInfo
+local earthSeen = false
+C_Item.GetItemInfo = function(x)
+  local id = tonumber(tostring(x):match("^item:(%d+)$"))
+  if id == 121 then local v = hoodInfo return "Earthen Hood", "item:121", v[2], v[3], 1, "", "", 1, v[4], 0, v[5], v[6], 0, v[7] end
+  if id == 7067 and earthSeen then return "Elemental Earth", "item:7067", 1, 25, 1, "", "", 10, "", 0, 100, 7 end
+  return infoNow(x)
+end
+C_Item.RequestLoadItemDataByID = function(id) if id == 7067 then earthSeen = true end end
+runTimers() -- the name pass started by earlier tests ends
+Cr.NAME_COOLDOWN = 0
+Auctionator.Database.db["7067"] = {}
+tt = fakeTooltip("FakeTipH", "|Hitem:121::|h[Earthen Hood]|h")
+tt:AddLine("Pattern: Earthen Hood")
+Cr.onTooltip(tt)
+check("craft: the made item from the recipe tooltip", tt:find("Sells for") == "~85s 50c AH")
+check("craft: an unseen reagent name has no price at first", tt:find("  No price: Elemental Earth"))
+runTimers()
+check("craft: reagent names are learned from the Auctionator scan", UpgradeFinderDB.names["Elemental Earth"] == 7067)
+tt = fakeTooltip("FakeTipI", "|Hitem:121::|h[Earthen Hood]|h")
+tt:AddLine("Pattern: Earthen Hood")
+Cr.onTooltip(tt)
+check("craft: the learned name gives the price", tt:find("Cost to craft") == "42s 00c" and tt:find("Profit") == "+43s 50c")
+C_Item.GetItemInfo = infoNow
 SlashCmdList.UPGRADEFINDER("craft")
 tt = fakeTooltip("FakeTipD", "item:118")
 Cr.onTooltip(tt)

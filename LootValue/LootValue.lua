@@ -29,22 +29,21 @@ LV.call = call
 
 function LV.hasAuctionator() return api() ~= nil end
 
--- When Auctionator last scanned the AH (unix seconds), or nil. Auctionator
+-- When Auctionator last ran a full scan (unix seconds), or nil. Auctionator
 -- keeps TimeOfLast...Scan fields in its saved state (Auctionator.SavedState,
--- the AUCTIONATOR_SAVEDVARS table). TimeOfLastBrowseScan changes on every AH
--- search or browse page, which sees only the items it showed; the other
--- fields (GetAll, Replicate) are full scans of every listing.
--- kind: "full", "search" or nil (any). Omni and MageMentor use
+-- the AUCTIONATOR_SAVEDVARS table), one per kind of full scan: Browse (the
+-- Full Scan button's default "incremental" scan, which pages through every
+-- listing), Replicate (with its replicate option on) and GetAll (older AH
+-- code). A plain AH search sets none of them. Omni and MageMentor use
 -- LootValue.scanText() too.
-function LV.lastScan(kind)
+function LV.lastScan()
   local state = Auctionator and Auctionator.SavedState
   if type(state) ~= "table" then state = rawget(_G, "AUCTIONATOR_SAVEDVARS") end
   if type(state) ~= "table" then return nil end
   local newest
   for k, v in pairs(state) do
-    local search = k == "TimeOfLastBrowseScan"
     if type(k) == "string" and k:find("^TimeOfLast.*Scan$") and type(v) == "number" and v > 0
-      and (not kind or (kind == "search") == search) and (not newest or v > newest) then newest = v end
+      and (not newest or v > newest) then newest = v end
   end
   return newest
 end
@@ -62,7 +61,7 @@ end
 
 -- True when a full scan ran today: an item with an older price was not listed.
 function LV.fullScanToday()
-  local full, midnight = LV.lastScan("full"), LV.midnight()
+  local full, midnight = LV.lastScan(), LV.midnight()
   return full ~= nil and midnight ~= nil and full >= midnight
 end
 
@@ -75,13 +74,10 @@ function LV.ago(t)
   return math.floor(s / 86400) .. "d ago"
 end
 
--- "AH full scan 3h ago", or "AH search 13m ago, no full scan" when
--- Auctionator only saw searches; nil when the scan time is unknown.
+-- "AH full scan 3h ago", or nil when the scan time is unknown.
 function LV.scanText()
-  local full = LV.lastScan("full")
-  if full then return "AH full scan " .. LV.ago(full) end
-  local search = LV.lastScan("search")
-  return search and ("AH search " .. LV.ago(search) .. ", no full scan") or nil
+  local t = LV.lastScan()
+  return t and ("AH full scan " .. LV.ago(t)) or nil
 end
 
 function LV.money(copper)

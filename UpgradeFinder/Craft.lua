@@ -29,13 +29,82 @@ local function info(item)
 end
 C.info = info
 
+---------------------------------------------------------------------------
+-- Item names. A recipe names its reagents and its made item by name, and
+-- the game finds an item by name only when the client has seen it. So the
+-- names of the items in the Auctionator scan are learned once in the
+-- background and saved (UpgradeFinderDB.names[name] = id).
+---------------------------------------------------------------------------
+local function names()
+  local db = ns.db()
+  db.names = db.names or {}
+  return db.names
+end
+
+function C.learn(name, id)
+  if type(name) == "string" and type(id) == "number" then names()[name] = id end
+end
+
+-- The item ID for a name, or nil (then C.learnNames runs once).
+function C.idByName(name)
+  local it = info(name)
+  if it and it.id then C.learn(name, it.id) return it.id end
+  local id = names()[name]
+  if id then return id end
+  C.learnNames()
+  return nil
+end
+
+C.NAME_BATCH, C.NAME_WAIT, C.NAME_TRIES, C.NAME_COOLDOWN = 150, 1.5, 3, 60
+local learning = nil -- { queue, tries } while the names load
+local learnedAt = nil -- when the last pass ended; a new scan can add names
+function C.learnNames()
+  if learning then return end
+  local now = call(rawget(_G, "time"))
+  if learnedAt and now and now - learnedAt < C.NAME_COOLDOWN then return end
+  local db = api("Auctionator.Database.db")
+  if type(db) ~= "table" then return end
+  local known, queue = {}, {}
+  for _, id in pairs(names()) do known[id] = true end
+  for key in pairs(db) do
+    -- Gear is keyed "g:12345:20"; reagents and made items without a level are plain.
+    local id = tonumber(key)
+    if id and not known[id] then table.insert(queue, id) end
+  end
+  learning = { queue = queue, tries = {} }
+  local function step()
+    local q, again = learning.queue, {}
+    local n = 0
+    while #q > 0 and n < C.NAME_BATCH do
+      local id = table.remove(q)
+      n = n + 1
+      local it = info(id)
+      if it and it.name then C.learn(it.name, id)
+      else
+        learning.tries[id] = (learning.tries[id] or 0) + 1
+        if learning.tries[id] <= C.NAME_TRIES then
+          call(api("C_Item.RequestLoadItemDataByID"), id)
+          table.insert(again, id)
+        end
+      end
+    end
+    for _, id in ipairs(again) do table.insert(q, 1, id) end
+    local after = api("C_Timer.After")
+    if #q > 0 and after then after(C.NAME_WAIT, step)
+    else learning, learnedAt = nil, call(rawget(_G, "time")) end
+  end
+  step()
+end
+
 -- What the reagents cost: { total, missing = { names }, parts }. Each
 -- reagent is { id or name, count, name } and costs its AH price or the
 -- vendor's price when that is lower (Scan.priceOf).
 function C.cost(reagents)
   local out = { total = 0, missing = {}, parts = {} }
   for _, r in ipairs(reagents or {}) do
-    local each, from = Scan.priceOf(r[1])
+    local item = r[1]
+    if type(item) == "string" then item = C.idByName(item) or item end
+    local each, from = Scan.priceOf(item)
     table.insert(out.parts, { r[3] or r[1], r[2], each, from })
     if each then out.total = out.total + each * r[2]
     else table.insert(out.missing, tostring(r[3] or r[1])) end
@@ -47,6 +116,7 @@ end
 -- bind on pickup item), the vendor and, with Enchanting and LootValue, the
 -- disenchant estimate. { best, how, ah, vendor, de } or nil when unknown.
 function C.sale(item, bop)
+  if type(item) == "string" then item = C.idByName(item) or item end
   local it = info(item)
   if not it then return nil end
   -- The made item's own bind type wins: a bind on pickup pattern can make
@@ -162,14 +232,16 @@ function C.recipe(id)
   return recipes[id]
 end
 
-function C.forRecipe(id)
+-- product: the made item's id when the caller knows it (the game's recipe
+-- tooltip reports it), else it is found by name.
+function C.forRecipe(id, product)
   local r = C.recipe(id)
   if not r then return nil end
   -- Enchanting formulas make no item: show the cost only.
   local enchant = r.made:match("^Enchant ") ~= nil
   local score
   if Scan.item(id) and Scan.cache[id] then score = Scan.cache[id] end
-  return C.lines({ reagents = r.reagents, product = r.made, bop = r.bop, enchant = enchant, score = score })
+  return C.lines({ reagents = r.reagents, product = product or r.made, bop = r.bop, enchant = enchant, score = score })
 end
 
 -- The recipe a tooltip shows. On a recipe tooltip GetItem gives the item
@@ -196,7 +268,10 @@ local function onTooltip(tt, data)
   if tt == rawget(_G, "UpgradeFinderScanTooltip") then return end
   local id = C.recipeOf(tt, data)
   if not id or hasLines(tt) then return end
-  local lines = C.forRecipe(id)
+  local _, link = tt:GetItem()
+  local made = idOf(link)
+  if made == id or isRecipe(made) then made = nil end
+  local lines = C.forRecipe(id, made)
   if lines then add(tt, lines) end
 end
 
@@ -221,6 +296,7 @@ function C.forTradeSkill(index)
   for i = 1, call(g("GetTradeSkillNumReagents"), index) or 0 do
     local name, _, count = call(g("GetTradeSkillReagentInfo"), index, i)
     local id = idOf(call(g("GetTradeSkillReagentItemLink"), index, i))
+    if id and name then C.learn(name, id) end
     if id or name then table.insert(reagents, { id or name, count or 1, name }) end
   end
   if #reagents == 0 then return nil end

@@ -97,10 +97,9 @@ check("cheap item, AH pays 14x the vendor", has(LV.adviceLine("|Hitem:9003:0|h",
 
 -- Scan age -------------------------------------------------------------------
 check("no scan time: nothing shown", LV.scanText() == nil and has(robe, "AH 42s") and not has(robe, "AH scan"))
-SAVED.TimeOfLastBrowseScan = os.time() - 13 * 60
-check("only searches: says so", LV.scanText() == "AH search 13m ago, no full scan")
 SAVED.TimeOfLastGetAllScan = os.time() - 3 * 3600 - 5
-check("a full scan wins over a newer search", LV.scanText() == "AH full scan 3h ago")
+SAVED.TimeOfLastBrowseScan = os.time() - 5 * 3600
+check("newest full scan as an age", LV.scanText() == "AH full scan 3h ago")
 check("scan age on a line with an AH price", has(LV.adviceLine("|Hitem:9001:0|h", true, CTX), "· AH full scan 3h ago"))
 -- A full scan since midnight that did not see the item: its price is old,
 -- and yesterday's listings and trend no longer count.

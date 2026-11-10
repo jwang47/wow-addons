@@ -391,7 +391,7 @@ do
   Auctionator.API.v1.GetAuctionAgeByItemID = function(_, id) return id == 4306 and 0 or nil end
   check("AH age in the row", strip(A.detail(g[1].entries[1])) == "bags 12  bank 20  AH 25s 0c  today")
   check("last scan: the newer stamp", A.lastScan() == 92800 and A.ago(A.lastScan()) == "2h ago"
-    and A.scanText() == "AH search 2h ago, no full scan")
+    and A.scanText() == "AH full scan 2h ago")
   Auctionator.SavedState.TimeOfLastGetAllScan = 100000 - 120
   check("last scan: a newer full scan wins", A.ago(A.lastScan()) == "2m ago")
   local lines = {}
