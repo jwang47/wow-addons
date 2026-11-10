@@ -11,6 +11,7 @@ local C = {}
 ns.craft = C
 
 C.LABEL = "Cost to craft"
+C.INTO = "Make into "
 C.CUT = 0.95 -- the AH keeps 5% of a sale
 
 local GOLD, GREY, BLUE = { 1, 0.82, 0 }, { 0.6, 0.6, 0.6 }, { 0.41, 0.8, 0.94 }
@@ -218,7 +219,8 @@ local function hasLines(tt)
   if not name or not tt.NumLines then return false end
   for i = 1, tt:NumLines() do
     local fs = rawget(_G, name .. "TextLeft" .. i)
-    if fs and fs.GetText and fs:GetText() == C.LABEL then return true end
+    local t = fs and fs.GetText and fs:GetText()
+    if t == C.LABEL or (type(t) == "string" and t:find("^" .. C.INTO)) then return true end
   end
   return false
 end
@@ -278,12 +280,105 @@ local function onTooltip(tt, data)
   if not (tt and tt.GetItem) or not on() then return end
   if tt == rawget(_G, "UpgradeFinderScanTooltip") then return end
   local id = C.recipeOf(tt, data)
-  if not id or hasLines(tt) then return end
+  if not id then
+    -- Not a recipe: a material you can make into something ("Make into").
+    local _, link = tt:GetItem()
+    local item = idOf(link)
+    local lines = item and not hasLines(tt) and C.forMaterial(item)
+    if lines and #lines > 0 then add(tt, lines) end
+    return
+  end
+  if hasLines(tt) then return end
   local _, link = tt:GetItem()
   local made = idOf(link)
   if made == id or isRecipe(made) then made = nil end
   local lines = C.forRecipe(id, made)
   if lines then add(tt, lines) end
+end
+
+---------------------------------------------------------------------------
+-- Transformations: a material you can make into another item with one
+-- reagent (Silk Cloth -> Bolt of Silk Cloth, ore -> bar). The tooltip of the
+-- material says what one craft gains or loses. The recipes come from your
+-- profession windows (saved in UpgradeFinderDB.recipes); the cloth bolts
+-- are built in, so they show before you open Tailoring.
+---------------------------------------------------------------------------
+-- [made item id] = { reagent id, count }
+C.BUILT_IN = {
+  [2996] = { 2589, 2 },   -- Bolt of Linen Cloth: 2 Linen Cloth
+  [2997] = { 2592, 3 },   -- Bolt of Woolen Cloth: 3 Wool Cloth
+  [4305] = { 4306, 4 },   -- Bolt of Silk Cloth: 4 Silk Cloth
+  [4339] = { 4338, 5 },   -- Bolt of Mageweave: 5 Mageweave Cloth
+  [14048] = { 14047, 5 }, -- Bolt of Runecloth: 5 Runecloth
+}
+
+local function recipesDB()
+  local db = ns.db()
+  db.recipes = db.recipes or {}
+  return db.recipes
+end
+
+-- Saves a recipe from the profession window: made item -> { reagents = {
+-- { id, count } }, made }.
+function C.saveRecipe(product, reagents, made)
+  if not product or #reagents == 0 then return end
+  local r = { reagents = {}, made = made or 1 }
+  for _, x in ipairs(reagents) do
+    if type(x[1]) ~= "number" then return end -- a reagent not loaded yet: next time
+    table.insert(r.reagents, { x[1], x[2] })
+  end
+  recipesDB()[product] = r
+end
+
+-- Every recipe of the open profession window.
+function C.readTradeSkills()
+  local g = function(n) return rawget(_G, n) end
+  for i = 1, call(g("GetNumTradeSkills")) or 0 do
+    local _, kind = call(g("GetTradeSkillInfo"), i)
+    if kind ~= "header" then
+      local product = idOf(call(g("GetTradeSkillItemLink"), i))
+      local reagents = {}
+      for r = 1, call(g("GetTradeSkillNumReagents"), i) or 0 do
+        local name, _, count = call(g("GetTradeSkillReagentInfo"), i, r)
+        local id = idOf(call(g("GetTradeSkillReagentItemLink"), i, r))
+        if id and name then C.learn(name, id) end
+        table.insert(reagents, { id or name, count or 1 })
+      end
+      local lo, hi = call(g("GetTradeSkillNumMade"), i)
+      C.saveRecipe(product, reagents, ((lo or 1) + (hi or lo or 1)) / 2)
+    end
+  end
+end
+
+-- The transformation lines for a material: one per made item.
+function C.forMaterial(id)
+  local money, out = ns.money, {}
+  local uses = {}
+  for product, r in pairs(C.BUILT_IN) do
+    if r[1] == id then uses[product] = { count = r[2], made = 1 } end
+  end
+  for product, r in pairs(recipesDB()) do
+    if #r.reagents == 1 and r.reagents[1][1] == id then
+      uses[product] = { count = r.reagents[1][2], made = r.made or 1 }
+    end
+  end
+  for product, u in pairs(uses) do
+    local each = Scan.priceOf(id)
+    local sale = C.sale(product)
+    local it = info(product)
+    local name = it and it.name or ("item " .. product)
+    local label = C.INTO .. name .. " (" .. u.count .. " each)"
+    if each and sale then
+      local cost = each * u.count
+      local diff = sale.best * u.made - cost
+      table.insert(out, { label, string.format("%s%s (%s -> %s%s)", diff >= 0 and "+" or "-", money(math.abs(diff)),
+        money(cost), sale.how == "vendor" and "" or "~", money(sale.best * u.made)), GOLD, diff >= 0 and GREEN or RED })
+    else
+      table.insert(out, { label, "no price", GOLD, GREY })
+    end
+  end
+  table.sort(out, function(a, b) return a[1] < b[1] end)
+  return out
 end
 
 -- Errors are reported once in chat, so a broken line does not fail silently.
@@ -382,10 +477,13 @@ function C.hook()
       -- Learn the names soon after login, before the first recipe hover.
       local after = api("C_Timer.After")
       if after then after(5, function() C.guard(C.learnNames) end) end
+    elseif ev == "TRADE_SKILL_SHOW" or ev == "TRADE_SKILL_UPDATE" then C.guard(C.readTradeSkills)
     elseif name == "Blizzard_TradeSkillUI" then C.hookRows() end
   end)
   pcall(f.RegisterEvent, f, "ADDON_LOADED")
   pcall(f.RegisterEvent, f, "PLAYER_EQUIPMENT_CHANGED")
   pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
+  pcall(f.RegisterEvent, f, "TRADE_SKILL_SHOW")
+  pcall(f.RegisterEvent, f, "TRADE_SKILL_UPDATE")
 end
 C.hook()

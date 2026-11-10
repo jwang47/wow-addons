@@ -14,6 +14,9 @@ the same, and a test checks that every `.toc` version has a section here.
   off.
 - Hovering a row in the profession window's recipe list now shows the made
   item's tooltip.
+- Transformations: the tooltip of a material you can make into another
+  item (Silk Cloth into Bolt of Silk Cloth, ore into bars) says what one
+  craft gains or loses ("Make into Bolt of Silk Cloth (4 each)").
 - Reagents the client has not seen yet get their AH price too: UpgradeFinder
   learns the item names in the Auctionator scan once and saves them.
 

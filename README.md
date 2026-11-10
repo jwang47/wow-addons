@@ -196,7 +196,13 @@ the price to buy the made item on the AH instead.
   Auctionator scan in the background, starting 5 s after login (names the
   client knows at once, others asked from the server 150 per 1.5 s), and saves them in
   `UpgradeFinderDB.names`. A reagent that shows "No price" at first gets
-  its price on the next hover. `/uf craft` turns the lines off and on.
+  its price on the next hover. A material you can turn into another item
+  with one reagent (Silk Cloth into Bolt of Silk Cloth, ore into bars)
+  gets a "Make into" line: what one craft gains or loses, with the cost
+  and the sale ("+7s 50c (40s -> ~47s 50c)"). The cloth bolts are built
+  in; other such recipes are read each time you open a profession window
+  and saved in `UpgradeFinderDB.recipes`. `/uf craft` turns the lines off
+  and on.
 - Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
   **Any price / Can afford**, and **All sources / AH only / Dungeons / Bags

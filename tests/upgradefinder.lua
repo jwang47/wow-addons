@@ -953,6 +953,38 @@ check("craft: the learned name gives the price", tt:find("Cost to craft") == "42
 SlashCmdList.UPGRADEFINDER("craft names")
 check("/uf craft names says how many names it knows", chat[#chat]:match("item names: %d+ learned") ~= nil)
 C_Item.GetItemInfo = infoNow
+-- Transformations: Silk Cloth -> Bolt of Silk Cloth (built in), Copper Ore -> Copper Bar (learned).
+local infoT = C_Item.GetItemInfo
+local TNAMES = { [4306] = "Silk Cloth", [4305] = "Bolt of Silk Cloth", [2770] = "Copper Ore", [2840] = "Copper Bar" }
+C_Item.GetItemInfo = function(x)
+  local id = tonumber(tostring(x):match("^item:(%d+)$"))
+  if id and TNAMES[id] then return TNAMES[id], "item:" .. id, 1, 10, 1, "", "", 20, "", 0, 50, 7 end
+  return infoT(x)
+end
+local ahT = Auctionator.API.v1.GetAuctionPriceByItemID
+Auctionator.API.v1.GetAuctionPriceByItemID = function(c, id)
+  return ({ [4306] = 1000, [4305] = 5000, [2770] = 100, [2840] = 50 })[id] or ahT(c, id) end
+tt = fakeTooltip("FakeTipJ", "item:4306")
+Cr.onTooltip(tt)
+-- 4 x 10s = 40s in; the bolt sells for 50s less 5% = 47s 50c.
+check("transform: built-in bolt on the cloth tooltip", tt:find("Make into Bolt of Silk Cloth (4 each)") == "+7s 50c (40s 00c -> ~47s 50c)")
+GetNumTradeSkills = function() return 2 end
+GetTradeSkillInfo = function(i) return i == 1 and "Smelting" or "Copper Bar", i == 1 and "header" or "optimal" end
+GetTradeSkillItemLink = function(i) return i == 2 and "|Hitem:2840::|h[Copper Bar]|h" or nil end
+GetTradeSkillNumReagents = function(i) return i == 2 and 1 or 0 end
+GetTradeSkillReagentInfo = function() return "Copper Ore", "icon", 1, 5 end
+GetTradeSkillReagentItemLink = function() return "|Hitem:2770::|h[Copper Ore]|h" end
+GetTradeSkillNumMade = function() return 1, 1 end
+Cr.readTradeSkills()
+check("transform: recipes learned from the profession window", UpgradeFinderDB.recipes[2840]
+  and UpgradeFinderDB.recipes[2840].reagents[1][1] == 2770)
+tt = fakeTooltip("FakeTipK", "item:2770")
+Cr.onTooltip(tt)
+check("transform: a loss shows red", tt:find("Make into Copper Bar (1 each)") == "-50c (1s 00c -> 50c)")
+local n2 = #tt.lines
+Cr.onTooltip(tt)
+check("transform: added once", #tt.lines == n2)
+C_Item.GetItemInfo, Auctionator.API.v1.GetAuctionPriceByItemID = infoT, ahT
 SlashCmdList.UPGRADEFINDER("craft")
 tt = fakeTooltip("FakeTipD", "item:118")
 Cr.onTooltip(tt)
