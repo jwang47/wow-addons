@@ -115,7 +115,8 @@ end
 
 local function questieQuery(kind, id, key)
   local qdb = ns.sources.questieDB()
-  local fn = qdb and ({ npc = qdb.QueryNPCSingle, quest = qdb.QueryQuestSingle, item = qdb.QueryItemSingle })[kind]
+  local fn = qdb and ({ npc = qdb.QueryNPCSingle, quest = qdb.QueryQuestSingle, item = qdb.QueryItemSingle,
+    object = qdb.QueryObjectSingle })[kind]
   return call(fn, id, key)
 end
 A.questieQuery = questieQuery
@@ -286,7 +287,13 @@ function A.run(e, alt)
     local by = questieQuery("quest", e.id, "startedBy")
     local npc = type(by) == "table" and firstNpc(by[1])
     if npc then return showNpc(npc, e.name .. " (from " .. (questieQuery("npc", npc, "name") or "?") .. ")") end
-    say(e.name .. ": Questie has no start NPC (it may start from an object or an item)")
+    -- Some quests start at an object (a note, a bag): pin the object.
+    local obj = type(by) == "table" and firstNpc(by[2])
+    if obj then
+      return A.showSpawn(e.name .. " (at " .. (questieQuery("object", obj, "name") or "an object") .. ")",
+        questieQuery("object", obj, "spawns"))
+    end
+    say(e.name .. ": Questie has no start NPC or object (it may start from an item)")
     return false
   end
   return false
@@ -395,6 +402,7 @@ function A.detail(e)
   elseif k == "quest" then
     local lvl = questieQuery("quest", e.id, "questLevel")
     local d = type(lvl) == "number" and ("level " .. lvl) or ""
+    if e.chainNote then d = "|cff9d9d9d" .. e.chainNote .. "|r  " .. d end
     local status = A.questStatus(e.id)
     if status == "log" then return "|cffffd100in your log|r  " .. d end
     if status == "done" then return "|cff9d9d9ddone|r  " .. d end

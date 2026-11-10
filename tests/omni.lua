@@ -179,10 +179,14 @@ local NPC = { [234] = { name = "Gryan Stoutmantle", subName = "The People's Mili
   [639] = { name = "Edwin VanCleef", spawns = { [1581] = { { -1, -1 } } } } }
 local QUEST = { [65] = { name = "The Defias Brotherhood", startedBy = { { 234 } }, questLevel = 18 },
   [6563] = { name = "The Essence of Aku'Mai", startedBy = { { 12736 } }, questLevel = 22, zoneOrSort = 719 },
-  [6921] = { name = "Amongst the Ruins", questLevel = 27, zoneOrSort = 10020 } }
+  [6921] = { name = "Amongst the Ruins", questLevel = 27, zoneOrSort = 10020 },
+  [79975] = { name = "A Spot to Rest", questLevel = 30, preQuestSingle = { 79974 } },
+  [79974] = { name = "Weary Traveler", questLevel = 28 },
+  [79976] = { name = "This Must Be The Place", questLevel = 32, preQuestSingle = { 79975 }, startedBy = { nil, { 50 } } } }
 local ITEM = { [3307] = { name = "Gnoll Paw", npcDrops = { 235 } }, [4306] = { name = "Silk Cloth" },
   [7000] = { name = "Heartwood Girdle", questRewards = { 6563 } },
   [2589] = { name = "Linen Cloth", objectDrops = { 50 }, vendors = { 234 } },
+  [211527] = { name = "Cozy Sleeping Bag", vendors = { 234 }, questRewards = { 79976 } },
   [280132] = { name = "Perfect Razormaw Egg", objectDrops = { 671892, 671931 }, relatedQuests = { 65 } } }
 local OBJECT = { [50] = { name = "Old Crate", spawns = { [10] = { { 40, 60 } } } } }
 local AREA = { [40] = 1436, [10] = 1431, [1581] = 9002 }
@@ -626,6 +630,17 @@ do
   src = ns.search("from: perfect razormaw egg")
   check("unknown objects get one row that says so", titles(src) == "Found in,For quests"
     and src[1].entries[1].name == "2 objects Questie has no location for")
+  -- A quest reward also sold by a vendor (who may want the quest done first):
+  -- the chain start, then the reward quest, before the vendor.
+  ns.fromID, ns.fromName = 211527, "cozy sleeping bag"
+  local bag = ns.search("from: cozy sleeping bag")
+  check("reward quests come before the vendor", titles(bag) == "Reward from,Sold by (may need the quest first)")
+  check("chain start, then the quest that gives it", names(bag, "quest") == "Weary Traveler,This Must Be The Place")
+  calls = {}
+  ns.actions.run(bag[1].entries[2])
+  check("a quest that starts at an object pins the object", chat[#chat]:find("This Must Be The Place %(at Old Crate%)") ~= nil)
+  check("chain notes", strip(ns.actions.detail(bag[1].entries[1])):find("chain start, 3 quests") ~= nil
+    and strip(ns.actions.detail(bag[1].entries[2])):find("gives it, quest 3 of 3") ~= nil)
   check("the quest that needs it", src[2].entries[1].kind == "quest" and src[2].entries[1].name == "The Defias Brotherhood")
 end
 g = ns.search("silk cloth")
