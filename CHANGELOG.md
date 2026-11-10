@@ -9,6 +9,7 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - New addon, a lighter HUD (`/glance`). Not in the releases yet: try it
   with `dev.ps1 Glance`.
+- A watch row of key spells (Blink, Counterspell ...) under your character.
 - Range on the target frame: a green or red edge, exact yards for party
   members and a yard bracket for anyone else.
 - Party members are easy to find: a large class-coloured name above each

@@ -339,3 +339,155 @@ ns.module("units", function()
     ns.on(ev, function(unit) if unit == "player" then castUpdate() end end)
   end
 end)
+
+---------------------------------------------------------------------------
+-- Watch row: your key spells (Blink, Counterspell ...) as large icons just
+-- below your character, so you see them without looking at the bar. Bright
+-- when ready, dark with a sweep while cooling down, a short flash when one
+-- comes back. /glance watch add NAME, /glance watch remove NAME.
+---------------------------------------------------------------------------
+local WATCH_SIZE = 30
+local WATCH_DEFAULTS = {
+  MAGE = { "Blink", "Counterspell", "Frost Nova", "Ice Block", "Cold Snap", "Ice Barrier", "Evocation" },
+  WARRIOR = { "Charge", "Intercept", "Pummel", "Shield Bash", "Intimidating Shout" },
+  ROGUE = { "Kick", "Sprint", "Evasion", "Vanish", "Blind", "Kidney Shot" },
+  PRIEST = { "Psychic Scream", "Power Word: Shield", "Fade" },
+  HUNTER = { "Disengage", "Feign Death", "Freezing Trap", "Rapid Fire" },
+  WARLOCK = { "Death Coil", "Howl of Terror", "Fear" },
+  DRUID = { "Dash", "Barkskin", "Bash", "Innervate" },
+  PALADIN = { "Divine Shield", "Hammer of Justice", "Lay on Hands", "Blessing of Protection" },
+  SHAMAN = { "Earth Shock", "Grounding Totem", "Ghost Wolf" },
+}
+local watch = { icons = {} }
+ns.units.watch = watch
+
+local function watchList()
+  if ns.char.watch then return ns.char.watch end
+  local _, class = UnitClass("player")
+  local list = {}
+  for _, n in ipairs(WATCH_DEFAULTS[class] or {}) do table.insert(list, n) end
+  return list
+end
+
+-- Spell id for a name you know: the last spellbook entry with that name
+-- (the highest rank).
+local function knownSpell(name)
+  local found
+  for _, id in ipairs(ns.keybar and ns.keybar.bookSpells or {}) do
+    local n = C_Spell and C_Spell.GetSpellName and ns.plain(C_Spell.GetSpellName(id))
+    if n and n:lower() == name:lower() then found = id end
+  end
+  return found
+end
+
+local function watchIcon(i)
+  local b = watch.icons[i]
+  if b then return b end
+  b = CreateFrame("Frame", nil, watch.frame)
+  b:SetSize(WATCH_SIZE, WATCH_SIZE)
+  b.icon = b:CreateTexture(nil, "ARTWORK")
+  b.icon:SetAllPoints()
+  b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  b.cd = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
+  b.cd:SetAllPoints()
+  b.flash = b:CreateTexture(nil, "OVERLAY")
+  b.flash:SetPoint("TOPLEFT", -3, 3)
+  b.flash:SetPoint("BOTTOMRIGHT", 3, -3)
+  b.flash:SetColorTexture(1, 0.9, 0.5, 0.5)
+  b.flash:Hide()
+  b.cd:SetScript("OnCooldownDone", function()
+    b.cooling = false
+    b.icon:SetVertexColor(1, 1, 1)
+    b.flash:Show()
+    if C_Timer and C_Timer.After then C_Timer.After(0.4, function() b.flash:Hide() end) end
+  end)
+  watch.icons[i] = b
+  return b
+end
+
+-- Cooldowns may be secret: the duration object draws them without maths.
+local function setSpellCooldown(b, id)
+  if C_Spell and C_Spell.GetSpellCooldownDuration and b.cd.SetCooldownFromDurationObject then
+    if pcall(function() b.cd:SetCooldownFromDurationObject(C_Spell.GetSpellCooldownDuration(id, true)) end) then
+      return
+    end
+  end
+  local info = C_Spell and C_Spell.GetSpellCooldown and C_Spell.GetSpellCooldown(id)
+  if info then pcall(b.cd.SetCooldown, b.cd, info.startTime, info.duration) end
+end
+
+-- On cooldown (not the global one)? nil when the game keeps it secret.
+local function cooling(id)
+  local info = C_Spell and C_Spell.GetSpellCooldown and C_Spell.GetSpellCooldown(id)
+  local d = info and ns.plain(info.duration)
+  if type(d) ~= "number" then return nil end
+  return d > 1.5
+end
+
+function watch.build()
+  if not watch.frame then return end
+  watch.ids = {}
+  for _, name in ipairs(watchList()) do
+    local id = knownSpell(name)
+    if id then table.insert(watch.ids, id) end
+  end
+  local n = #watch.ids
+  for i, b in ipairs(watch.icons) do b:Hide() end
+  for i, id in ipairs(watch.ids) do
+    local b = watchIcon(i)
+    b.id = id
+    b:ClearAllPoints()
+    b:SetPoint("TOPLEFT", watch.frame, "TOPLEFT", (i - 1) * (WATCH_SIZE + 4), 0)
+    local tex = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(id)
+    b.icon:SetTexture(tex)
+    b:Show()
+  end
+  watch.frame:SetSize(math.max(1, n * (WATCH_SIZE + 4) - 4), WATCH_SIZE)
+  watch.paint()
+end
+
+function watch.paint()
+  for i, id in ipairs(watch.ids or {}) do
+    local b = watch.icons[i]
+    setSpellCooldown(b, id)
+    local c = cooling(id)
+    if c ~= nil then b.cooling = c end
+    local usable = C_Spell and C_Spell.IsSpellUsable and ns.plain((C_Spell.IsSpellUsable(id)))
+    if b.cooling then b.icon:SetVertexColor(0.35, 0.35, 0.35)
+    elseif usable == false then b.icon:SetVertexColor(0.45, 0.5, 1)
+    else b.icon:SetVertexColor(1, 1, 1) end
+  end
+end
+
+ns.commands.watch = function(rest)
+  local verb, name = (rest or ""):match("^(%S*)%s*(.-)%s*$")
+  verb = (verb or ""):lower()
+  local list = watchList()
+  if verb == "add" and name ~= "" then
+    table.insert(list, name)
+  elseif verb == "remove" and name ~= "" then
+    for i = #list, 1, -1 do if list[i]:lower() == name:lower() then table.remove(list, i) end end
+  elseif verb == "reset" then
+    ns.char.watch = nil
+    watch.build()
+    return ns.print("Watch row back to the defaults.")
+  else
+    return ns.print("Watching: " .. table.concat(list, ", ") .. ". /glance watch add NAME | remove NAME | reset")
+  end
+  ns.char.watch = list
+  watch.build()
+  ns.print("Watching: " .. table.concat(list, ", "))
+end
+
+ns.module("watch", function()
+  watch.frame = CreateFrame("Frame", "GlanceWatch", UIParent)
+  watch.frame:SetPoint("TOP", UIParent, "CENTER", 0, -174)
+  watch.frame:SetSize(1, WATCH_SIZE)
+  watch.build()
+  for _, ev in ipairs({ "SPELLS_CHANGED", "LEARNED_SPELL_IN_SKILL_LINE", "PLAYER_ENTERING_WORLD" }) do
+    ns.on(ev, function() ns.safe("watch", watch.build) end)
+  end
+  for _, ev in ipairs({ "SPELL_UPDATE_COOLDOWN", "SPELL_UPDATE_USABLE", "UNIT_POWER_FREQUENT" }) do
+    ns.on(ev, function() ns.safe("watch", watch.paint) end)
+  end
+end)

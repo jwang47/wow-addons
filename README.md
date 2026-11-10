@@ -313,6 +313,11 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
   drawer behind the Addons tab. A Reload button sits under it, then amber chips show what you can spend
   or fix: unspent talent points, Legacy points, keys with an old spell rank
   and full bags. Click one to open that window; it hides when done.
+- **Watch row**: your key spells (for a mage: Blink, Counterspell, Frost
+  Nova, Ice Block, Cold Snap, Ice Barrier, Evocation) as large icons below
+  the cast bar. Bright when ready, dark with a sweep on cooldown, a short
+  flash when one comes back. `/glance watch add NAME`, `remove NAME`,
+  `reset`. Only spells you know show.
 - **Range**: the target frame gets a green edge while your longest-range
   spell reaches the target, red when it does not. Under it is the
   distance: exact yards for a party or raid member ("23 yd"), and for

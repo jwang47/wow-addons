@@ -428,6 +428,28 @@ ReloadUI = function() reloaded = true end
 A.reload.scripts.OnClick()
 check("reload button", reloaded)
 
+-- Watch row: key spells by name from the spellbook.
+local NAMES = { [1953] = "Blink", [2139] = "Counterspell", [116] = "Frostbolt" }
+C_Spell.GetSpellName = function(id) return NAMES[id] or (SPELLS[id] and SPELLS[id][1]) end
+C_Spell.GetSpellTexture = function(id) return id end
+local cdur = { [1953] = 15, [2139] = 0 }
+C_Spell.GetSpellCooldown = function(id) return { startTime = 1, duration = cdur[id] or 0 } end
+UnitClass = function() return "Mage", "MAGE" end
+ns.keybar.bookSpells = { 1953, 2139, 116 }
+local W = ns.units.watch
+W.build()
+check("watch shows known key spells", #W.ids == 2 and W.icons[1].id == 1953 and W.icons[2].id == 2139)
+check("cooling spell is dark", W.icons[1].cooling == true and W.icons[2].cooling == false)
+W.icons[1].cd.scripts.OnCooldownDone()
+check("ready flash", W.icons[1].flash.shown)
+SlashCmdList.GLANCE("watch remove Blink")
+check("watch remove", #W.ids == 1 and W.icons[1].id == 2139)
+SlashCmdList.GLANCE("watch add Frostbolt")
+check("watch add", #W.ids == 2 and W.icons[2].id == 116)
+SlashCmdList.GLANCE("watch reset")
+check("watch reset", #W.ids == 2 and W.icons[1].id == 1953)
+ns.keybar.bookSpells = nil
+
 -- Party: names over party members, group CVars on and back.
 local cvars = { nameplateShowFriendlyPlayers = "0", nameplateShowFriendlyClassColor = "0", UnitNameFriendlyPlayerName = "0" }
 function GetCVar(k) return cvars[k] end
