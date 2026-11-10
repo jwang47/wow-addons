@@ -36,7 +36,7 @@ function ns.rebuild()
   -- Order matters: the first source to give a key wins (owned items before
   -- Questie's copy of the same item; S.items keeps its Questie flag).
   lists = { safe("commands", S.commands), safe("quest log", S.questLog), safe("spells", S.spells),
-    safe("items", S.items, qitems), safe("places", S.places), safe("people", S.people), qitems or {},
+    safe("items", S.items, qitems), safe("places", S.places), safe("dungeons", S.dungeons), safe("people", S.people), qitems or {},
     safe("nearby", S.nearby), npcs or {}, quests or {} }
   return lists
 end
@@ -52,7 +52,58 @@ function ns.trimRecent(recent)
 end
 
 function ns.search(text)
+  local only, q = M.parse(text)
+  if only == "loot" then return (S.dungeonLoot(q)) end
+  if only == "from" then return ns.sourcesFor(q) end
   return (M.search(lists, text, ns.db().recent))
+end
+
+-- "from: Silk Cloth": where to get the item. ns.fromID is the item Enter
+-- was pressed on; a typed name looks the item up by its exact name.
+-- With no rows, ns.emptyText says why.
+function ns.sourcesFor(q)
+  local id = ns.fromID and ns.fromName == q and ns.fromID
+  local name
+  if not id then
+    -- The exact name, else the only item whose name starts with q.
+    local prefix, many
+    for _, src in ipairs(lists) do
+      for _, e in ipairs(src) do
+        if e.kind == "item" then
+          if e.lname == q then id, name = e.id, e.name break end
+          if q ~= "" and e.lname:sub(1, #q) == q then
+            if prefix and prefix.id ~= e.id then many = true end
+            prefix = prefix or e
+          end
+        end
+      end
+      if id then break end
+    end
+    if not id and prefix and not many then id, name = prefix.id, prefix.name end
+  end
+  if not id then
+    local qs = S.questieState.state
+    ns.emptyText = (qs == "busy" or qs == "idle") and "Questie is still loading; try again in a moment"
+      or ("No item called \"" .. q .. "\" (Omni knows your items, the AH scan and Questie's items)")
+    return {}
+  end
+  local groups = S.itemSources(id)
+  if #groups == 0 then
+    ns.emptyText = (S.questieDB() and "Questie has no drop, object or vendor for " or "Questie is off: no sources for ")
+      .. (name or ns.db().itemNames[id] or ("item " .. id))
+  end
+  return groups
+end
+
+-- Shows where to get an item (Enter on an item row).
+function ns.showSources(e)
+  ns.fromID, ns.fromName = e.id, M.norm(e.name)
+  ns.setText("from: " .. e.name)
+end
+
+-- Puts text in the box (the next refresh searches it).
+function ns.setText(text)
+  if box then box:SetText(text) end
 end
 
 
@@ -226,7 +277,7 @@ local function paint()
   if n > view.top + MAX_ROWS - 1 then status = status .. "  |cff9d9d9d(more below)|r" end
   if n == 0 then
     footer:SetText((box:GetText() == "" and "Type to search items, places, people, spells, NPCs.  i: p: @ s: n: q:"
-      or "No match") .. status)
+      or ns.emptyText or "No match") .. status)
   else
     footer:SetText("|cff9d9d9d" .. A.hint(r and r.entry) .. "|r" .. status)
   end
@@ -291,10 +342,36 @@ local function step(my)
   end
 end
 
+-- "loot: bfd" lists a dungeon's drops. Item names the client has not
+-- loaded yet show as "item 1234"; look again shortly (a few times).
+ns.LOOT_RETRIES = 5
+local lootTries = {}
+local function showLoot(text, q)
+  job = nil
+  local groups, loading = S.dungeonLoot(q)
+  show(groups)
+  local n = (lootTries[text] or 0) + 1
+  lootTries[text] = n
+  if loading and n <= ns.LOOT_RETRIES then
+    call(api("C_Timer.After"), 0.4, function()
+      if frame and frame:IsShown() and box:GetText() == text then showLoot(text, q) end
+    end)
+  end
+end
+
 function ns.startSearch(text)
+  ns.emptyText = nil
+  local only, q = M.parse(text)
+  if only == "loot" then
+    lootTries = {}
+    return showLoot(text, q)
+  end
+  if only == "from" then
+    job = nil
+    return show(ns.sourcesFor(q))
+  end
   local my = { text = text, ms = 0, frames = 0 }
   job = my
-  local only, q = M.parse(text)
   local narrow = narrowFor(text)
   local function remember(matched)
     last = { lists = lists, only = only, q = q, matched = matched }

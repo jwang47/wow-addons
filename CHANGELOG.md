@@ -5,6 +5,21 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## Omni 0.1.2
+
+- Search dungeons by name or short name ("bfd", "sm gy"). The row shows
+  the levels, the short name and the boss count.
+- Enter on a dungeon (or `loot: bfd`) lists each boss's drops, then the
+  dungeon's quests and their reward items (with Questie). Hover an item
+  for its tooltip; Enter links it.
+- Enter on an item shows where to get it (with Questie): the mobs that
+  drop it, the objects that hold it and the vendors that sell it, nearest
+  first, with yards on your map or the zone. Enter on one pins it on the
+  map. Shift+Enter links the item.
+  When Questie lists a source but has no location for it (some Forever
+  quests), a row says so, and the quests that need the item follow. An
+  empty `from:` view says why (no such item, no source, Questie loading).
+
 ## QuestBoard 0.1.1
 
 - XP colours: in each group, the best third of the XP (Turn in) or XP per
@@ -62,6 +77,12 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - Nearby is always the first group in the results.
 - With an empty search, Omni shows the 5 nearest NPCs above Recent.
+
+## UpgradeFinder 0.1.9
+
+- Spell damage against one creature type ("damage done to Undead by
+  magical spells") is its own stat, not spell damage. The built-in weights
+  give it 0; with MageMentor, a mage uses MageMentor's weight (0.1).
 
 ## UpgradeFinder 0.1.8
 

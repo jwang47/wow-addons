@@ -76,7 +76,11 @@ C_Spell = {
 C_UnitAuras = {
   GetAuraDataByIndex = function(u, i)
     local list = {}
-    for name, exp in pairs(U(u) and U(u).auras or {}) do list[#list + 1] = { name = name, expirationTime = exp, duration = 1800 } end
+    local x = U(u) or {}
+    for name, exp in pairs(x.auras or {}) do
+      list[#list + 1] = { name = name, expirationTime = exp, duration = 1800,
+                          sourceUnit = x.src and x.src[name], auraInstanceID = #name * 1000 + (exp or 0) }
+    end
     table.sort(list, function(a, b) return a.name < b.name end)
     return list[i]
   end,
@@ -147,13 +151,23 @@ ns.refresh()
 check("next: renew the priest", st.next and st.next.unit == "party2")
 T = T - 50
 
--- A stranger buffs you: return the favour first.
+-- A stranger buffs you: return the favour first. The UNIT_AURA payload
+-- is secret on Forever (reading it raises an error), so it is never read.
+local secretPayload = setmetatable({}, { __index = function() error("attempt to read a secret value") end })
 W.units.nameplate2 = { first = "Chrome", last = "Steelhart", class = "PALADIN", auras = {}, stranger = true }
-ns.onPlayerAura({ addedAuras = { { name = "Blessing of Wisdom", sourceUnit = "nameplate2", duration = 300 } } })
+W.units.player.src = { ["Blessing of Wisdom"] = "nameplate2", ["Battle Shout"] = "nameplate2" }
+W.units.player.auras["Blessing of Wisdom"] = T + 300
+local okEvent, err = pcall(ev.scripts.OnEvent, ev, "UNIT_AURA", "player", secretPayload)
+check("a secret UNIT_AURA payload raises no error", okEvent)
+if not okEvent then print(err) end
 ns.refresh()
 check("next: returns a favour", st.next and st.next.reason == "returns a favour" and st.next.name == "Chrome Steelhart")
-ns.onPlayerAura({ addedAuras = { { name = "Battle Shout", sourceUnit = "nameplate2", duration = 120 } } })
+W.units.player.auras["Battle Shout"] = T + 120
+ev.scripts.OnEvent(ev, "UNIT_AURA", "player", secretPayload)
 check("a shout is not a favour", #st.owed == 1)
+W.units.player.auras["Blessing of Wisdom"], W.units.player.auras["Battle Shout"] = nil, nil
+ev.scripts.OnEvent(ev, "UNIT_AURA", "player", secretPayload)
+check("a buff that ends adds nothing", #st.owed == 1)
 
 -- Pressing it removes it; a right-click skips the next one.
 ns.pressed("LeftButton")
@@ -193,6 +207,37 @@ end
 W.units.party1.class = "PALADIN"
 ns.refresh()
 check("hidden aura: unknown", st.rows[2].cells[1].state == "unknown")
+C_UnitAuras.GetAuraDataByIndex = oldIndex
+issecretvalue = nil
+
+-- In combat the client hides aura names. The last full read fills in the
+-- buffs that have not run out, and Next stays empty.
+W.units.player.auras = { ["Arcane Intellect"] = T + 1500, ["Frost Armor"] = T + 3000 }
+ns.refresh()
+function issecretvalue(v) return v == secretOne end
+C_UnitAuras.GetAuraDataByIndex = function(u, i)
+  if u == "player" then
+    if i <= 2 then return { name = secretOne, expirationTime = secretOne } end
+    return nil
+  end
+  return oldIndex(u, i)
+end
+W.combat = true
+ns.refresh()
+check("combat: Int remembered as on", st.rows[1].cells[1].state == "on")
+local armorCol
+for c, def in ipairs(st.cols) do if def.self then armorCol = c end end
+check("combat: armor remembered as on", st.rows[1].cells[armorCol].state == "on")
+check("combat: no next buff", st.next == nil and BuffCheckNext.label.text:find("In combat") ~= nil)
+T = T + 2000
+ns.refresh()
+check("combat: a remembered buff runs out", st.rows[1].cells[1].state == "unknown")
+check("combat: hidden armor is unknown, not missing", st.rows[1].cells[armorCol].state == "on")
+T = T + 1500
+ns.refresh()
+check("combat: armor unknown once its time is up", st.rows[1].cells[armorCol].state == "unknown")
+T = T - 3500
+W.combat = false
 C_UnitAuras.GetAuraDataByIndex = oldIndex
 issecretvalue = nil
 

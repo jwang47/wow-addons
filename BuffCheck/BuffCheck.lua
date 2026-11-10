@@ -49,9 +49,40 @@ function ns.fullName(unit)
   return M.joinName(call(G("UnitName"), unit))
 end
 
+-- The last full read of each unit's auras, by GUID (or name). In combat
+-- the Forever client hides aura names, so a read there is partial: buffs
+-- from the last full read that have not run out yet fill it in.
+local remembered = {}
+ns.remembered = remembered
+
+local function auraKey(unit)
+  local guid = plain(call(G("UnitGUID"), unit))
+  if type(guid) == "string" then return guid end
+  return ns.fullName(unit)
+end
+
 -- Every helpful aura on `unit`: name -> { expires, duration }. nil when
 -- nothing can be read; `partial` is set when the client hid some of them.
 function ns.readAuras(unit)
+  local out = ns.readAurasNow(unit)
+  local key = out and auraKey(unit)
+  if not key then return out end
+  if not out.partial then
+    remembered[key] = out
+    return out
+  end
+  local last, t = remembered[key], now()
+  if last then
+    for name, a in pairs(last) do
+      if type(a) == "table" and out[name] == nil and ((a.expires or 0) <= 0 or a.expires > t) then
+        out[name] = a
+      end
+    end
+  end
+  return out
+end
+
+function ns.readAurasNow(unit)
   local api = G("C_UnitAuras")
   local out = {}
   if api and api.GetAuraDataByIndex then
@@ -388,7 +419,7 @@ function ns.refresh()
     for _, n in ipairs(near) do if n.near then nearby[#nearby + 1] = n end end
   end
   local pick = nil
-  if not mounted() then
+  if not mounted() and not combat then
     pick = M.nextBuff({ rows = rows, mine = mine, selfSpell = selfSpell, class = myClass,
       owed = st.owed, nearby = nearby, skip = st.skip, now = t })
   end
@@ -414,7 +445,7 @@ function ns.refresh()
     nextBtn.label:SetText("Next: " .. pick.spell .. " > " .. (pick.name or "?") .. "  |cffa0a0a0(" .. pick.reason .. ")|r")
   else
     nextBtn.icon:Hide()
-    nextBtn.label:SetText("|cffa0a0a0" .. (mounted() and "Mounted" or "Everyone is buffed") .. "|r")
+    nextBtn.label:SetText("|cffa0a0a0" .. (combat and "In combat" or mounted() and "Mounted" or "Everyone is buffed") .. "|r")
   end
   if not combat then
     local hadTarget = call(G("UnitExists"), "target") == true
@@ -448,22 +479,44 @@ function ns.pressed(button)
 end
 
 -- Somebody buffed you: note it, so Next can return the favour.
-function ns.onPlayerAura(info)
-  if type(info) ~= "table" or type(info.addedAuras) ~= "table" then return end
-  for _, a in ipairs(info.addedAuras) do
-    local name = plain(a) and plain(a.name)
-    local src = plain(a) and plain(a.sourceUnit)
-    local duration = plain(a) and plain(a.duration) or 0
-    if type(name) == "string" and type(src) == "string" and duration > 0 and not M.NOT_A_FAVOUR[name]
-        and call(G("UnitIsPlayer"), src) and not call(G("UnitIsUnit"), src, "player") and not inGroup(src) then
-      local who = ns.fullName(src)
-      if who then
-        for i = #st.owed, 1, -1 do if st.owed[i].name == who then table.remove(st.owed, i) end end
+--
+-- The UNIT_AURA payload is not read: on Forever its addedAuras table and
+-- isFullUpdate flag can be secret values, and touching them raises an
+-- error. Instead, each UNIT_AURA on you rescans your buffs and compares
+-- them with the last scan. The first scan after login only learns what is
+-- already there.
+local function favourFrom(a)
+  if type(plain(a)) ~= "table" then return nil end
+  local name, src = plain(a.name), plain(a.sourceUnit)
+  local duration = plain(a.duration)
+  if type(name) ~= "string" or type(src) ~= "string" then return nil end
+  if type(duration) ~= "number" or duration <= 0 or M.NOT_A_FAVOUR[name] then return nil end
+  if not call(G("UnitIsPlayer"), src) or call(G("UnitIsUnit"), src, "player") or inGroup(src) then return nil end
+  local who = ns.fullName(src)
+  if not who then return nil end
+  return who, name, src
+end
+
+function ns.scanPlayer()
+  local api = G("C_UnitAuras")
+  if not (api and api.GetAuraDataByIndex) then return end
+  local seen, first = {}, st.seen == nil
+  for i = 1, 40 do
+    local ok, a = pcall(api.GetAuraDataByIndex, "player", i, "HELPFUL")
+    if not ok or a == nil then break end
+    local who, name, src = favourFrom(a)
+    if who then
+      local id = plain(a.auraInstanceID)
+      local key = (type(id) == "number" and id) or (who .. ":" .. name .. ":" .. tostring(plain(a.expirationTime)))
+      seen[key] = true
+      if not first and not st.seen[key] then
+        for j = #st.owed, 1, -1 do if st.owed[j].name == who then table.remove(st.owed, j) end end
         table.insert(st.owed, 1, { name = who, at = now(), class = classOf(src), spell = name })
         while #st.owed > 10 do table.remove(st.owed) end
       end
     end
   end
+  st.seen = seen
   st.dirty = true
 end
 
@@ -485,9 +538,10 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3)
     ns.db = BuffCheckDB
   elseif event == "PLAYER_LOGIN" then
     ns.build()
+    ns.scanPlayer()
     ns.refresh()
   elseif event == "UNIT_AURA" then
-    if a1 == "player" then ns.onPlayerAura(a2) end
+    if a1 == "player" then ns.scanPlayer() end
     st.dirty = true
   elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
     if a1 ~= "player" then return end
