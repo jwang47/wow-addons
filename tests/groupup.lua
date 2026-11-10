@@ -249,6 +249,72 @@ ns.updateButton()
 check("button off hides it in a group", GroupUpByeButton.shown == false)
 P.party = {}
 
+-- QuestBoard pins: GroupUp judges only the pinned quests.
+check("no QuestBoard: no pins", M.pins() == nil)
+QuestBoardDB = { doing = {} }
+check("empty pins count as none", M.pins() == nil)
+QuestBoardDB.doing = { [180] = true, [127] = true, [555] = true }
+C_QuestLog.GetTitleForQuestID = function(id) if id == 555 then return "The Defias Brotherhood" end end
+local pins = M.pins()
+check("pins read from QuestBoardDB.doing", pins[180] and pins[127] and pins[555])
+local f = M.focus(M.quests(ns.units()), pins)
+check("focus has the pinned quests only", #f.focus == 3 and f.pinned)
+check("rest has the others", #f.rest == 4)
+local last = f.focus[#f.focus]
+check("a pinned pick-up is not taken yet", last.id == 555 and last.verdict == "pickup" and last.name == "The Defias Brotherhood")
+text = ""
+for _, row in ipairs(ns.rows()) do text = text .. row.left .. " | " .. row.right .. "\n" end
+check("panel heads the pinned list", text:find("Your pinned quests (QuestBoard)", 1, true) ~= nil)
+check("panel lean is for the pins", text:find("Leans group for your pins", 1, true) ~= nil)
+check("pinned kill quest listed", text:find("Wanted: Lieutenant Fangore | kills count for all", 1, true) ~= nil)
+check("pinned hand-in listed", text:find("Murloc Poachers | ready to turn in", 1, true) ~= nil)
+check("pinned pick-up listed", text:find("The Defias Brotherhood | not taken yet", 1, true) ~= nil)
+check("unpinned elite not listed", text:find("[Elite] Blackrock Champions", 1, true) == nil)
+check("rest of the log in one line", text:find("4 more in your log (1 need, 0 faster)", 1, true) ~= nil)
+local q1 = ns.summary()
+check("summary says pinned", q1:find("^Pinned quests: 1 go faster") ~= nil and q1:find("1 not taken yet", 1, true) ~= nil)
+QuestBoardDB.doing = {}
+check("no pins: back to the whole log", (ns.summary()):find("^Quests: 1 need a group") ~= nil)
+
+-- QuestBoard link: Ctrl-click and the tooltip line.
+local qbPanel = widget("QuestBoardFrame")
+local qbClicks = {}
+QuestBoard = { panel = qbPanel, click = function(e, b) table.insert(qbClicks, e) end }
+local tipLines, tipScripts = {}, {}
+GameTooltip = { owner = nil }
+function GameTooltip:HookScript(what, fn) tipScripts[what] = fn end
+function GameTooltip:GetOwner() return self.owner end
+function GameTooltip:AddLine(l) table.insert(tipLines, l) end
+function GameTooltip:Show() if tipScripts.OnShow then tipScripts.OnShow(self) end end
+ns.hooked = nil
+check("hooks QuestBoard", ns.hookQuestBoard() == true)
+local row = { entry = { id = 180, kind = "log", name = "Wanted: Lieutenant Fangore" } }
+function row:GetParent() return qbPanel end
+GameTooltip.owner = row
+GameTooltip:Show()
+check("tooltip gets the group line", tipLines[1] == "Group: kills count for all")
+check("tooltip says Ctrl-click", tipLines[2] == "Ctrl-click: GroupUp for this quest" and #tipLines == 2)
+tipLines = {}
+local other = { entry = { id = 180 } }
+function other:GetParent() return UIParent end
+GameTooltip.owner = other
+GameTooltip:Show()
+check("other addons' tooltips are left alone", #tipLines == 0)
+QuestBoard.click(row.entry, "LeftButton")
+check("plain click goes to QuestBoard", #qbClicks == 1)
+IsControlKeyDown = function() return true end
+QuestBoard.click(row.entry, "LeftButton")
+check("Ctrl-click opens GroupUp on the quest", #qbClicks == 1 and GroupUpFrame.shown and ns.picked == 180)
+text = ""
+for _, r2 in ipairs(ns.rows()) do text = text .. r2.left .. " | " .. r2.right .. "\n" end
+check("panel shows the asked quest first", text:find("Asked about: Wanted: Lieutenant Fangore | kills count for all", 1, true) ~= nil)
+QuestBoard.click(row.entry, "LeftButton")
+check("Ctrl-click again closes it", GroupUpFrame.shown == false and ns.picked == nil)
+QuestBoard.click({ kind = "area", name = "Lakeshire" }, "LeftButton")
+check("Ctrl-click on an area goes to QuestBoard", #qbClicks == 2)
+IsControlKeyDown = nil
+QuestBoardDB, QuestBoard, GameTooltip = nil, nil, nil
+
 -- Secret values count as unknown
 issecretvalue = function(v) return v == 777 end
 check("secret level is unknown", M.plain(777) == nil)
