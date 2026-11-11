@@ -167,10 +167,22 @@ function D.rate(xp, secs)
   return xp / (secs / 60)
 end
 
-function D.travelSecs(dist)
+-- The trip in seconds: on foot in a straight line, or with e (the quest,
+-- its place known) by flight when that is shorter (Spare2.lua). The second
+-- result is "fly" for a flight.
+function D.travelSecs(dist, e)
   local speed = plain(call(rawget(_G, "GetUnitSpeed"), "player")) or 0
   if speed < D.RUN_SPEED then speed = D.RUN_SPEED end
-  return (dist or 0) / speed
+  local run = (dist or 0) / speed
+  local fly = e and dist and D.flySecs and D.flySecs(e, speed)
+  if fly and fly < run then return fly, "fly" end
+  return run
+end
+-- Where you are in the world: x, y (yards), instance.
+function D.playerWorld()
+  local lib = hbd()
+  if not lib then return nil end
+  return call(lib.GetPlayerWorldPosition, lib)
 end
 
 ---------------------------------------------------------------------------
@@ -454,8 +466,8 @@ function D.workSecs(e)
 end
 
 function D.logSecs(e)
-  if e.done then return D.travelSecs(e.dist) + D.PICKUP_SECS end
-  return D.travelSecs(e.dist) + D.workSecs(e) + D.RETURN_SECS
+  if e.done then return D.travelSecs(e.dist, e) + D.PICKUP_SECS end
+  return D.travelSecs(e.dist, e) + D.workSecs(e) + D.RETURN_SECS
 end
 
 ---------------------------------------------------------------------------
@@ -766,7 +778,7 @@ end
 
 function D.pickupSecs(e)
   local work = D.runSecs(e) or math.max(1, e.objectives) * D.OBJECTIVE_SECS * D.levelFactor(e.level)
-  return D.travelSecs(e.dist) + D.PICKUP_SECS + work + D.RETURN_SECS
+  return D.travelSecs(e.dist, e) + D.PICKUP_SECS + work + D.RETURN_SECS
 end
 
 ---------------------------------------------------------------------------
@@ -799,9 +811,7 @@ end
 -- Finishes one entry: colour, estimate, direction.
 function D.finish(e, level)
   e.color = D.difficulty(e.level, level)
-  local secs = (e.kind == "pickup" or e.kind == "party") and D.pickupSecs(e) or D.logSecs(e)
-  e.secs = e.far and nil or secs
-  e.rate = (not e.far) and D.rate(e.xp, secs) or nil
+  -- The place first: the trip estimate needs it (a flight).
   if e.spot then
     -- Placed by where you last made progress: world position already known.
     local lib = hbd()
@@ -809,10 +819,17 @@ function D.finish(e, level)
     if lib then px, py, pi = call(lib.GetPlayerWorldPosition, lib) end
     e.wx, e.wy, e.inst = e.spot.wx, e.spot.wy, e.spot.inst
     e.angle = (px and pi == e.inst) and (call(lib.GetWorldVector, lib, pi, px, py, e.wx, e.wy)) or nil
-    return e
+  else
+    e.angle = e.dist and D.bearing(e.spawn, e.zone) or nil
+    if e.dist then e.wx, e.wy, e.inst = D.world(e.spawn, e.zone) end
   end
-  e.angle = e.dist and D.bearing(e.spawn, e.zone) or nil
-  if e.dist then e.wx, e.wy, e.inst = D.world(e.spawn, e.zone) end
+  local secs = (e.kind == "pickup" or e.kind == "party") and D.pickupSecs(e) or D.logSecs(e)
+  -- Another continent: a boat or zeppelin trip, a flat guess (Spare2.lua).
+  local trip = e.far and D.FAR_TRIP_SECS or nil
+  if e.far and trip then secs = secs + trip end
+  e.secs = (not e.far or trip) and secs or nil
+  e.rate = (not e.far or trip) and D.rate(e.xp, secs) or nil
+  e.by = e.dist and select(2, D.travelSecs(e.dist, e)) or nil
   return e
 end
 
@@ -899,7 +916,7 @@ function D.areas(out)
         end
       end
       if #a.stops >= 2 then
-        a.secs = D.travelSecs(a.dist) + a.work
+        a.secs = D.travelSecs(a.dist, seed) + a.work
         a.rate = a.xp > 0 and D.rate(a.xp, a.secs) or nil
         -- Inside it: say so, the stops can be anywhere within AREA_YARDS.
         a.name = (a.dist <= D.AREA_YARDS and "Around you, by " or "Near ") .. (seed.target or seed.name)
@@ -951,7 +968,8 @@ function D.zones(out)
     end
   end
   for _, z in ipairs(list) do
-    z.secs = (z.dist and D.travelSecs(z.dist) or 0) + z.work
+    -- A zone on another continent: the boat or zeppelin trip counts.
+    z.secs = (z.dist and D.travelSecs(z.dist, z.near) or D.FAR_TRIP_SECS or 0) + z.work
     z.rate = z.xp > 0 and D.rate(z.xp, z.secs) or nil
     z.far = not z.dist
   end

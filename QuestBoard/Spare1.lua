@@ -62,7 +62,7 @@ function ns.stopTotals(s)
   -- Time: the run there and the work on the quests you finish there. A
   -- stop with only pick-ups: the longest of those quests, a guess.
   if hand + todo > 0 then
-    s.secs, s.guess = s.dist and (D.travelSecs(s.dist) + work) or nil, guess
+    s.secs, s.guess = s.dist and (D.travelSecs(s.dist, s.seed) + work) or nil, guess
   else
     s.secs, s.guess = longest, true
   end
@@ -153,7 +153,7 @@ function ns.stopSections(active, way, handIns)
       return at[a] < at[b]
     end)
     s.first = s.hand > 0 and s.dist ~= nil and s.dist <= ns.HAND_IN_YARDS
-    s.handRate = s.first and s.handXP / math.max(20, D.travelSecs(s.dist)) or 0
+    s.handRate = s.first and s.handXP / math.max(20, D.travelSecs(s.dist, s.seed)) or 0
   end
   table.sort(stops, function(a, b)
     if a.first ~= b.first then return a.first end

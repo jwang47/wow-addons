@@ -1141,6 +1141,23 @@ local capped = ns.stopSections({}, { camp1, thorsen, camp2, q("Third", "pickup",
 QuestBoardDB.rows.onway = saveRows
 check("rules: hand-ins do not count against the row limit",
   #capped == 3 and capped[1].stop.hand == 2 and capped[2].list[1] == thorsen and capped[3].list[1].kind == "more")
+-- Trips (Spare2.lua): a flight when it beats the run, a flat guess for
+-- another continent. You are at 0, 0.
+assert(loadfile(root .. "QuestBoard/Spare2.lua"))("QuestBoard", ns)
+D.flyNodeList = { { wx = 0, wy = 70, inst = 0, id = 1 }, { wx = 6000, wy = 0, inst = 0, id = 2 }, { wx = 0, wy = 0, inst = 1, id = 3 } }
+local farQuest = q("Across the zone", "turnin", 6000, 140, 6000, 1000)
+local flySecs = 70 / D.RUN_SPEED + 140 / D.RUN_SPEED + D.FLY_BOARD_SECS + math.sqrt(6000 * 6000 + 70 * 70) / D.FLY_SPEED
+local got, how = D.travelSecs(6000, farQuest)
+check("trips: a long way goes by flight", how == "fly" and math.abs(got - flySecs) < 0.01 and got < D.travelSecs(6000))
+check("trips: a short way is a run", select(2, D.travelSecs(1000, q("Close", "turnin", 1000, 0, 1000, 100))) == nil)
+check("trips: no flight when one flight master is nearest to both ends", D.flySecs(q("By the master", "turnin", 0, 1600, 1600, 100), D.RUN_SPEED) == nil)
+check("trips: a flight far from the place loses to the run", select(2, D.travelSecs(2500, q("Middle", "turnin", 2500, 0, 2500, 100))) == nil)
+check("trips: no flight to another continent's flight master", D.flySecs(q("Elsewhere", "turnin", 0, 3000, 3000, 100, { inst = 1 }), D.RUN_SPEED) == nil)
+local flown = D.finish(q("Flown", "turnin", 6000, 140, 6000, 1000, { done = true, spot = { wx = 6000, wy = 140, inst = 0 } }), 33)
+check("trips: the quest's time and XP per minute count the flight", flown.by == "fly" and math.abs(flown.secs - (flySecs + D.PICKUP_SECS)) < 0.01 and flown.rate > D.rate(1000, D.travelSecs(6000)))
+local abroad = D.finish({ name = "Abroad", kind = "turnin", done = true, far = true, xp = 1000, level = 33, left = {}, id = 0 }, 33)
+check("trips: another continent counts the boat, a guess", abroad.secs == D.FAR_TRIP_SECS + D.PICKUP_SECS and abroad.rate ~= nil and abroad.by == nil)
+D.flyNodeList = nil
 -- On the board: the Doing tab draws stops; /qb stops goes back to one list.
 ns.refresh()
 ns.pickTab("doing")

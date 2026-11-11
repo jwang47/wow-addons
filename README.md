@@ -444,6 +444,13 @@ hand-in or a pick-up). It stays while you are within 600 yards
   per minute of the run first), and a farther hand-in joins a stop already
   shown at its place. `/qb stops` goes back to one list
   (the code is in `QuestBoard/Spare1.lua`).
+- Travel time is an estimate. Near places are a run in a straight line
+  at your speed. From 1500 yd, the trip is the shorter of the run and a
+  flight (run to the nearest flight master, a straight flight at 30 yd per
+  second plus 20 s, run from the flight master nearest the place); the
+  board assumes you have the flight path. Another continent counts a flat
+  15 minutes for the boat or zeppelin. The constants are in
+  `QuestBoard/Spare2.lua` and are not measured in the game yet.
 - A dungeon, raid or group quest has a tag after its level: 28D, 40R, 22G
   (`GetQuestTagInfo`, else Questie's `GetQuestTagInfo`, else the suggested
   group size). `/qb dungeons off` keeps dungeon and raid quests to the Log

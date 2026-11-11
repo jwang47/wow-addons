@@ -41,6 +41,15 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.2.0
 
+- Travel time counts flights and boats. For a place 1500 yd or more away
+  on your continent, the trip is the shorter of the run and a flight: the
+  run to the flight master nearest you, the flight (a straight line at
+  30 yd per second, 20 s to board), and the run from the flight master
+  nearest the place. A quest or zone on another continent counts a flat
+  15 minutes for the boat or zeppelin, so it has an XP per minute too
+  (a far zone counted no travel at all before). These are estimates: the
+  board does not know which flight paths you have, and the tooltip says
+  when a time counts a flight or a boat.
 - Fix: a pinned quest showed twice in Nearby (in Pinned and in Chain
   next). It is now only in Pinned. The Log tab has no Pinned group: it
   lists every quest once, with the star on your pins.

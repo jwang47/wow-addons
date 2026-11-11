@@ -174,7 +174,7 @@ function ns.nextStep(st)
   local todo = ns.todoWho(e)
   if e.kind == "turnin" then todo = "Hand in " .. e.name .. (e.target and (" to " .. e.target) or "") end
   -- For a quest you are on: about how long the rest takes, at your pace.
-  local left = e == st.active[1] and e.left and #e.left > 0 and ("  ~" .. D.mins(D.travelSecs(e.dist) + D.workSecs(e)) .. " left") or ""
+  local left = e == st.active[1] and e.left and #e.left > 0 and ("  ~" .. D.mins(D.travelSecs(e.dist, e) + D.workSecs(e)) .. " left") or ""
   return todo and (todo .. (e.dist and ("  " .. D.yards(e.dist)) or "") .. left), e
 end
 
@@ -200,11 +200,11 @@ function ns.stats(e, kind)
   if e.toFinisher then return "" end
   local secs, guess
   if e.kind == "turnin" then
-    secs = e.dist and D.travelSecs(e.dist)
+    secs = e.dist and D.travelSecs(e.dist, e)
   elseif e.kind == "log" and not e.done and e.left and #e.left > 0 then
     local work
     work, guess = D.workSecs(e)
-    secs = D.travelSecs(e.dist) + work
+    secs = D.travelSecs(e.dist, e) + work
   else
     secs, guess = e.secs, true
   end
@@ -241,11 +241,11 @@ function ns.meta(e, kind)
     if p ~= "" then table.insert(parts, p) end
   end
   if e.kind == "log" and not e.done and kind == "active" and e.left and #e.left > 0 then
-    table.insert(parts, "~" .. D.mins(D.travelSecs(e.dist) + D.workSecs(e)))
+    table.insert(parts, "~" .. D.mins(D.travelSecs(e.dist, e) + D.workSecs(e)))
   end
   if e.kind == "turnin" and e.xp then table.insert(parts, D.tierText(e, D.short(e.xp) .. " xp")) end
   -- A hand-in: the run there, so you can weigh the trip against the XP.
-  if e.kind == "turnin" and e.dist then table.insert(parts, D.mins(D.travelSecs(e.dist))) end
+  if e.kind == "turnin" and e.dist then table.insert(parts, D.mins(D.travelSecs(e.dist, e))) end
   if e.toFinisher then table.insert(parts, "|cff909090drop unknown|r")
   elseif (e.kind == "pickup" or e.kind == "area" or e.kind == "zone") and e.rate then table.insert(parts, D.tierText(e, "~" .. D.short(e.rate) .. " xp/m")) end
   if e.dist then table.insert(parts, D.yardsText(e.dist))
@@ -364,7 +364,7 @@ local function tooltip(r)
   tip:AddLine(lvl, 0.8, 0.8, 0.8)
   if e.xp then tip:AddLine(D.short(e.xp) .. " XP", 0.6, 0.8, 1) end
   if e.kind == "turnin" and e.dist then
-    tip:AddLine(string.format("About %s to run there, ~%s XP per minute of the trip", D.mins(D.travelSecs(e.dist)), D.short(e.rate)), 0.6, 0.8, 1)
+    tip:AddLine(string.format("About %s to %s, ~%s XP per minute of the trip", D.mins(D.travelSecs(e.dist, e)), e.by == "fly" and "fly there (if you have the flight path)" or "run there", D.short(e.rate)), 0.6, 0.8, 1)
   elseif e.kind == "turnin" and e.far then
     tip:AddLine("On another continent or in an instance: a boat, a flight or a dungeon run", 0.8, 0.5, 0.5)
   elseif e.rate and e.secs then
@@ -372,6 +372,8 @@ local function tooltip(r)
     tip:AddLine(string.format("~%s XP per minute (about %d min%s)", D.short(e.rate), math.max(1, math.floor(e.secs / 60 + 0.5)),
       D.runSecs and D.runSecs(e) and (e.tag == "R" and ", a raid run" or ", a dungeon run")
         or guess and ", a guess until you make progress" or ""), 0.6, 0.8, 1)
+    if e.by == "fly" then tip:AddLine("The trip is by flight (if you have the flight path)", 0.6, 0.8, 1) end
+    if e.far then tip:AddLine("On another continent: about " .. D.mins(D.FAR_TRIP_SECS) .. " counted for the boat or zeppelin, a guess", 0.8, 0.5, 0.5) end
   end
   local verb = e.kind == "turnin" and "Turn in at " or e.toFinisher and "Hand in to " or (e.kind == "pickup" or e.kind == "party") and "Get it from " or "Nearest: "
   if e.target then
