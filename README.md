@@ -726,7 +726,8 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
     Bartender bars you no longer need in Bartender's options.
 - **Unit frames**: small player and target bars under your character and a
   cast bar below them. They replace Blizzard's player, target and cast
-  frames (`/glance blizzard on` keeps those).
+  frames (`/glance blizzard on` keeps those). A blue "Zzz" on your own
+  frame shows that you are resting (in an inn or a city).
 - **Edge pointers**: arrows on the minimap's rim for things off the map,
   with the name and yards: party members (class colours), your map pin and
   your corpse. Other addons add points with
