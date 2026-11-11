@@ -529,7 +529,11 @@ hand-in or a pick-up). It stays while you are within 600 yards
   names them (click it for the whole list). `/qb why NAME` says where a
   quest is on the board, or why it is not there.
 - Point at a quest to see its whole chain in the tooltip: each step with
-  its level, marked done, `>>` (this one), log or `...` (later).
+  its level, marked done, `>>` (this one), log or `...` (later). Each step
+  not done shows its XP and minutes (the trip plus the work, a guess), and
+  `+gear` when it rewards gear. The heading sums what is left ("4 left:
+  6.2k xp, 25 min") and splits the time into travel and questing. The trip
+  goes from where the step before ends; `~` marks a step with no known place.
 - Alt-click any quest row: "I'm doing this" (it stays in Active until
   you Alt-click it again or hand it in). This works for hand-ins and
   pick-ups too: a pinned pick-up waits in Active until you take it.
