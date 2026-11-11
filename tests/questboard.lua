@@ -41,6 +41,7 @@ UIParent = widget("UIParent")
 GameTooltip = widget("GameTooltip")
 GameTooltip.lines = {}
 function GameTooltip:AddLine(t) table.insert(self.lines, t) end
+function GameTooltip:AddDoubleLine(l, r) table.insert(self.lines, l .. " | " .. r) end
 DEFAULT_CHAT_FRAME = { AddMessage = function(_, m) table.insert(chat, strip(m)) end }
 SlashCmdList = {}
 local timers = {}
@@ -139,7 +140,7 @@ function LibStub(name) if name == "HereBeDragonsQuestie-2.0" then return HBD end
 local ns = {}
 -- Quest 122 (log index 3) has a usable quest item.
 function GetQuestLogSpecialItemInfo(i) if i == 3 then return "|Hitem:5000|h[Vial]|h", 134400, 1 end end
-for _, file in ipairs({ "Data.lua", "Chain.lua", "QuestBoard.lua", "Items.lua" }) do
+for _, file in ipairs({ "Data.lua", "Chain.lua", "QuestBoard.lua", "Items.lua", "Spare3.lua" }) do
   local chunk = assert(loadfile(root .. "QuestBoard/" .. file))
   chunk("QuestBoard", ns)
 end
@@ -237,14 +238,25 @@ local doing = D.collect({ time = 4000, doing = { [122] = true } })
 check("a quest you mark is Active", #doing.active == 1 and doing.active[1].id == 122 and doing.active[1].pinned)
 -- Every quest can be pinned: a hand-in and a pick-up too.
 local pickID = doing.pickup[1].id
-local pins = { [127] = true, [pickID] = true, [9999] = true }
+local pins = { [127] = true, [pickID] = true, [9999] = true, [9998] = true }
+local realDone = C_QuestLog.IsQuestFlaggedCompleted
+C_QuestLog.IsQuestFlaggedCompleted = function(id) return id == 9999 end
 local all = D.collect({ time = 4001, doing = pins })
+C_QuestLog.IsQuestFlaggedCompleted = realDone
 local inActive = {}
 for _, e in ipairs(all.active) do inActive[e.id] = e end
+-- A quest you were working on that is now done stays in Active.
+D.heldAt[127] = 3990
+local justDone = D.collect({ time = 4000 })
+local stays = false
+for _, e in ipairs(justDone.active) do if e.id == 127 then stays = true end end
+check("just done: the hand-in stays in Doing", stays)
+D.heldAt[127] = nil
 check("a pinned hand-in is Active", inActive[127] and inActive[127].kind == "turnin" and inActive[127].pinned and #all.turnin == 0)
 check("a pinned pick-up is Active", inActive[pickID] and inActive[pickID].kind == "pickup" and inActive[pickID].pinned)
 check("a pinned pick-up leaves Pick up", (function() for _, e in ipairs(all.pickup) do if e.id == pickID then return false end end return true end)())
-check("a pin of a quest gone from the log and the givers goes", pins[9999] == nil and pins[127] and pins[pickID])
+check("a pin of a quest you handed in goes", pins[9999] == nil and pins[127] and pins[pickID])
+check("a pin stays when the quest is not seen yet (just after /reload)", pins[9998])
 check("hand-ins and pick-ups are pinnable", ns.pinnable(inActive[127]) and ns.pinnable(inActive[pickID]) and not ns.pinnable({ kind = "area" }))
 D.HERE_YARDS = 0
 D.seen, D.activeAt, D.heldAt = {}, {}, {}
@@ -277,7 +289,7 @@ ns.updateItems(ns.state())
 check("the item button sits left of its quest's row", placed and placed[1] == "TOPRIGHT" and placed[4] == 897 and placed[5] == 400)
 itemBtn.SetPoint, rowOf122.GetTop, QuestBoardFrame.GetLeft = nil, nil, nil
 local savedCollapsed = QuestBoardDB.collapsed
-QuestBoardDB.collapsed = { active = true, nearby = true, log = true, turnin = true }
+QuestBoardDB.collapsed = { next = true, active = true }
 ns.render()
 check("no button when the quest's row is hidden", not itemBtn.shown)
 QuestBoardDB.collapsed = savedCollapsed
@@ -301,27 +313,27 @@ local function countRows()
   return n
 end
 ns.render()
-check("out in the world the whole board shows", countRows() == 5)
+check("out in the world the whole board shows", countRows() == 4)
 local inside = true
 function IsInInstance() return inside end
 ns.render()
-check("focus: in an instance, no rows when nothing is active", countRows() == 0 and QuestBoardFrame.next.shown)
+check("focus: in an instance, no rows when nothing is active", countRows() == 0 and QuestBoardFrame.tabs[1].shown)
 local over = false
 QuestBoardFrame.IsMouseOver = function() return over end
 over = true
 QuestBoardFrame.scripts.OnUpdate(QuestBoardFrame, 0.05)
-check("focus: mouse-over shows the whole board", countRows() == 5)
+check("focus: mouse-over shows the whole board", countRows() == 4)
 over = false
 QuestBoardFrame.scripts.OnUpdate(QuestBoardFrame, 0.1)
-check("focus: it stays open for a moment", countRows() == 5)
+check("focus: it stays open for a moment", countRows() == 4)
 QuestBoardFrame.scripts.OnUpdate(QuestBoardFrame, 0.5)
 check("focus: then only Next and Active again", countRows() == 0)
 SlashCmdList.QUESTBOARD("focus")
-check("/qb focus off shows the whole board", countRows() == 5 and QuestBoardDB.focus == false)
+check("/qb focus off shows the whole board", countRows() == 4 and QuestBoardDB.focus == false)
 SlashCmdList.QUESTBOARD("focus")
 inside = false
 ns.render()
-check("leaving the instance shows the whole board again", countRows() == 5)
+check("leaving the instance shows the whole board again", countRows() == 4)
 
 local shownRows = 0
 local firstRow
@@ -331,10 +343,54 @@ for _, f in ipairs(frames) do
     firstRow = firstRow or f
   end
 end
-check("rows drawn for every quest", shownRows == 5)
+check("Nearby: every stop within 1000 yd", shownRows == 4 and ns.tab() == "nearby")
 check("first row is the turn-in", firstRow.entry.id == 127 and firstRow.name.text == "Murloc Poachers")
-check("row shows what to do", firstRow.sub.text == "Hand in to Wiley")
-check("board shows the next step", QuestBoardFrame.next.text == "Next: Hand in Murloc Poachers to Wiley  300 yd")
+check("row shows what to do, marked complete", strip(firstRow.sub.text) == "Complete  Hand in to Wiley")
+-- Alt-click a list's heading: pin every quest in it (an area's stops too).
+local setList = { { id = 501, kind = "log", name = "x" }, { kind = "area", stops = { { id = 502, kind = "pickup", name = "y" }, { id = 501, kind = "log", name = "x" } } },
+  { kind = "more", name = "+1 more" } }
+QuestBoardDB.doing = {}
+check("pin all: the quests of a list, area stops included, once each", #ns.listQuests(setList) == 2)
+ns.pinList(setList)
+check("pin all: every one pinned", QuestBoardDB.doing[501] and QuestBoardDB.doing[502] and ns.listPinned(setList))
+ns.pinList(setList)
+check("pin all: again unpins them", next(QuestBoardDB.doing) == nil)
+local zoneRow = { kind = "zone", name = "Wetlands", stops = { { id = 601, kind = "log", name = "a" }, { id = 602, kind = "pickup", name = "b" } }, left = {} }
+local realAltZ = IsAltKeyDown
+IsAltKeyDown = function() return true end
+ns.click(zoneRow)
+check("pin all: Alt-click a zone pins its quests", QuestBoardDB.doing[601] and QuestBoardDB.doing[602])
+ns.click(zoneRow)
+IsAltKeyDown = realAltZ
+check("pin all: again unpins the zone", next(QuestBoardDB.doing) == nil)
+local pinState = { active = { { id = 1, pinned = true, name = "p", kind = "log", left = {} }, { id = 2, name = "q", kind = "log", left = {} } },
+  nearby = {}, turnin = {}, log = {}, party = {}, pickup = {}, area = {}, zones = {}, town = {}, members = {} }
+local ps = ns.sections(pinState, "areas")
+check("pins: a Pinned list on top of the other tabs", ps[1] and ps[1].key == "pinned" and #ps[1].list == 1 and ps[1].list[1].id == 1)
+check("pins: not twice in Doing", ns.sections(pinState, "doing")[1].key == "active")
+check("pins: not twice in Log (the star marks them there)", ns.sections(pinState, "log")[1].key ~= "pinned")
+pinState.active[1].dist, pinState.active[2].dist = 100, 100
+local pn = ns.sections(pinState, "nearby")
+check("pins: not twice in Nearby", pn[1].key == "pinned" and pn[2].key == "next" and #pn[2].list == 1 and pn[2].list[1].id == 2)
+pinState.active[1].dist, pinState.active[2].dist = nil, nil
+ns.refresh()
+for _ = 1, 50 do ns.step() end
+local nextHead
+for _, f in ipairs(frames) do if f.kind == "Button" and f.shown and f.list and f.text and (f.text.text or ""):find("^Chain next") then nextHead = f end end
+local realAlt = IsAltKeyDown
+IsAltKeyDown = function() return true end
+nextHead.scripts.OnClick(nextHead, "LeftButton")
+IsAltKeyDown = realAlt
+local pinnedN = 0
+for _ in pairs(QuestBoardDB.doing) do pinnedN = pinnedN + 1 end
+check("pin all: Alt-click on Chain next pins its rows", pinnedN == 4)
+QuestBoardDB.doing = {}
+D.heldAt = {}
+ns.refresh()
+for _ = 1, 50 do ns.step() end
+check("tabs: Nearby is picked and gold", QuestBoardFrame.tabs[2].text.text == "Nearby" and QuestBoardFrame.tabs[2].line.shown
+  and QuestBoardFrame.tabs[4].text.text == "Log" and not QuestBoardFrame.next.shown)
+check("tabs: no title line above them", QuestBoardFrame.title.text == "" and QuestBoardFrame.sub.text == "")
 SlashCmdList.QUESTBOARD("compact")
 check("/qb compact drops the what-to-do line", firstRow.sub.text == "")
 SlashCmdList.QUESTBOARD("compact")
@@ -464,6 +520,50 @@ check("party group: quests a member has that you do not", #withParty.party == 1 
   and D.partyText(withParty.party[1].party) == "Ann 2/8")
 check("party row says who and where", ns.todo(withParty.party[1]) == "Ann 2/8  -  Get it from Marshal")
 check("shared row adds who", ns.todo(shared):find("with Ann 5/6", 1, true) ~= nil)
+-- Your party: a row per member with how they are and where.
+local realMap = { C_Map.GetBestMapForUnit, C_Map.GetPlayerMapPosition, C_Map.GetMapInfo }
+local realLevel = UnitLevel
+UnitLevel = function(u) if u == "party1" then return 12 end return realLevel(u) end
+UnitClass = function() return "Mage", "MAGE" end
+RAID_CLASS_COLORS = { MAGE = { r = 0.25, g = 0.78, b = 0.92 } }
+UnitHealth = function() return 45 end
+UnitHealthMax = function() return 60 end
+UnitIsAFK = function() return false end
+C_Map.GetBestMapForUnit = function(u) return u == "party1" and 1436 or 1437 end
+C_Map.GetPlayerMapPosition = function() return { GetXY = function() return 0.5, 0.5 end } end
+C_Map.GetMapInfo = function(id) return { name = id == 1436 and "Westfall" or "Elwynn" } end
+local realWorld = HBD.GetWorldCoordinatesFromZone
+HBD.GetWorldCoordinatesFromZone = function() return 300, 400, 0 end
+D.resetModules()
+local mem = D.collect({}).members
+local ann = mem and mem[1]
+check("members: one row per member", mem and #mem == 1 and ann.name == "Ann" and ann.level == 12 and ann.classColor[1] == 0.25)
+check("members: where they are", ann.dist == 500 and ann.spot.mapID == 1436 and ann.zoneName == "Westfall")
+check("members: status line", D.memberText(ann) == "75% hp, in Westfall, 1 quest with you, 1 you lack"
+  and D.memberText({ theirs = 2 }) == "2 you lack")
+check("members: row text and distance", ns.todo(ann) == D.memberText(ann) and strip(ns.meta(ann)) == "500 yd")
+check("members: not pinnable, no link", not ns.pinnable(ann))
+ns.refresh()
+for _ = 1, 50 do ns.step() end
+local memRow
+for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and f.entry.kind == "member" then memRow = f end end
+GameTooltip.lines = {}
+if memRow then memRow.scripts.OnEnter(memRow) end
+local tipHas = false
+for _, l in ipairs(GameTooltip.lines) do if strip(l):find("75% health, 500 yd", 1, true) then tipHas = true end end
+check("members: a row on the board with a tooltip", memRow and tipHas)
+UnitIsDeadOrGhost = function() return true end
+check("members: dead", D.collect({}).members[1].status == "Dead")
+UnitIsDeadOrGhost = nil
+UnitIsConnected = function() return false end
+local off = D.collect({}).members[1]
+check("members: offline, no health", off.status == "Offline" and D.memberText(off):find("^Offline") ~= nil and not off.hp)
+UnitIsConnected = nil
+check("members: party off hides them", #D.collect({ party = false }).members == 0)
+check("members: behind when you can hand in and they cannot", D.memberText({ shared = { 1, 2 }, behind = 1 }) == "2 quests with you (1 behind)")
+UnitLevel, UnitClass, RAID_CLASS_COLORS, UnitHealth, UnitHealthMax, UnitIsAFK = realLevel, nil, nil, nil, nil, nil
+C_Map.GetBestMapForUnit, C_Map.GetPlayerMapPosition, C_Map.GetMapInfo = realMap[1], realMap[2], realMap[3]
+HBD.GetWorldCoordinatesFromZone = realWorld
 UnitName = realUnitName
 mods.QuestieComms = nil
 C_QuestLog.IsUnitOnQuest = nil
@@ -488,7 +588,17 @@ mods.DistanceUtils.GetNearestFinisherOrStarter = function(who)
   return realFinisher(who)
 end
 local shard = D.pickup(207, 27, 3)
-check("item quest: where the item drops", shard.fromItem and shard.item == "Glowing Shard" and shard.dropFrom == "Mutanus the Devourer" and shard.dist == 900)
+check("item quest: where the item drops", shard.fromItem and shard.startItem == "Glowing Shard" and not shard.item and shard.dropFrom == "Mutanus the Devourer" and shard.dist == 900)
+check("a pinned item-start pickup does not break the item buttons", pcall(ns.itemList, { active = { shard } }))
+do
+  -- Long lines wrap at a space (5 units a letter here), at most two lines.
+  local realProbe = ns.probe
+  ns.probe = { SetText = function(self, t) self.t = t end, GetStringWidth = function(self) return #self.t * 5 end }
+  local out = ns.wrapLines({ "short", "Loot Titan Relic from a far place, hand in to Prospector" }, 150)
+  check("a short line stays one line", out[1] == "short")
+  check("a long line wraps at a space", out[2] == "Loot Titan Relic from a far" and out[3] == "  place, hand in to Prospector" and #out == 3)
+  ns.probe = realProbe
+end
 check("item quest: who takes it in", shard.finisher == "Sputtervalve")
 check("item quest: what to do", ns.todo(shard) == "Loot Glowing Shard from Mutanus the Devourer, hand in to Sputtervalve")
 -- In a chest: the object's place.
@@ -501,6 +611,17 @@ mods.QuestieDB.GetItem = function(_, id) if id == 10441 then return { name = "Gl
 local loose = D.pickup(207, 27, 3)
 check("item quest: unknown drop has the finisher's distance", loose.dist == 2000 and loose.toFinisher and loose.target == "Sputtervalve")
 check("item quest: unknown drop says so", ns.todo(loose) == "Loot Glowing Shard (drop unknown), hand in to Sputtervalve")
+do
+  local avail = mods.AvailableQuests.__availableQuests
+  avail[207] = true
+  local function has(list) for _, e in ipairs(list) do if e.id == 207 then return e end end end
+  local st = D.collect({ time = 9000 })
+  check("a world-drop quest is not offered as a pick-up", not has(st.pickup) and not has(st.farPickup) and not has(st.active))
+  local pinnedSt = D.collect({ time = 9001, doing = { [207] = true } })
+  local p = has(pinnedSt.active)
+  check("a pinned world-drop quest stays, marked drop unknown", p and p.toFinisher and ns.meta(p, "active"):find("drop unknown", 1, true))
+  avail[207] = nil
+end
 mods.QuestieDB.GetObject = nil
 mods.QuestieDB.GetQuest = realGetQuest
 mods.DistanceUtils.GetNearestFinisherOrStarter = realFinisher
@@ -584,6 +705,14 @@ check("turn-in: meta has the XP", strip(ns.meta(q127)) == "1.5k xp  <1 min  300 
 check("run time", D.mins(30) == "<1 min" and D.mins(300) == "5 min")
 check("turn-in: a long run shows its minutes", strip(ns.meta({ kind = "turnin", xp = 900, dist = 2100 })) == "900 xp  5 min  2.1k yd")
 check("turn-in: no item says so", D.rewardTag({ steps = 0, count = 0 }) == "no item")
+-- Two-line quest rows: line 1 how far, line 2 the same two numbers on
+-- every quest, then a gear line only when there is gear.
+check("row: line 1 has only the distance", strip(ns.place(q127)) == "300 yd" and strip(ns.place({ kind = "log", left = {} })) == "no place")
+check("row: a hand-in shows its XP and the run", strip(ns.stats(q127)) == "1.5k xp  <1 min")
+check("row: a pick-up shows XP and a guessed time", strip(ns.stats({ kind = "pickup", xp = 625, secs = 180 })):match("^625 xp  ~3 min$") ~= nil)
+check("row: a hand-in names its reward", strip(ns.rewardLine(q127)) == "Reward: [Murloc Charm] or 1 more")
+check("row: a chain names the gear and how far on", strip(ns.rewardLine(q125)) == "Leads to [Ironforge Gladius], 2 quests on")
+check("row: XP only gets no gear line", ns.rewardLine(q122) == nil)
 check("turn-in: better gear on down the chain",
   strip(D.rewardTag({ steps = 1, count = 1, own = { id = 1, name = "Pie", quality = 1 }, best = { id = 2, name = "Axe", quality = 3, gear = true } })) == "[Pie], chain -> [Axe]")
 GameTooltip.lines = {}
@@ -612,17 +741,109 @@ check("chain: walks back and on", table.concat(full, ",") == "124,125,126,128" a
 local steps = D.chainSteps(126, { [125] = true })
 check("chain: steps marked done, log, here, later", steps and steps[1].state == "done" and steps[2].state == "log"
   and steps[3].state == "here" and steps[4].state == "later" and steps[4].name == "End")
+-- Steps not done show their XP and minutes (the trip and the work); the
+-- heading sums what is left. Every place is at 100, 0; you are at 0, 0.
+QUESTS[126] = { level = 27, requiredLevel = 20, name = "Middle", place = { 100, "Giver" }, xp = 1000 }
+QUESTS[128] = { level = 27, requiredLevel = 20, name = "End", place = { 100, "Giver" }, xp = 500 }
+local realNPC = mods.QuestieDB.QueryNPCSingle
+mods.QuestieDB.QueryNPCSingle = function(id, key) if key == "spawns" then return { [44] = { { 50, 50 } } } end end
+local level0 = P.level
+P.level = 27
 local lines = D.chainLines(D.chainSteps(126, {}))
-check("chain: tooltip lines", strip(lines[1]) == "Chain: quest 3 of 4" and strip(lines[4]) == "  >>  [10] Middle" and #lines == 5)
+local work = D.PICKUP_SECS * 2 + D.OBJECTIVE_SECS + D.RETURN_SECS
+local stepMin = math.floor((100 / D.RUN_SPEED + work) / 60 + 0.5)
+check("chain: heading sums what is left", type(lines[1]) == "table" and strip(lines[1][1]) == "Chain: quest 3 of 4"
+  and lines[1][2] == string.format("2 left: 1.5k xp, %d min", math.floor((100 / D.RUN_SPEED + 2 * work) / 60 + 0.5)))
+check("chain: travel and questing time", strip(lines[2][2]) == string.format("1 min travel, %d min questing (a guess)", math.floor(2 * work / 60 + 0.5)))
+check("chain: done steps have no numbers", strip(lines[3]) == "  done  [10] Before" and strip(lines[4]) == "  done  [10] Start")
+check("chain: a step shows its XP and minutes", strip(lines[5][1]) == "  >>  [10] Middle" and lines[5][2] == "1.0k xp  " .. stepMin .. " min")
+check("chain: the next step starts where the last one ends; gear is marked", strip(lines[6][1]) == "  ...  [10] End  +gear"
+  and lines[6][2] == "500 xp  " .. math.floor(work / 60 + 0.5) .. " min" and #lines == 6)
+local hereLines = D.chainLines(D.chainSteps(126, {}), 3, { secs = 600, dist = 70 })
+check("chain: the hovered quest uses the board's time", hereLines[5][2] == "1.0k xp  10 min")
+mods.QuestieDB.QueryNPCSingle = function() end
+check("chain: no place, the time is a guess", D.chainLines(D.chainSteps(126, {}))[5][2]:find("~") ~= nil)
 check("chain: no chain, no lines", D.chainSteps(122, {}) == nil and #D.chainLines(nil) == 0)
 D.CHAIN_SHOW = 2
 local cut = D.chainLines(D.chainSteps(126, {}))
-check("chain: a long chain is cut around this quest", strip(cut[2]) == "  (1 earlier)" and strip(cut[#cut]) == "  (1 more)")
+check("chain: a long chain is cut around this quest", strip(cut[3]) == "  (1 earlier)" and strip(cut[#cut][1]) == "  (1 more)"
+  and cut[#cut][2]:find("^500 xp") ~= nil)
 D.CHAIN_SHOW = 8
+mods.QuestieDB.QueryNPCSingle, QUESTS[126], QUESTS[128], P.level = realNPC, nil, nil, level0
 GameTooltip.lines = {}
 turnRow.scripts.OnEnter(turnRow)
 mods.QuestieDB.QueryQuestSingle = function(id, key) if key == "nextQuestInChain" then return NEXT[id] or 0 end end
 D.resetModules()
+
+-- A group past its row limit ends in a "+N more" line, never a silent cut.
+local saveRows = QuestBoardDB.rows.log
+QuestBoardDB.rows.log = 1
+local longList = { { name = "A" }, { name = "B" }, { name = "Stopping the Cycle" } }
+local cut = ns.shownRows("log", longList)
+check("rows: a cut group ends in a more line", #cut == 2 and cut[2].kind == "more" and cut[2].name == "+2 more: B, Stopping the Cycle")
+ns.click(cut[2])
+local open = ns.shownRows("log", longList)
+check("rows: click shows the whole group", #open == 4 and open[4].name == "show fewer")
+ns.click(open[4])
+check("rows: again folds it", #ns.shownRows("log", longList) == 2 and not ns.pinnable(cut[2]))
+check("rows: a short group has no more line", #ns.shownRows("log", { { name = "A" } }) == 1)
+QuestBoardDB.rows.log = saveRows
+-- /qb why: where a quest is, or why not.
+local whyState = { active = {}, nearby = {}, turnin = {}, log = { { name = "A" }, { name = "Stopping the Cycle" } }, party = {}, pickup = {} }
+check("why: in the log", D.whyQuest("stopping", whyState, ns.WHERE, 3) == "Stopping the Cycle, no known place: in the Log tab, and in Nearby within 1000 yd")
+check("why: a level too high", D.unfitReason({ level = 20 }, 10, 3):find("level 20, more than 3 over you", 1, true) ~= nil)
+check("why: unknown name", D.whyQuest("no such quest", whyState, ns.WHERE, 3):find("no quest named", 1, true) ~= nil)
+
+-- Dungeon quests: the level gets a tag, and /qb dungeons off keeps them
+-- to the Log tab.
+D.resetTags()
+GetQuestTagInfo = function(id) if id == 122 then return 81, "Dungeon" end if id == 201 then return 62, "Raid" end end
+check("tag: dungeon, raid, group by size", D.questTag(122) == "D" and D.questTag(201) == "R" and D.questTag(999, 5) == "G" and D.questTag(998) == nil)
+local tagged = D.collect({})
+local q122t
+for _, kind in ipairs({ "active", "nearby", "log" }) do for _, e in ipairs(tagged[kind]) do if e.id == 122 then q122t = e end end end
+check("tag: a log quest has it", q122t and q122t.tag == "D" and not q122t.hiddenTag)
+local hid = D.collect({ dungeons = false })
+local q122h, p201
+for _, kind in ipairs({ "active", "nearby", "log" }) do for _, e in ipairs(hid[kind]) do if e.id == 122 then q122h = e end end end
+for _, e in ipairs(hid.pickup) do if e.id == 201 then p201 = e end end
+check("dungeons off: the log quest stays for the Log tab, marked hidden", q122h and q122h.hiddenTag)
+check("dungeons off: a raid pick-up is left out", p201 == nil)
+local inNext = false
+for _, e in ipairs(ns.nextList(hid)) do if e.id == 122 then inNext = true end end
+check("dungeons off: not in Nearby", not inNext)
+GetQuestTagInfo = nil
+D.resetTags()
+do
+  -- No tag from the game, but Questie files it under the Stockade (717).
+  local realQ = mods.QuestieDB.QueryQuestSingle
+  mods.QuestieDB.QueryQuestSingle = function(id, key)
+    if key == "zoneOrSort" then return id == 386 and 717 or id == 387 and 2717 or 12 end
+    return realQ and realQ(id, key)
+  end
+  check("tag: an untagged quest filed under a dungeon is D", D.questTag(386) == "D" and D.questTag(387) == "R" and D.questTag(388) == nil)
+  mods.QuestieDB.QueryQuestSingle = realQ
+  D.resetTags()
+  -- A dungeon quest takes a run, not one kill.
+  local secs = D.workSecs({ id = 386, tag = "D", left = { { have = 0, need = 1 } } })
+  check("dungeon quest: the time is a run", secs == D.RUN_SECS.D)
+  check("dungeon quest: half done, half a run", D.workSecs({ id = 386, tag = "D", frac = 0.5 }) == D.RUN_SECS.D / 2)
+end
+
+-- Level weight: a quest over your level counts slower; red near not doable.
+check("level factor", D.levelFactor(10, 10) == 1 and D.levelFactor(12, 10) == 1.6 and D.levelFactor(15, 10) == D.RED_SLOW
+  and D.levelFactor(6, 10) == D.LOW_FAST and D.levelFactor(nil, 10) == 1)
+local easy = D.pickupSecs({ level = P.level, objectives = 2 })
+local hard = D.pickupSecs({ level = P.level + 3, objectives = 2 })
+check("level factor: a pick-up 3 over takes longer", hard > easy and math.abs((hard - easy) - 2 * D.OBJECTIVE_SECS * 1.2) < 0.01)
+local savedPace = D.pace
+D.pace = {}
+local w1 = D.workSecs({ id = 77001, level = P.level, left = { { have = 0, need = 4 } } })
+local w2 = D.workSecs({ id = 77002, level = P.level + 2, left = { { have = 0, need = 4 } } })
+D.pace = { [77003] = 20 }
+local w3 = D.workSecs({ id = 77003, level = P.level + 2, left = { { have = 0, need = 4 } } })
+D.pace = savedPace
+check("level factor: guessed work scales, measured pace does not", math.abs(w2 - w1 * 1.6) < 0.01 and w3 == 80)
 
 -- Distances take a colour: green near, yellow a walk, grey far.
 check("distance colours", D.yardsText(120):find("^|cff") and D.yardsText(120) ~= D.yardsText(700)
@@ -777,13 +998,6 @@ local names = {}
 for _, e in ipairs(sorted) do table.insert(names, e.name) end
 check("sort: near by distance, then far by XP", table.concat(names) == "becda")
 
--- Group order: hand-ins first when nothing is active and one is near;
--- Active first while you are on a quest.
-local function order(st) return table.concat(ns.order(st), ",") end
-check("order: a near hand-in leads when nothing is active", order({ active = {}, turnin = { { dist = 300 } } }):find("^turnin,nearby") ~= nil)
-check("order: a far hand-in does not", order({ active = {}, turnin = { { dist = 3000 } } }):find("^active") ~= nil)
-check("order: Active leads while you do a quest", order({ active = { {} }, turnin = { { dist = 100 } } }):find("^active,nearby") ~= nil)
-
 -- Pinned quests get a gold star.
 QuestBoardDB.doing = { [122] = true }
 ns.refresh()
@@ -802,7 +1016,7 @@ check("progress: half way", barRow.entry.frac == 0.5)
 check("progress: the bar shows", barRow.bar.shown and barRow.fill.shown)
 local turnBar
 for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and f.entry.id == 127 then turnBar = f end end
-check("progress: no bar on a hand-in", not turnBar.bar.shown)
+check("progress: a hand-in has a full green bar", turnBar.bar.shown and turnBar.fill.shown and ns.complete(turnBar.entry))
 -- On a job: Active plus hand-ins and pick-ups on the way; the rest on hover.
 local shownIDs = {}
 for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown then table.insert(shownIDs, f.entry.id) end end
@@ -813,11 +1027,34 @@ check("on a job: Active shows, the rest of the log does not", idSet[122] and idS
 local way = ns.onWay({ { id = 1, dist = 250 }, { id = 2, dist = 900, wx = 100, wy = 0, inst = 0 }, { id = 3, dist = 900, wx = 900, wy = 0, inst = 0 } },
   { { wx = 0, wy = 0, inst = 0 } })
 check("on a way: near you or near an Active quest", #way == 2 and way[1].id == 1 and way[2].id == 2)
-check("on a job: the title says hover shows all", (QuestBoardFrame.sub.text or ""):find("hover: all", 1, true) ~= nil)
-ns.hover(true, 0)
-check("on a job: mouse-over shows the whole board", countRows() > #shownIDs)
-ns.hover(false, 1)
-check("on a job: and trims again after", countRows() == #shownIDs)
+check("on a job: the board picks Doing", ns.tab() == "doing")
+local restRow
+for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and f.entry.tab == "log" then restRow = f end end
+check("on a job: one line counts the rest of the log", restRow and restRow.entry.name == "1 more in your log: Log tab")
+ns.click(restRow.entry)
+check("tabs: that line opens the Log tab with every quest, each once", ns.tab() == "log" and countRows() == 3)
+ns.pickTab("areas")
+check("tabs: a click holds a tab", ns.tab() == "areas")
+QuestBoardDB.doing = {}
+D.heldAt = {}
+ns.refresh()
+for _ = 1, 50 do ns.step() end
+check("tabs: when you stop the quest the board picks again", ns.tab() == "nearby")
+local stNow = ns.state()
+local areaSecs = ns.sections(stNow, "areas")
+check("areas tab: zones ranked, then travel", areaSecs[1] and areaSecs[1].key == "zones" and #areaSecs[1].list >= 1 and areaSecs[1].list[1].kind == "zone")
+local z1 = areaSecs[1].list[1]
+check("areas tab: a zone row says what is there", D.zoneText(z1) ~= "" and #z1.stops >= 1 and ns.todo(z1) == D.zoneText(z1))
+local logSecs = ns.sections(stNow, "log")
+local logRows = 0
+for _, sec in ipairs(logSecs) do check("log tab: one section per log zone, never cut", sec.key:find("^log:") and sec.cap == math.huge and sec.compact) logRows = logRows + #sec.list end
+check("log tab: every quest in the log", logRows == #ns.logAll(stNow) and logRows == 3)
+check("no place: a log quest with no distance says so", strip(ns.meta({ kind = "log", left = {} })) == "no place")
+check("zones: far ones after the ones you can reach", (function()
+  local zs = D.zones({ log = { { kind = "log", name = "a", header = "Near Zone", xp = 900, dist = 400, left = {} },
+    { kind = "log", name = "b", header = "Far Zone", xp = 5000, left = {} } } })
+  return #zs == 2 and not zs[1].far and zs[2].far
+end)())
 QuestBoardDB.doing = {}
 D.heldAt = {}
 
@@ -840,8 +1077,26 @@ for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and 
 check("height: the wheel shows rows further down", moved and ns.scroll > 0 and (board.more.text or ""):find("above", 1, true) ~= nil)
 ns.scrollBy(100)
 check("height: scroll stops at the top", ns.scroll == 0)
-local cursor = 500
-function GetCursorPosition() return 0, cursor end
+local cursor, cursorX = 500, 100
+function GetCursorPosition() return cursorX, cursor end
+local widths = {}
+local realSetWidth = board.SetWidth
+function board:SetWidth(w) widths[#widths + 1] = w end
+ns.sizeStart()
+check("size: the outline shows while you drag", board.outline and board.outline.shown)
+cursor, cursorX = 400, 160
+ns.sizeMove()
+check("size: the outline names the size", board.outline.text.text == "330 x " .. QuestBoardDB.maxHeight)
+ns.sizeStop()
+check("size: dragging right widens the board", QuestBoardDB.width == 330 and widths[#widths] == 330 and not board.outline.shown)
+ns.sizeStart()
+cursorX = -1000
+ns.sizeMove() ns.sizeStop()
+check("size: not narrower than the minimum", QuestBoardDB.width == ns.MIN_W)
+SlashCmdList.QUESTBOARD("width reset")
+check("/qb width reset", QuestBoardDB.width == 270)
+board.SetWidth = realSetWidth
+cursor, cursorX = 500, 100
 ns.sizeStart()
 cursor = 400
 ns.sizeMove()
@@ -853,6 +1108,106 @@ mods.QuestieDB.QueryQuestSingle, mods.QuestieDB.ItemPointers, mods.QuestieDB.Que
 D.rewardBuild = { state = "idle", i = 1 }
 D.rewardsByQuest = nil
 D.resetModules()
+
+---------------------------------------------------------------------------
+-- Stops (Spare1.lua): the Doing tab groups its quests by place.
+;(function()
+assert(loadfile(root .. "QuestBoard/Spare1.lua"))("QuestBoard", ns)
+local function q(name, kind, wx, wy, dist, xp, more)
+  local e = { name = name, kind = kind, wx = wx, wy = wy, inst = 0, dist = dist, xp = xp, level = 33, color = "yellow", left = {}, id = 0 }
+  for k, v in pairs(more or {}) do e[k] = v end
+  return e
+end
+local camp1 = q("Raptor Mastery", "turnin", 0, 100, 100, 1400, { target = "Hemet Nesingwary", pinned = true })
+local camp2 = q("Tiger Mastery", "turnin", 10, 100, 100, 1300, { target = "Ajeck Rouack" })
+local thorsen = q("Jungle Secrets", "pickup", 400, 0, 400, 1300, { target = "Private Thorsen", secs = 240 })
+local bay1 = q("Supply and Demand", "turnin", 0, -2800, 2800, 1200, { target = "Drizzlik" })
+local camp3 = q("Panther Mastery", "turnin", 5, 110, 100, 1300, { target = "Sir S. J. Erlgadin" })
+local bay2 = q("Singing Blue Shards", "pickup", 60, -2850, 2800, 2800, { target = "Crank Fizzlebub", secs = 660 })
+local crystal = q("Crystal in the Mountains", "log", -200, 0, 200, 280, { target = "Bloodscalp Warrior", left = { { text = "Pendant of Myzrael: 0/1" } } })
+local other = q("Elsewhere", "turnin", 5, 100, 100, 500, { inst = 1 })
+local stops = ns.stops({ camp1, camp2, thorsen, bay1, camp3, bay2, crystal, other })
+check("stops: quests at one place make one stop, in list order",
+  #stops == 5 and #stops[1].list == 3 and stops[1].list[3] == camp3 and #stops[2].list == 1 and #stops[3].list == 2 and stops[4].list[1] == crystal)
+check("stops: another continent is another stop", stops[5].list[1] == other)
+check("stops: a stop with hand-ins pays their XP, and takes the run there",
+  stops[1].hand == 3 and stops[1].xp == 4000 and stops[1].dist == 100 and stops[1].secs == D.travelSecs(100) and not stops[1].guess)
+check("stops: pick-ups do not count in a hand-in stop's XP", stops[3].hand == 1 and stops[3].pick == 1 and stops[3].xp == 1200)
+check("stops: a pick-up stop shows the quest's XP and time as a guess", stops[2].xp == 1300 and stops[2].secs == 240 and stops[2].guess)
+check("stops: what you do there", strip(ns.stopWhat(stops[1])) == "3 hand-ins" and strip(ns.stopWhat(stops[3])) == "1 hand-in, 1 pick-up"
+  and strip(ns.stopWhat(stops[4])) == "1 to finish" and strip(ns.stopWhat(stops[2])) == "1 pick-up")
+local realZoneName, realZoneText = D.zoneName, GetRealZoneText
+D.zoneName = function(z) return z == 15 and "Dustwallow Marsh" or nil end
+camp1.zone = 15
+GetRealZoneText = function() return "Stranglethorn Vale" end
+check("stops: a stop in another zone names it", strip(ns.stopWhat(stops[1])) == "3 hand-ins  Dustwallow Marsh")
+GetRealZoneText = function() return "Dustwallow Marsh" end
+check("stops: not when you are in that zone", strip(ns.stopWhat(stops[1])) == "3 hand-ins" and ns.zoneOf(camp1) == "Dustwallow Marsh")
+D.zoneName, GetRealZoneText, camp1.zone = realZoneName, realZoneText, nil
+check("stops: the head's numbers", ns.stopStats(stops[1]) == "4.0k xp  <1 min" and ns.stopStats(stops[2]) == "1.3k xp  ~4 min" and ns.stopPlace(stops[3]) == "2.8k yd")
+check("stops: ? to hand in, ! to pick up, a grey ? to finish",
+  ns.stopMark(camp1) == "|cffffd100?|r" and ns.stopMark(thorsen) == "|cffffd100!|r" and ns.stopMark(crystal) == "|cff909090?|r")
+check("stops: only a quest to finish has lines under it", #ns.stopLines(camp1) == 0 and #ns.stopLines(thorsen) == 0 and ns.stopLines(crystal)[1]:find("Pendant", 1, true) ~= nil)
+check("stops: no gear, no gear mark", ns.gearMark(camp1) == "")
+local noPlace = q("Lost", "log", nil, nil, nil, 100)
+check("stops: a quest with no place is its own stop", #ns.stops({ noPlace, q("Lost too", "log", nil, nil, nil, 100) }) == 2 and ns.stopPlace(ns.stops({ noPlace })[1]) == "no place")
+local moreRow = { kind = "more", group = "onway", name = "+2 more", left = {} }
+local ss = ns.stopSections({ camp1, bay1 }, { camp2, moreRow })
+check("stops: one section per stop, the +N more line last", #ss == 3 and ss[1].stop and #ss[1].list == 2 and ss[2].stop and ss[3].nohead and ss[3].list[1] == moreRow)
+-- The rules: a hand-in close by comes first, and joins Doing by itself.
+local work = q("Bloodscalp Ears", "log", 0, -200, 200, 2000, { left = { { text = "Ears: 3/15" } } })
+local farHand = q("Far hand-in", "turnin", 0, 3000, 3000, 900)
+local order = ns.stopSections({ work, thorsen }, {}, { camp1, camp2, bay1, farHand })
+check("rules: a hand-in within 600 yd joins Doing; a far one does not",
+  #order == 3 and order[1].list[1] == camp1 and order[1].list[2] == camp2)
+check("rules: the hand-in stop comes before the quest you are on", order[1].stop.hand == 2 and order[2].list[1] == work and order[3].list[1] == thorsen)
+local two = ns.stopSections({}, {}, { q("One", "turnin", 300, 0, 300, 1000), camp1, camp2 })
+check("rules: two hand-ins in one place beat one", two[1].stop.hand == 2 and two[2].list[1].name == "One")
+local joined = ns.stopSections({ bay2 }, {}, { bay1, farHand })
+check("rules: a far hand-in joins a stop you go to anyway, hand-ins first in the stop",
+  #joined == 1 and joined[1].list[1] == bay1 and joined[1].list[2] == bay2)
+local saveRows = QuestBoardDB.rows.onway
+QuestBoardDB.rows.onway = 1
+local capped = ns.stopSections({}, { camp1, thorsen, camp2, q("Third", "pickup", 900, 900, 1200, 100) }, {})
+QuestBoardDB.rows.onway = saveRows
+check("rules: hand-ins do not count against the row limit",
+  #capped == 3 and capped[1].stop.hand == 2 and capped[2].list[1] == thorsen and capped[3].list[1].kind == "more")
+-- Trips (Spare2.lua): a flight when it beats the run, a flat guess for
+-- another continent. You are at 0, 0.
+assert(loadfile(root .. "QuestBoard/Spare2.lua"))("QuestBoard", ns)
+D.flyNodeList = { { wx = 0, wy = 70, inst = 0, id = 1 }, { wx = 6000, wy = 0, inst = 0, id = 2 }, { wx = 0, wy = 0, inst = 1, id = 3 } }
+local farQuest = q("Across the zone", "turnin", 6000, 140, 6000, 1000)
+local flySecs = 70 / D.RUN_SPEED + 140 / D.RUN_SPEED + D.FLY_BOARD_SECS + math.sqrt(6000 * 6000 + 70 * 70) / D.FLY_SPEED
+local got, how = D.travelSecs(6000, farQuest)
+check("trips: a long way goes by flight", how == "fly" and math.abs(got - flySecs) < 0.01 and got < D.travelSecs(6000))
+check("trips: a short way is a run", select(2, D.travelSecs(1000, q("Close", "turnin", 1000, 0, 1000, 100))) == nil)
+check("trips: no flight when one flight master is nearest to both ends", D.flySecs(q("By the master", "turnin", 0, 1600, 1600, 100), D.RUN_SPEED) == nil)
+check("trips: a flight far from the place loses to the run", select(2, D.travelSecs(2500, q("Middle", "turnin", 2500, 0, 2500, 100))) == nil)
+check("trips: no flight to another continent's flight master", D.flySecs(q("Elsewhere", "turnin", 0, 3000, 3000, 100, { inst = 1 }), D.RUN_SPEED) == nil)
+local flown = D.finish(q("Flown", "turnin", 6000, 140, 6000, 1000, { done = true, spot = { wx = 6000, wy = 140, inst = 0 } }), 33)
+check("trips: the quest's time and XP per minute count the flight", flown.by == "fly" and math.abs(flown.secs - (flySecs + D.PICKUP_SECS)) < 0.01 and flown.rate > D.rate(1000, D.travelSecs(6000)))
+local abroad = D.finish({ name = "Abroad", kind = "turnin", done = true, far = true, xp = 1000, level = 33, left = {}, id = 0 }, 33)
+check("trips: another continent counts the boat, a guess", abroad.secs == D.FAR_TRIP_SECS + D.PICKUP_SECS and abroad.rate ~= nil and abroad.by == nil)
+D.flyNodeList = nil
+-- On the board: the Doing tab draws stops; /qb stops goes back to one list.
+ns.refresh()
+ns.pickTab("doing")
+local doingSecs = ns.sections(ns.state(), "doing")
+local stopHeads, stopRows = 0, 0
+for _, f in ipairs(frames) do
+  if f.kind == "Button" and f.stop and f.shown then stopHeads = stopHeads + 1 end
+  if f.kind == "Button" and f.entry and f.shown and f.noArrow then stopRows = stopRows + 1 end
+end
+local nStops = 0
+for _, sec in ipairs(doingSecs) do if sec.stop then nStops = nStops + 1 end end
+check("stops: the Doing tab has no Doing or On the way group", nStops > 0 and doingSecs[1].stop ~= nil)
+check("stops: the board draws a head per stop and marks its rows", stopHeads == nStops and stopRows > 0)
+SlashCmdList.QUESTBOARD("stops")
+check("/qb stops: back to one list", QuestBoardDB.stops == false and not ns.sections(ns.state(), "doing")[1].stop)
+SlashCmdList.QUESTBOARD("stops")
+check("/qb stops again: stops", QuestBoardDB.stops == true and ns.sections(ns.state(), "doing")[1].stop ~= nil)
+ns.pickTab("nearby")
+end)()
 
 ---------------------------------------------------------------------------
 -- Without Questie: the log only, no errors.

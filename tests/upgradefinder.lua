@@ -378,6 +378,51 @@ ns.handlers.PLAYER_EQUIPMENT_CHANGED()
 check("equipped ring is no longer a free bag item; the AH copy stays", row("Opal Ring") and row("Opal Ring").source == "AH")
 P.bagItem, WORN[11] = 104, 200
 
+-- A quest reward handed in while the window is closed: the game has not
+-- loaded it yet when the bags change, so UpgradeFinder asks and looks again.
+-- Worn: a dagger and an off-hand, so the staff replaces both hands.
+ITEMS[113] = { loc = "INVTYPE_2HWEAPON", lines = { "Dragon Scepter", "Two-Hand", "+20 Intellect" } }
+ITEMS[114] = { loc = "INVTYPE_HOLDABLE", lines = { "Glass Orb", "Held In Off-hand", "+4 Intellect" } }
+local wornMain, cachedBy = WORN[16], C_Item.IsItemDataCachedByID
+WORN[16], WORN[17] = 107, 114
+local loaded113 = false
+C_Item.IsItemDataCachedByID = function(id) if id == 113 then return loaded113 end return cachedBy(id) end
+UpgradeFinderFrame:Hide()
+calls, timers = {}, {}
+P.bagItem = 113
+ns.handlers.BAG_UPDATE_DELAYED()
+check("an unloaded bag item is asked for", table.concat(calls, ","):find("load 113") ~= nil
+  and ns.scan.state.bagPending == 1 and #timers == 1)
+loaded113 = true
+runTimers()
+ns.open()
+local scepter = row("Dragon Scepter")
+check("the quest reward is listed once it loads", scepter ~= nil and scepter.source == "bags"
+  and ns.scan.state.bagPending == 0)
+-- 20 Int against dagger (2) + orb (4), at the mage's Int weight.
+local wInt = ns.weights().int
+check("the staff's gain counts both hands it replaces",
+  scepter and math.abs(scepter.gain - (20 - 2 - 4) * wInt) < 1e-6)
+-- The retry gives up after Scan.PATIENCE looks.
+loaded113 = false
+ns.scan.cache[113] = nil
+ns.handlers.BAG_UPDATE_DELAYED()
+local looks = 0
+while #timers > 0 do looks = looks + 1 table.remove(timers, 1)() end
+check("the retry stops after Scan.PATIENCE looks", looks == ns.scan.PATIENCE)
+-- Handed in during a scan: the scan's end adds it.
+loaded113 = true
+ns.scan.cache[113] = nil
+P.bagItem = 104
+ns.rescan()
+P.bagItem = 113
+runTimers()
+check("a bag item that arrives during a scan is listed", row("Dragon Scepter") ~= nil)
+C_Item.IsItemDataCachedByID = cachedBy
+P.bagItem, WORN[16], WORN[17] = 104, wornMain, nil
+ns.scan.cache[113], ITEMS[113], ITEMS[114] = nil, nil, nil
+ns.handlers.BAG_UPDATE_DELAYED()
+
 -- Dual wield comes from the game
 CanDualWield = function() return false end
 check("no dual wield until learned", ns.scan.readWorn().dualWield == false)
