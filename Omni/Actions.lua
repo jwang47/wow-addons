@@ -210,6 +210,7 @@ function A.hint(e)
   elseif k == "person" then return "Enter: whisper   Shift+Enter: invite"
   elseif k == "spell" then return "Enter: put on the cursor   Shift+Enter: link"
   elseif k == "command" then return "Enter: run"
+  elseif k == "bazaar" then return "Enter: open the AH browser with this search"
   elseif k == "npc" or k == "near" then return "Enter: show on the map"
   elseif k == "quest" then
     if A.questStatus(e.id) == "log" then return "Enter: open in the quest log   Shift+Enter: where it starts" end
@@ -269,6 +270,9 @@ function A.run(e, alt)
     return true
   elseif k == "command" then
     call(api("SlashCmdList.MAGEMENTOR"), e.args)
+    return true
+  elseif k == "bazaar" then
+    call(api("Bazaar.open"), e.query ~= "" and e.query or nil)
     return true
   elseif k == "npc" then
     return showNpc(e.id, e.name)
@@ -347,11 +351,49 @@ function A.fullScanToday()
   return full >= now - (t.hour or 0) * 3600 - (t.min or 0) * 60 - (t.sec or 0)
 end
 
+-- The skill-up colour of a recipe you know, as the profession window shows it.
+A.SKILL_UP = { optimal = { "|cffff8040", "skill-up" }, medium = { "|cffffff00", "skill-up likely" },
+  easy = { "|cff40bf40", "skill-up rare" }, trivial = { "|cff808080", "no skill-up" } }
+
 -- The right-hand text of a row, worked out only for rows on screen.
 function A.detail(e)
   local k = e.kind
   if k == "item" then
     local parts = {}
+    local r = e.recipe
+    if r then
+      -- A recipe: the skill it needs, then the profit of one craft.
+      if r.source == "known" then
+        local c = A.SKILL_UP[r.kind]
+        if c then table.insert(parts, c[1] .. c[2] .. "|r") end
+      elseif r.source == "trainer" then
+        local low = r.req and r.rank and r.rank < r.req
+        table.insert(parts, (low and "|cffff6060" or "|cffffd100") .. r.prof .. (r.req and (" " .. r.req) or "") .. "|r")
+        if r.price and r.price > 0 then table.insert(parts, "learn " .. ns.money(r.price)) end
+      elseif r.skill then
+        table.insert(parts, "|cffffd100" .. r.skill .. (r.rank and (" " .. r.rank) or "") .. "|r")
+      end
+      if r.profit then
+        -- Grey with "?" when LootValue is not sure the AH sale happens.
+        local unsure = ns.sources.unsure(r)
+        local color = unsure and "|cff9d9d9d" or (r.profit >= 0 and "|cff40ff40" or "|cffff6060")
+        table.insert(parts, color .. (r.profit >= 0 and "+" or "-") .. ns.money(math.abs(r.profit))
+          .. ((r.unknown or unsure) and " ?" or "") .. "|r")
+      elseif r.made and r.made:match("^Enchant ") then
+        table.insert(parts, "costs " .. ns.money(r.cost))
+      else
+        table.insert(parts, "|cff9d9d9dno sale price|r")
+      end
+    end
+    local ah = e.ahRow
+    if ah then
+      -- An AH search row: cheapest, fair price, listed, sold in 2 days.
+      if ah.min then table.insert(parts, "from " .. ns.money(ah.min)) end
+      if ah.fair then table.insert(parts, "|cff9d9d9dfair|r " .. ns.money(ah.fair)) end
+      if ah.listed then table.insert(parts, ah.listed .. " listed") end
+      if ah.sold then table.insert(parts, (ah.sold > 0 and "|cff40ff40" or "|cff9d9d9d") .. ah.sold .. " sold/2d|r") end
+      return table.concat(parts, "  ")
+    end
     for _, w in ipairs({ "bags", "bank", "mail" }) do
       if e.where and e.where[w] then table.insert(parts, w .. " " .. e.where[w]) end
     end
@@ -421,6 +463,15 @@ function A.tooltip(tt, e)
       local scan = A.scanText()
       if scan then table.insert(parts, scan) end
       if #parts > 0 then tt:AddLine(table.concat(parts, "; "), 0.6, 0.6, 0.6) end
+    end
+    -- A recipe row: where its profit comes from.
+    local r = e.recipe
+    if r and r.cost and r.sale then
+      tt:AddLine(string.format("One craft: reagents %s%s, sells for %s (%s), profit %s", ns.money(r.cost),
+        r.unknown and " + ?" or "", ns.money(r.sale), r.how or "?", r.profit and ns.money(r.profit) or "?"), 1, 0.82, 0)
+      if ns.sources.unsure(r) then
+        tt:AddLine("Not sure it sells at that price (" .. r.confidence .. " market): the profit is a guess.", 1, 0.4, 0.4, true)
+      end
     end
   elseif k == "spell" and tt.SetSpellByID then
     tt:SetSpellByID(e.spellID)

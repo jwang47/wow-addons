@@ -504,6 +504,168 @@ check("scan: none sold makes the market slow", has(LV.marketInfo("|Hitem:9003:0|
 check("scan: thousands", SC.number(164749) == "164,749" and SC.number(100) == "100" and SC.number(1000000) == "1,000,000")
 AL.slash("scan")
 check("/lv scan prints the status", has(chat[#chat], "last full scan"))
+-- Clear bags ------------------------------------------------------------------
+do
+  -- A frame that takes any call; scripts, attributes, text and shown are kept.
+  local frames, events = {}, {}
+  local function stub(name)
+    local fr = { scripts = {}, attrs = {}, shown = true, name = name }
+    local methods = {
+      SetScript = function(self, k, fn) self.scripts[k] = fn end,
+      HookScript = function(self, k, fn) self.scripts[k] = fn end,
+      RegisterEvent = function(self, e) events[e] = self end,
+      SetAttribute = function(self, k, v) self.attrs[k] = v end,
+      SetText = function(self, t) self.text = t end,
+      Show = function(self) self.shown = true end,
+      Hide = function(self) self.shown = false end,
+      IsShown = function(self) return self.shown end,
+      SetEnabled = function(self, on) self.enabled = on end,
+      CreateFontString = function() return stub() end,
+      CreateTexture = function() return stub() end,
+      GetPoint = function() return "CENTER", nil, "CENTER", 0, 0 end,
+    }
+    return setmetatable(fr, { __index = function(_, k) return methods[k] or function() end end })
+  end
+  CreateFrame = function(_, name)
+    local fr = stub(name)
+    if name then frames[name] = fr end
+    return fr
+  end
+  UIParent = stub("UIParent")
+  local combat = false
+  InCombatLockdown = function() return combat end
+  C_Timer = nil
+
+  -- Bags: bag 0 slots hold { itemID, stackCount, quality, isBound, isLocked }.
+  local used = {}
+  for k in pairs(BAG) do BAG[k] = nil end
+  C_Container.GetContainerNumSlots = function(bag) return bag == 0 and 12 or 0 end
+  C_Container.GetContainerItemInfo = function(bag, slot)
+    local it = bag == 0 and BAG[slot]
+    if not it then return nil end
+    return { itemID = it.itemID, stackCount = it.stackCount or 1, quality = ITEMS[it.itemID][1], isBound = it.bound,
+      isLocked = it.locked, hyperlink = link(it.itemID) }
+  end
+  C_Container.UseContainerItem = function(bag, slot)
+    table.insert(used, BAG[slot].itemID)
+    BAG[slot] = nil
+  end
+  local WORN = {}
+  GetInventoryItemLink = function(_, slot) return WORN[slot] and link(WORN[slot]) end
+
+  ITEMS[9101] = { 2, 20, 700, 4, 1, "INVTYPE_FEET", 1 }    -- green boots, no AH price: vendor
+  ITEMS[9102] = { 2, 31, 900, 4, 1, "INVTYPE_FEET", 1 }    -- better boots than worn
+  ITEMS[9103] = { 2, 28, 1200, 4, 1, "INVTYPE_FEET", 1 }   -- the boots you wear
+  ITEMS[9104] = { 4, 30, 5000, 4, 1, "INVTYPE_HEAD", 1 }   -- epic
+  ITEMS[9105] = { 1, 25, 300, 12, 1, "", 0 }               -- quest item
+  ITEMS[9106] = { 2, 21, 600, 4, 1, "INVTYPE_HEAD", 1 }    -- green helm to disenchant
+  AH[9101], AH[9001], DE[9001] = nil, 4500, nil
+  WORN[8], WORN[1] = 9103, 9103
+  LootValueDB = nil
+  assert(loadfile(root .. "LootValue/Clear.lua"))("LootValue", {})
+  local CL = LV.clear
+  local function item(id, extra)
+    local it = { id = id, link = link(id), count = 1, quality = ITEMS[id][1], bag = 0, slot = 1 }
+    for k, v in pairs(extra or {}) do it[k] = v end
+    return it
+  end
+  -- No Enchanting in this block until said.
+  for i = #SKILLS, 1, -1 do if SKILLS[i][1] == "Enchanting" then table.remove(SKILLS, i) end end
+
+  local r = CL.classify(item(1468, { count = 5 }))
+  check("clear: grey junk goes to the vendor, ticked", r.kind == "vendor" and r.on and r.grey and r.value == 30)
+  r = CL.classify(item(9101))
+  check("clear: gear below what you wear is ticked for the vendor", r.kind == "vendor" and r.on and r.value == 700)
+  r = CL.classify(item(9102))
+  check("clear: gear above what you wear is not ticked", r.kind == "vendor" and not r.on
+    and r.why == "item level 31, you wear 28")
+  WORN[8] = nil
+  check("clear: an empty slot counts as an upgrade", CL.classify(item(9101)).why == "that slot is empty")
+  WORN[8] = 9103
+  check("clear: epics and quest items are never listed", CL.classify(item(9104)) == nil
+    and CL.classify(item(9105)) == nil)
+  check("clear: a locked slot is not listed", CL.classify(item(1468, { locked = true })) == nil)
+  check("clear: cloth, potions and other non-gear are not sold", CL.classify(item(2589)) == nil
+    and CL.classify(item(3001)) == nil)
+  r = CL.classify(item(9001))
+  check("clear: an unbound item the AH pays more for goes to the AH list", r.kind == "ah" and r.value == 4275)
+  r = CL.classify(item(9001, { bound = true }))
+  check("clear: the bound copy goes to the vendor", r.kind == "vendor" and r.value == 800)
+  table.insert(SKILLS, { "Enchanting", false, nil, 50 })
+  DE[9106] = 2500
+  r = CL.classify(item(9106))
+  check("clear: with Enchanting, gear worth more as dust is disenchanted", r.kind == "de" and r.on and r.value == 2500)
+
+  -- Your own ticks are kept per item.
+  CL.toggle(CL.classify(item(9102)))
+  check("clear: ticking an upgrade row sells it", CL.classify(item(9102)).on)
+  CL.toggle(CL.classify(item(9102)))
+  check("clear: unticking keeps it for good", not CL.classify(item(9102)).on and LootValueDB.clear.choice[9102] == "keep")
+  CL.toggle(CL.classify(item(1468)))
+  check("clear: a grey item can be kept", not CL.classify(item(1468)).on)
+  CL.toggle(CL.classify(item(1468)))
+  check("clear: and sold again", CL.classify(item(1468)).on and LootValueDB.clear.choice[1468] == nil)
+
+  -- Scan, totals and the panel lines.
+  BAG[1] = { itemID = 1468, stackCount = 5 }
+  BAG[2] = { itemID = 9101 }
+  BAG[3] = { itemID = 9102 }
+  BAG[4] = { itemID = 9001 }
+  BAG[5] = { itemID = 9001 }
+  BAG[6] = { itemID = 9106 }
+  BAG[7] = { itemID = 2589, stackCount = 20 }
+  local rows = CL.scan()
+  local t = CL.totals(rows)
+  check("clear: scan lists vendor, disenchant and AH rows", #rows == 5 and rows[1].kind == "vendor" and rows[1].id == 9101
+    and rows[3].id == 9102 and rows[4].kind == "de" and rows[5].kind == "ah")
+  check("clear: two AH stacks are one row", rows[5].count == 2 and rows[5].value == 8550)
+  check("clear: totals count ticked rows only", t.vendor.n == 2 and t.vendor.value == 730 and t.de.n == 1 and t.ah.n == 1)
+  local shown = CL.display(rows, "merchant")
+  check("clear: the merchant view has no AH list", #shown == 6 and has(shown[1].header, "Vendor: 2 items, 7s30c")
+    and has(shown[5].header, "Disenchant: 1 item, ~25s"))
+  shown = CL.display(rows, "ah")
+  check("clear: the AH view has only the AH list", #shown == 2 and has(shown[1].header, "Auction House: 1 item, ~85s after the cut"))
+  check("clear: the disenchant macro names the bag slot", CL.disenchantMacro(CL.nextDisenchant(rows))
+    == "/cast Disenchant\n/use 0 6")
+
+  -- One press sells every grey item and at most 12 others.
+  local many = {}
+  for i = 1, 15 do many[i] = { kind = "vendor", on = true, value = 1, id = i } end
+  many[16] = { kind = "vendor", on = true, grey = true, value = 1, id = 16 }
+  many[17] = { kind = "vendor", on = false, value = 1, id = 17 }
+  local queue, left = CL.sellQueue(many)
+  check("clear: sells grey first, then 12 others", #queue == 13 and queue[1].id == 16 and left == 3)
+
+  -- The merchant flow.
+  CL.sell()
+  check("clear: no selling away from a merchant", #used == 0 and has(chat[#chat], "open a merchant first"))
+  events.MERCHANT_SHOW.scripts.OnEvent(nil, "MERCHANT_SHOW")
+  local panel = frames.LootValueClearFrame
+  check("clear: the panel opens at a merchant", panel ~= nil and panel:IsShown())
+  local deBtn = frames.LootValueDisenchantButton
+  check("clear: the disenchant button is a secure down-click macro", deBtn.attrs.type == "macro"
+    and deBtn.attrs.pressAndHoldAction == true and deBtn.attrs.macrotext == "/cast Disenchant\n/use 0 6")
+  BAG[2] = { itemID = 9101, locked = true }
+  BAG[8] = { itemID = 9101 }
+  CL.sell()
+  check("clear: Sell sells the ticked vendor rows only", #used == 2 and used[1] == 1468 and used[2] == 9101
+    and BAG[3] ~= nil and BAG[4] ~= nil and BAG[6] ~= nil and BAG[7] ~= nil and BAG[2] ~= nil)
+  check("clear: it says what it sold", has(chat[#chat], "sold 2 items for 7s30c"))
+  combat = true
+  events.PLAYER_REGEN_DISABLED.scripts.OnEvent(nil, "PLAYER_REGEN_DISABLED")
+  check("clear: the panel hides when combat starts", not panel:IsShown())
+  check("clear: it does not open in combat", CL.show("all") == false and not panel:IsShown())
+  combat = false
+  events.MERCHANT_CLOSED.scripts.OnEvent(nil, "MERCHANT_CLOSED")
+  AL.slash("clear")
+  check("/lv clear opens the panel", panel:IsShown())
+  AL.slash("clear auto")
+  BAG[1] = { itemID = 1468 }
+  CL.hide()
+  events.MERCHANT_SHOW.scripts.OnEvent(nil, "MERCHANT_SHOW")
+  check("/lv clear auto: no longer opens by itself", not panel:IsShown() and LootValueDB.clear.auto == false)
+  events.MERCHANT_CLOSED.scripts.OnEvent(nil, "MERCHANT_CLOSED")
+end
 
 if failures > 0 then error(failures .. " LootValue test(s) failed") end
 print("all LootValue tests passed")

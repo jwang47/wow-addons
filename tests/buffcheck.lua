@@ -325,6 +325,113 @@ check("staff with an imbue: on", st.rows[1].cells[scrollCol].state == "on")
 check("a level 25 imbue waits", ns.logic.bagScrolls({ "Scroll of Imbue Flame" },
   { class = "MAGE", ids = { ["Scroll of Imbue Flame"] = 277497 }, level = 18, weapon = 10 }).Imbue == nil)
 
+-- The game blocks CheckInteractDistance in combat: no call there.
+do
+  local old, calls = CheckInteractDistance, 0
+  CheckInteractDistance = function(u) calls = calls + 1 return old(u) end
+  W.combat = false
+  ns.refresh()
+  check("out of combat it asks how near players are", calls > 0)
+  calls, W.combat = 0, true
+  ns.refresh()
+  check("in combat it never calls CheckInteractDistance", calls == 0)
+  W.combat = false
+  CheckInteractDistance = old
+  ns.refresh()
+end
+
+-- The refresh timer: an event waits DIRTY_SECS out of combat, and in
+-- combat the grid is read once every IDLE_SECS whatever fires.
+do
+  local old, n = ns.refresh, 0
+  ns.refresh = function() n = n + 1 end
+  local tick = ev.scripts.OnUpdate
+  tick(ev, 5)
+  n = 0
+  ns.st.dirty = true
+  tick(ev, 0.3)
+  check("an event does not refresh at once", n == 0)
+  tick(ev, 0.3)
+  check("it refreshes half a second after an event", n == 1)
+  W.combat = true
+  for _ = 1, 9 do ns.st.dirty = true tick(ev, 0.1) end
+  check("in combat events do not refresh", n == 1)
+  tick(ev, 0.2)
+  check("in combat it refreshes once a second", n == 2)
+  W.combat = false
+  ns.refresh = old
+end
+
+-- Ready check ---------------------------------------------------------------
+do
+  load("Ready.lua")
+  local R = ns.ready
+  local function knowsOf(list)
+    local set = {}
+    for _, n in ipairs(list) do set[n] = true end
+    return function(n) return set[n] == true end
+  end
+  local mage = { class = "MAGE", knows = knowsOf({ "Teleport: Stormwind", "Conjure Water", "Slow Fall" }),
+    counts = { [17031] = 3, [17056] = 2, [2136] = 20 }, durability = 0.9, free = 10, talents = 0 }
+  check("ready: nothing missing, no line", R.line(mage) == nil)
+  mage.counts = { [17031] = 1, [2136] = 5, [3772] = 3 }
+  check("ready: reagents and water", R.line(mage)
+    == "Before you go: 1 Rune of Teleportation, no Light Feather, 8 conjured water")
+  mage.counts = { [17031] = 3, [17056] = 2, [2136] = 20 }
+  check("ready: a spell you do not know needs no reagent", #R.problems(mage) == 0
+    and R.REAGENTS.MAGE[2].name == "Rune of Portals")
+  mage.durability, mage.free, mage.talents = 0.224, 3, 1
+  check("ready: gear, bags and talents", R.line(mage)
+    == "Before you go: gear at 22% (repair), 3 free bag slots, 1 talent point to spend")
+  mage.durability, mage.free, mage.talents = nil, 0, nil
+  check("ready: full bags, unknown values stay quiet", R.line(mage) == "Before you go: bags full")
+  check("ready: another class has its own reagents", R.line({ class = "SHAMAN", knows = knowsOf({ "Reincarnation" }),
+    counts = {} }) == "Before you go: no Ankh")
+
+  -- In the game: leaving a rest area says the line once.
+  local resting, screen = true, {}
+  IsResting = function() return resting end
+  IsInInstance = function() return false, "none" end
+  GetInventoryItemDurability = function(slot) if slot == 5 then return 20, 100 end end
+  UnitCharacterPoints = function() return 0 end
+  UIErrorsFrame = { AddMessage = function(_, m) table.insert(screen, m) end }
+  C_Container.GetContainerNumSlots = function(bag) return bag == 0 and 2 or 0 end
+  C_Container.GetContainerItemInfo = function(bag, slot)
+    if bag == 0 and slot == 1 then return { itemID = 17031, stackCount = 4 } end
+  end
+  C_Container.GetContainerNumFreeSlots = function(bag) return bag == 0 and 9 or 0, 0 end
+  W.known["Teleport: Stormwind"] = true
+  local rev = R.ev
+  rev.scripts.OnEvent(rev, "PLAYER_LOGIN")
+  local before = #chat
+  resting = false
+  rev.scripts.OnEvent(rev, "PLAYER_UPDATE_RESTING")
+  check("ready: leaving town says the line in chat and on screen", #chat == before + 1
+    and chat[#chat] == "BuffCheck: Before you go: gear at 20% (repair)" and #screen == 1)
+  resting = true
+  rev.scripts.OnEvent(rev, "PLAYER_UPDATE_RESTING")
+  resting = false
+  rev.scripts.OnEvent(rev, "PLAYER_UPDATE_RESTING")
+  check("ready: the same line is not repeated at once", #chat == before + 1)
+  SlashCmdList.BUFFCHECK("ready")
+  check("/buffs ready says it again", #chat == before + 2)
+  SlashCmdList.BUFFCHECK("ready off")
+  T = T + 1000
+  resting = true
+  rev.scripts.OnEvent(rev, "PLAYER_UPDATE_RESTING")
+  resting = false
+  rev.scripts.OnEvent(rev, "PLAYER_UPDATE_RESTING")
+  check("/buffs ready off: quiet when you leave town", ns.db.ready == false and #screen == 2)
+  SlashCmdList.BUFFCHECK("ready on")
+  IsInInstance = function() return true, "party" end
+  rev.scripts.OnEvent(rev, "PLAYER_ENTERING_WORLD")
+  check("ready: entering a dungeon says the line", #screen == 3)
+  GetInventoryItemDurability = function() return 100, 100 end
+  before = #chat
+  SlashCmdList.BUFFCHECK("ready")
+  check("/buffs ready: all well", chat[#chat] == "BuffCheck: Ready: nothing missing." and #chat == before + 1)
+end
+
 if failures > 0 then
   print(failures .. " failed")
   os.exit(1)

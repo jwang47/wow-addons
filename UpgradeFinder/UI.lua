@@ -386,6 +386,19 @@ function ns.toggle()
 end
 UpgradeFinder_Toggle = ns.toggle
 
+-- For other addons: UpgradeFinderAPI.recipe(itemID) (see C.summary).
+UpgradeFinderAPI = {
+  recipe = function(id)
+    local ok, out = pcall(ns.craft.summary, id)
+    if ok then return out end
+  end,
+  -- The recipes you know and your trainer's (see C.known).
+  known = function()
+    local ok, out = pcall(ns.craft.known)
+    if ok then return out end
+  end,
+}
+
 -- A button on the Auction House window.
 local ahButton
 function ns.addAHButton(tries)

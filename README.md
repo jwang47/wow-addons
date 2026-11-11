@@ -18,6 +18,8 @@ Classic clients with the same APIs, but we test them only on Forever.
 - **Glance** (in testing, not in the releases yet): a lighter HUD with a
   keyboard-shaped action bar, a square minimap and small floating unit
   frames (`/glance`).
+- **Bazaar** (in testing, not in the releases yet): an AH browser for your
+  last full AH scan, anywhere in the world (`/bazaar`).
 
 Download page: https://jwang47.github.io/wow-addons/ (Windows installer).
 Releases: [GitHub releases](https://github.com/jwang47/wow-addons/releases)
@@ -128,7 +130,37 @@ like) on the body. It is on by default; `/lv` shows the settings.
   Auto Loot option off (it can only choose when the game does not take
   everything first), and `off` puts your old setting back.
 
-Its functions are on the global `LootValue` table (`adviceLine`,
+### Clear your bags
+
+`/lv clear` opens a panel that acts on the tooltip advice for everything in
+your bags. It opens by itself at a merchant and at the Auction House when it
+has something for you (`/lv clear auto` turns that on and off).
+
+| List | What is in it | What you do |
+| --- | --- | --- |
+| Vendor | grey junk, and weapons and armor whose best option is the vendor | At a merchant, press **Sell** |
+| Disenchant | green and blue gear whose best option is to disenchant it (with Enchanting) | Press **Disenchant**, one click an item |
+| Auction House | unbound items the AH clearly pays more for (the tooltip rule) | At the AH, click a row: the item goes into Auctionator's Selling tab |
+
+- A ticked row ("+") will be sold or disenchanted. Gear whose item level is
+  at or above what you wear in that slot may be an upgrade, so it starts
+  unticked and says why ("item level 31, you wear 28"). Click a row to tick
+  or untick it. LootValue remembers that per item; `/lv clear reset` forgets.
+- It never lists quest items, epics, or locked slots. Cloth, potions,
+  recipes and other items that are not gear are never sold or disenchanted;
+  they can show in the Auction House list. Right-click an AH row to hide it.
+- One press of Sell sells every grey item and at most 12 others
+  (`BUYBACK`), so each item that is not junk is still on the merchant's
+  Buyback tab. Press again for the rest.
+- The game allows a cast only on a real click, so the Disenchant button
+  does one item a click. The panel hides when combat starts.
+- Leatrix Plus and other addons that sell grey junk work beside it: the
+  panel opens a moment after the merchant does and lists what is left.
+- The AH click uses Auctionator's own Selling-tab code (checked against
+  Auctionator 344). If a later Auctionator changes it, the click prints a
+  hint and you pick the item in the Selling tab yourself.
+
+Its functions are on the global `LootValue` table (`adviceLine`, `options`,
 `marketInfo`, `ahWins`, `money`, `scanText`). Another addon can set
 `LootValue.deferTo = "<its name>"` and draw the line itself; LootValue's own
 tooltip hook then stays quiet. (Jiahua's private MageMentor addon does this.)
@@ -171,7 +203,13 @@ nothing). Fuzzy hits rank below exact ones.
 Filters: `i:` items, `p:` places, `@` or `w:` people, `s:` spells, `n:` NPCs,
 `q:` quests (your log and Questie), `l:` your log only, `c:` commands,
 `d:` dungeons, `loot:` one dungeon's drops and quests (`loot: bfd`),
-`from:` where to get an item (`from: linen cloth`),
+`from:` where to get an item (`from: linen cloth`), `r:` or a recipe word
+anywhere ("bag recipes") recipes with the skill and the profit of one craft
+(with UpgradeFinder), a profession word ("tailoring bag") that profession's
+recipes: the ones you know, your trainer's and recipe items (UpgradeFinder
+learns them when you open the profession window and the trainer window),
+`ah:` your last full AH scan (`ah: silk`: cheapest, fair price, listed,
+sold in 2 days; LootValue's full scan; the last row opens Bazaar),
 `near:` or `nb:` nearby NPCs (alone: everything nearby, nearest first). The Nearby group always comes first. An empty box lists the 5 nearest NPCs, then what you used last.
 
 Ranking: a name that starts with the query first, then names where each
@@ -669,6 +707,19 @@ small grid (`/buffs`). It is not in the release yet.
   from the last read before the fight: a buff counts as on until its end
   time. Drag the header to move the grid; `/buffs reset` moves it back,
   `/buffs` hides or shows it.
+- **Ready check**: when you leave a rest area (an inn or a city) or enter
+  a dungeon, one line in chat and in the middle of the screen says what
+  you are short of ("Before you go: no Rune of Teleportation, 8 conjured
+  water, gear at 22% (repair)"). It says nothing when all is well, and it
+  does not repeat the same line within 5 minutes. It checks:
+  reagents for spells you know (under 2 Rune of Teleportation, Rune of
+  Portals, Arcane Powder or Light Feather for a mage; `R.REAGENTS` in
+  `Ready.lua` has the other classes), conjured water under 20 and food
+  under 10 when you know the Conjure spell, the most worn item at 30%
+  durability or less, fewer than 5 free bag slots, and unspent talent
+  points. `/buffs ready` runs it now; `/buffs ready off` turns the automatic
+  line off. The reagent table and item IDs are from Classic: a reagent
+  counts only when you know one of its spells.
 - It replaces the third-party Manners addon: turn Manners off in the
   AddOns list so that the two do not both prompt you.
 
@@ -775,6 +826,35 @@ The bar uses the game's secure action buttons and override bindings
 (`SetOverrideBindingClick`), so it only reads bindings; it never changes
 your saved Key Bindings.
 
+## Bazaar (in testing)
+
+Bazaar is a window like the AH's Browse tab, but it works away from the
+AH. It shows your last full AH scan: every item with the cheapest buyout
+per item, the items listed, the fair price and how many sold in the last
+2 days. `/bazaar` (or `/ahb`) opens it; `/bazaar silk` opens it with a
+search. Esc closes it.
+
+- Categories on the left come from the items in the scan (Armor, Container,
+  Trade Goods...). Click a category to filter; click it again to close its
+  types.
+- Search words, a level range (the level the item needs) and a highest
+  price in gold filter the list.
+- Click a column header to sort by it; click again to turn the order
+  round. The default is most sold first: what moves.
+- The Profit column estimates what one item earns. For a recipe (with
+  UpgradeFinder loaded) it is the profit of one craft. For other items it
+  is buying the cheapest and selling again at the fair price after the 5%
+  AH cut, or to a vendor when that pays more. The row tooltip says which.
+- Hover a row for the item tooltip; Shift+click links it in chat.
+
+The data comes from LootValue's full scan (LootValue's Scan button above
+the AH window, or Auctionator's Full Scan with LootValue loaded): LootValue
+keeps every auction, its fair price (outliers dropped) and the sales it
+saw between scans. Without a LootValue scan, Bazaar lists the items in
+Auctionator's price database with their last price only. Bazaar reads the
+scan a few milliseconds a frame, so a big scan does not freeze the game.
+Item names the client has not seen yet load from the server and fill in.
+
 ## Forever client notes
 
 - A secure button (a click that casts) works only when it is registered
@@ -832,6 +912,10 @@ your saved Key Bindings.
 - Health (and sometimes power) is secret, but `AbbreviateLargeNumbers` takes
   secret values and the result can be joined into a string for `SetText`.
   Wrap it in `pcall` and fall back to the bare value.
+- `CheckInteractDistance` is blocked in combat: a call there raises
+  `ADDON_ACTION_BLOCKED` with the function name `UNKNOWN()` and the game
+  prints "Interface action failed because of an AddOn". Call it only when
+  `InCombatLockdown()` is false.
 - `UnitDistanceSquared` works only for party and raid members. For any
   other unit, bracket the distance with `C_Spell.IsSpellInRange` over the
   spellbook and `CheckInteractDistance` (out of combat).

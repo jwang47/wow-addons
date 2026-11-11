@@ -793,6 +793,10 @@ do
   local s1, s2 = shop("ShoppingTooltip1", 300, 400), shop("ShoppingTooltip2", 300, 400)
   ns.open("silk")
   GameTooltip.owner = OmniFrame
+  s2.NumLines = function() return 0 end
+  ns.placeCompare()
+  check("compare: an empty comparison is hidden", not s2:IsShown())
+  s2.NumLines, s2.shown = nil, true
   UIParent.GetRight = function() return 1700 end
   local tl, tr, tb = 700, 1000, 600
   GameTooltip.GetLeft = function() return tl end
@@ -962,6 +966,104 @@ do
   check("other dungeons don't list it", (ns.search("loot: dm")[#ns.search("loot: dm")].title:find("^Quest") == nil))
   check("loot: unknown dungeon is empty", #ns.search("loot: nowhere") == 0)
   ns.close()
+end
+
+-- Recipes: "bag recipes" lists recipe items, best profit first (UpgradeFinderAPI).
+do
+  local M = ns.match
+  check("a recipe word lists recipes", select(1, M.parse("bag recipes")) == "recipe" and select(2, M.parse("bag recipes")) == "bag")
+  check("r: filter", select(1, M.parse("r: silk")) == "recipe")
+  local E = ns.sources.entry
+  local list = { E("item", 5000, "Pattern: Small Silk Pack"), E("item", 5001, "Pattern: Linen Bag"),
+    E("item", 5002, "Pattern: Silk Robe"), E("item", 5003, "Linen Bag"), E("item", 5004, "Pattern: Red Linen Bag") }
+  local instant = C_Item.GetItemInfoInstant
+  C_Item.GetItemInfoInstant = function(id) return id, "", "", "", 0, id == 5003 and 1 or 9, 2 end
+  local SUM = { [5000] = { skill = "Tailoring", rank = 150, profit = 5000, cost = 3000 },
+    [5001] = { skill = "Tailoring", rank = 45, profit = -200, cost = 400 },
+    [5002] = { skill = "Tailoring", rank = 125, profit = 9000, cost = 100 } }
+  UpgradeFinderAPI = { recipe = function(id) return SUM[id] end }
+  local g, loading = ns.sources.recipes({ list }, "bag")
+  local got = {}
+  for _, e in ipairs(g[1] and g[1].entries or {}) do table.insert(got, e.name) end
+  check("bag recipes: packs too, not the bag itself, best profit first",
+    table.concat(got, ",") == "Pattern: Small Silk Pack,Pattern: Linen Bag,Pattern: Red Linen Bag")
+  check("a recipe still loading is retried", loading == true)
+  check("recipe row: skill and profit", strip(ns.actions.detail(g[1].entries[1])):find("^Tailoring 150  %+50s 0c") ~= nil)
+  check("recipe row: a loss", strip(ns.actions.detail(g[1].entries[2])):find("^Tailoring 45  %-2s 0c") ~= nil)
+  -- "tailoring": the recipes you know, then your trainer's, then recipe items.
+  check("a profession word lists recipes", select(1, M.parse("tailoring bag")) == "recipe"
+    and select(2, M.parse("tailoring bag")) == "tailoring bag")
+  local KNOWN = {
+    { prof = "Tailoring", name = "Linen Bag", product = 4238, source = "known", kind = "trivial", rank = 140, max = 150,
+      profit = 300 },
+    { prof = "Tailoring", name = "Small Silk Pack", product = 4245, source = "known", kind = "optimal", rank = 140,
+      max = 150, profit = 2500 },
+    { prof = "Tailoring", name = "Green Woolen Bag", product = 4241, source = "trainer", req = 145, price = 900,
+      rank = 140, max = 150, profit = 800 },
+    { prof = "Mining", name = "Copper Bar", product = 2840, source = "known", kind = "optimal", profit = 10 },
+  }
+  UpgradeFinderAPI = { recipe = function(id) return SUM[id] end, known = function() return KNOWN end }
+  g = ns.sources.recipes({ list }, "tailoring bag")
+  local titles = {}
+  for _, x in ipairs(g) do table.insert(titles, x.title) end
+  check("tailoring bag: known, trainer, items", #g == 3 and g[1].title == "Tailoring you know (skill 140/150), best profit first"
+    and g[1].entries[1].name == "Small Silk Pack" and g[1].entries[2].name == "Linen Bag"
+    and g[2].entries[1].name == "Green Woolen Bag" and g[3].title:find("^Recipe items") ~= nil)
+  check("known row: skill-up colour and profit", strip(ns.actions.detail(g[1].entries[1])):find("^skill%-up  %+25s 0c") ~= nil
+    and strip(ns.actions.detail(g[1].entries[2])):find("^no skill%-up  %+3s 0c") ~= nil)
+  check("trainer row: skill needed, cost to learn, profit",
+    strip(ns.actions.detail(g[2].entries[1])):find("^Tailoring 145  learn 9s 0c  %+8s 0c") ~= nil)
+  KNOWN[1].confidence, KNOWN[1].profit = "thin", 9000
+  g = ns.sources.recipes({ list }, "tailoring bag")
+  check("an unsure profit sorts after a sure one", g[1].entries[1].name == "Small Silk Pack"
+    and g[1].entries[2].name == "Linen Bag")
+  check("an unsure profit is grey with ?", strip(ns.actions.detail(g[1].entries[2])):find("%+90s 0c %?") ~= nil,
+    strip(ns.actions.detail(g[1].entries[2])))
+  KNOWN[1].confidence, KNOWN[1].profit = nil, 300
+  local asked = 0
+  local ufRecipe = UpgradeFinderAPI.recipe
+  UpgradeFinderAPI.recipe = function(id) asked = asked + 1 return ufRecipe(id) end
+  ns.sources.recipes({ list }, "mining")
+  check("recipe items of another profession are not priced", asked == 0)
+  UpgradeFinderAPI.recipe = ufRecipe
+  g = ns.sources.recipes({ list }, "mining")
+  check("another profession: only its recipes", g[1].entries[1].name == "Copper Bar" and #g[1].entries == 1)
+  g = ns.sources.recipes({ list }, "cooking")
+  check("a profession not seen yet: says to open its window", g[#g].title:find("Open your Cooking window") ~= nil)
+  UpgradeFinderAPI = nil
+  g = ns.sources.recipes({ list }, "")
+  check("without UpgradeFinder: recipes by name, title says why", #g[1].entries == 4 and g[1].title:find("UpgradeFinder") ~= nil)
+  C_Item.GetItemInfoInstant = instant
+end
+
+-- "ah: silk": items in LootValue's last full scan, most sold first; Bazaar opens the browser.
+do
+  local E = ns.sources.entry
+  local list = { E("item", 6000, "Silk Cloth"), E("item", 6001, "Small Silk Pack"), E("item", 6002, "Silk Robe") }
+  check("ah: filter", select(1, ns.match.parse("ah: silk")) == "ah")
+  LootValueDB = { snap = { t = 0, owners = { "Ann" }, items = { [6000] = "1,20,2000,4;1,10,1500,2", [6001] = "1,1,30000,4" } } }
+  LootValue = { scan = {
+    decode = function(str, owners)
+      local out = {}
+      for o, c, b, t in str:gmatch("(%d+),(%d+),(%d+),(%d+)") do
+        table.insert(out, { owners[tonumber(o)], tonumber(c), tonumber(b), tonumber(t) })
+      end
+      return out
+    end,
+    price = function(id) return id == 6000 and 120 or nil end,
+    stats = function(id) return id == 6000 and { sold = 60 } or nil end,
+  } }
+  local opened
+  Bazaar = { open = function(q) opened = q end }
+  local g = ns.sources.recipes and ns.sources.ah({ list }, "silk")
+  check("ah: listed items only, most sold first", g[1].entries[1].name == "Silk Cloth" and #g[1].entries == 2
+    and g[1].title:find("^AH scan") ~= nil)
+  check("ah row: cheapest, fair, listed, sold",
+    strip(ns.actions.detail(g[1].entries[1])) == "from 1s 0c  fair 1s 20c  30 listed  60 sold/2d",
+    strip(ns.actions.detail(g[1].entries[1])))
+  check("ah: a row opens Bazaar with the search", g[2].entries[1].kind == "bazaar" and ns.actions.run(g[2].entries[1])
+    and opened == "silk")
+  LootValue, LootValueDB, Bazaar = nil, nil, nil
 end
 
 -- Omni's dungeon table is a copy of UpgradeFinder's: the two must match.

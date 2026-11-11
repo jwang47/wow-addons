@@ -1006,6 +1006,12 @@ tt = fakeTooltip("FakeTipI", "|Hitem:121::|h[Earthen Hood]|h")
 tt:AddLine("Pattern: Earthen Hood")
 Cr.onTooltip(tt)
 check("craft: the learned name gives the price", tt:find("Cost to craft") == "42s 00c" and tt:find("Profit") == "+43s 50c")
+-- The made item's name is learned from the AH scan like the reagents' names.
+UpgradeFinderDB.names["Earthen Hood"] = 121
+local sum = UpgradeFinderAPI.recipe(120)
+check("API: recipe summary for other addons", sum and sum.skill == "Tailoring" and sum.rank == 150 and sum.cost == 4200
+  and sum.profit == 4350 and sum.how == "AH" and sum.made == "Earthen Hood")
+check("API: not a recipe gives nil", UpgradeFinderAPI.recipe(106) == nil)
 SlashCmdList.UPGRADEFINDER("craft names")
 check("/uf craft names says how many names it knows", chat[#chat]:match("item names: %d+ learned") ~= nil)
 C_Item.GetItemInfo = infoNow
@@ -1034,6 +1040,53 @@ GetTradeSkillNumMade = function() return 1, 1 end
 Cr.readTradeSkills()
 check("transform: recipes learned from the profession window", UpgradeFinderDB.recipes[2840]
   and UpgradeFinderDB.recipes[2840].reagents[1][1] == 2770)
+-- Known recipes and the trainer's list, for Omni ("tailoring").
+GetTradeSkillLine = function() return "Mining", 60, 75 end
+Cr.readTradeSkills()
+GetNumTrainerServices = function() return 3 end
+GetTrainerServiceInfo = function(i) return ({ "Bolt of Silk Cloth", "Copper Bar", "Mining" })[i], "", i == 3 and "header" or "available" end
+GetTrainerServiceSkillReq = function(i) if i == 1 then return "Tailoring", 125 elseif i == 2 then return "Mining", 1 end end
+GetTrainerServiceItemLink = function(i) return ({ "|Hitem:4305::|h[Bolt]|h", "|Hitem:2840::|h[Bar]|h" })[i] end
+GetTrainerServiceNumReagents = function(i) return i == 1 and 1 or 0 end
+GetTrainerServiceReagentInfo = function() return "Silk Cloth", "icon", 4, 0 end
+GetTrainerServiceReagentLink = function() return "|Hitem:4306::|h[Silk Cloth]|h" end
+GetTrainerServiceCost = function() return 900 end
+Cr.readTrainer()
+local kn, byName = UpgradeFinderAPI.known(), {}
+for _, r in ipairs(kn or {}) do byName[r.name] = r end
+local bar, bolt = byName["Copper Bar"], byName["Bolt of Silk Cloth"]
+check("known: a profession window recipe with rank and skill-up colour", bar and bar.source == "known"
+  and bar.prof == "Mining" and bar.kind == "optimal" and bar.rank == 60 and bar.max == 75 and bar.profit == -50)
+check("known: a trainer recipe with its skill and price", bolt and bolt.source == "trainer" and bolt.prof == "Tailoring"
+  and bolt.req == 125 and bolt.price == 900 and bolt.cost == 4000 and bolt.profit == 750)
+check("known: a trainer recipe you know is left out", #kn == 2)
+-- The modern profession window (C_TradeSkillUI), as on Forever.
+C_TradeSkillUI = {
+  GetFilteredRecipeIDs = function() return { 1, 2 } end,
+  GetRecipeInfo = function(id) return ({ { name = "Bolt of Silk Cloth", learned = true, relativeDifficulty = 1 },
+    { name = "Silk Headband", learned = false, relativeDifficulty = 0 } })[id] end,
+  GetRecipeSchematic = function(id) return ({ { outputItemID = 4305, quantityMin = 1,
+    reagentSlotSchematics = { { quantityRequired = 4, reagents = { { itemID = 4306 } } } } },
+    { outputItemID = 7050, reagentSlotSchematics = { { quantityRequired = 3, reagents = { { itemID = 4306 } } } } } })[id] end,
+  GetBaseProfessionInfo = function() return { professionName = "Tailoring", skillLevel = 130, maxSkillLevel = 150 } end,
+}
+Cr.readTradeSkills()
+kn, byName = UpgradeFinderAPI.known(), {}
+for _, r in ipairs(kn or {}) do byName[r.prof .. ":" .. r.name] = r end
+local bolt2, band = byName["Tailoring:Bolt of Silk Cloth"], byName["Tailoring:Silk Headband"]
+check("modern window: a learned recipe is known, with its colour and rank", bolt2 and bolt2.source == "known"
+  and bolt2.kind == "medium" and bolt2.rank == 130 and bolt2.profit == 750)
+check("modern window: an unlearned recipe goes with the ones to learn", band and band.source == "trainer"
+  and band.cost == 3000)
+local schematics = 0
+local getSch = C_TradeSkillUI.GetRecipeSchematic
+C_TradeSkillUI.GetRecipeSchematic = function(...) schematics = schematics + 1 return getSch(...) end
+Cr.readTradeSkills()
+Cr.readProfession()
+check("modern window: the same list is not read again within a minute", schematics == 0)
+local k1 = UpgradeFinderAPI.known()
+check("known: the list is kept between keystrokes", UpgradeFinderAPI.known() == k1)
+C_TradeSkillUI = nil
 tt = fakeTooltip("FakeTipK", "item:2770")
 Cr.onTooltip(tt)
 check("transform: a loss shows red", tt:find("Make into Copper Bar (1 each)") == "-50c (1s 00c -> 50c)")

@@ -282,7 +282,12 @@ function AL.slash(msg)
     say("last skipped: " .. skippedText(recent))
     return
   end
-  if cmd ~= "autoloot" and cmd ~= "al" then say(AL.status()) return end
+  if cmd == "clear" and LV.clear then LV.clear.slash(rest) return end
+  if cmd ~= "autoloot" and cmd ~= "al" then
+    say(AL.status())
+    if LV.clear then say("/lv clear: what to sell, disenchant and auction from your bags.") end
+    return
+  end
   local sub, arg = rest:match("^(%S*)%s*(.-)$")
   if sub == "on" then AL.setEnabled(true)
   elseif sub == "off" then AL.setEnabled(false)
