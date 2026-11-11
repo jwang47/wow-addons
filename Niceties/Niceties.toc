@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: Niceties: Small Quality-of-Life Tweaks
-## Notes: A home for small nice-to-haves: max camera zoom, and which addon caused "Interface action failed". /nice
+## Notes: A home for small nice-to-haves: zoom the camera out further, track addon CPU spikes, name the addon behind "Interface action failed". /nice, /cpu
 ## Author: jwang47
 ## Version: 0.1.0
 ## SavedVariables: NicetiesDB
