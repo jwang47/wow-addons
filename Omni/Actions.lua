@@ -448,6 +448,12 @@ function A.tooltip(tt, e)
       if scan then table.insert(parts, scan) end
       if #parts > 0 then tt:AddLine(table.concat(parts, "; "), 0.6, 0.6, 0.6) end
     end
+    -- A recipe row: where its profit comes from.
+    local r = e.recipe
+    if r and r.cost and r.sale then
+      tt:AddLine(string.format("One craft: reagents %s%s, sells for %s (%s), profit %s", ns.money(r.cost),
+        r.unknown and " + ?" or "", ns.money(r.sale), r.how or "?", r.profit and ns.money(r.profit) or "?"), 1, 0.82, 0)
+    end
   elseif k == "spell" and tt.SetSpellByID then
     tt:SetSpellByID(e.spellID)
   else
