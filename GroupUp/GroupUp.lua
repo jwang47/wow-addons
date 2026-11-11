@@ -5,7 +5,7 @@
 -- /gu for the commands.
 local addonName, ns = ...
 GroupUp = ns                        -- global, for /dump
-ns.VERSION = "0.1.0"
+ns.VERSION = "0.2.0"
 local M = ns.logic
 local call, plain = M.call, M.plain
 
@@ -116,9 +116,25 @@ function ns.rates()
   return out
 end
 
+-- Your quests split by QuestBoard pins: { focus, rest, pinned }. With pins,
+-- GroupUp judges only the pinned quests; without, every quest in the log.
+function ns.questState()
+  return M.focus(M.quests(ns.units()), M.pins())
+end
+
 function ns.summary()
   local r = ns.rates()
-  return M.summary(M.quests(ns.units()), r.solo, r.grouped)
+  local f = ns.questState()
+  return M.summary(f.focus, r.solo, r.grouped, f.pinned)
+end
+
+-- One quest, from your log or (not taken yet) by its ID.
+function ns.quest(id, quests)
+  for _, q in ipairs(quests or M.quests(ns.units())) do
+    if q.id == id then return q end
+  end
+  local f = M.focus({}, { [id] = true })
+  return f.focus[1]
 end
 
 ---------------------------------------------------------------------------
@@ -175,8 +191,20 @@ local VERDICT = {
   faster = { "kills count for all", 0.35, 0.8, 0.35 },
   maybe = { "drops or clicks", 0.85, 0.85, 0.5 },
   same = { "talk or explore", 0.6, 0.6, 0.6 },
+  pickup = { "not taken yet", 0.6, 0.6, 0.6 },
   done = { "ready to turn in", 0.6, 0.6, 0.6 },
 }
+ns.VERDICT = VERDICT
+
+-- The line for one quest: label, right text and colour.
+local function questLine(q)
+  local v = VERDICT[q.verdict] or VERDICT.same
+  local label = (q.tag and ("[" .. q.tag .. "] ") or "") .. q.name
+  local right = v[1]
+  if #q.shared > 0 then right = right .. "  +" .. table.concat(q.shared, ", ") end
+  return label, right, v[2], v[3], v[4]
+end
+ns.questLine = questLine
 
 local function line(i)
   local l = lines[i]
@@ -202,12 +230,24 @@ function ns.rows()
   local function add(left, right, r, g, b) table.insert(out, { left = left, right = right or "", r = r or 1, g = g or 1, b = b or 1 }) end
   local lv = level()
   local rt = ns.rates()
-  local quests = M.quests(ns.units())
+  local all = M.quests(ns.units())
+  local f = M.focus(all, M.pins())
+  local quests = f.focus
   local c = M.count(quests)
   local soloRate, groupRate = M.perHour(rt.solo), M.perHour(rt.grouped)
   local way, why = M.lean(c, soloRate, groupRate)
   local head = way == "group" and "Leans group" or way == "solo" and "Leans solo" or "About even"
+  if f.pinned then head = head .. " for your pins" end
   add(head, #why > 0 and table.concat(why, ", ") or "", 1, 0.85, 0.25)
+
+  -- Ctrl-click on a QuestBoard row: that quest first.
+  if ns.picked then
+    local q = ns.quest(ns.picked, all)
+    if q then
+      local label, right, r, g, b = questLine(q)
+      add("Asked about: " .. label, right, r, g, b)
+    end
+  end
 
   add(" ")
   add("XP per hour, levels " .. math.max(1, lv - M.LEVELS_BACK) .. "-" .. lv, "no rested XP", 0.6, 0.8, 1)
@@ -249,20 +289,26 @@ function ns.rows()
   add("  Quest XP is never split: each member gets all of it.", "", 0.6, 0.6, 0.6)
 
   add(" ")
-  add("Your quests", string.format("%d need, %d faster, %d drops", c.need, c.faster, c.maybe), 0.6, 0.8, 1)
+  add(f.pinned and "Your pinned quests (QuestBoard)" or "Your quests",
+    string.format("%d need, %d faster, %d drops", c.need, c.faster, c.maybe), 0.6, 0.8, 1)
   local shown = 0
   for _, q in ipairs(quests) do
     if shown >= 12 then break end
-    if q.verdict ~= "done" then
+    -- A pinned hand-in stays: you pinned it.
+    if q.verdict ~= "done" or f.pinned then
       shown = shown + 1
-      local v = VERDICT[q.verdict]
-      local label = (q.tag and ("[" .. q.tag .. "] ") or "") .. q.name
-      local right = v[1]
-      if #q.shared > 0 then right = right .. "  +" .. table.concat(q.shared, ", ") end
-      add("  " .. label, right, v[2], v[3], v[4])
+      local label, right, r, g, b = questLine(q)
+      add("  " .. label, right, r, g, b)
     end
   end
   if shown == 0 then add("  No open quests.", "", 0.6, 0.6, 0.6) end
+  if f.pinned then
+    local rc = M.count(f.rest)
+    local open = #f.rest - rc.done
+    if open > 0 then
+      add(string.format("  %d more in your log (%d need, %d faster): unpin all to judge them", open, rc.need, rc.faster), "", 0.6, 0.6, 0.6)
+    end
+  end
   return out
 end
 
@@ -342,7 +388,73 @@ end
 function ns.show(on)
   build()
   ns.db.shown = on
+  if not on then ns.picked = nil end
   if on then panel:Show() ns.refresh() else panel:Hide() end
+end
+
+---------------------------------------------------------------------------
+-- QuestBoard link: a GroupUp line in QuestBoard's quest tooltips, and
+-- Ctrl-click on a QuestBoard quest row opens this panel with that quest
+-- first. GroupUp wraps QuestBoard's click handler and hooks the tooltip,
+-- so QuestBoard itself needs no change.
+---------------------------------------------------------------------------
+-- The tooltip line for a quest: "Group: kills count for all  +Ann".
+function ns.tipLine(id)
+  local q = ns.quest(id)
+  if not q then return nil end
+  local _, right, r, g, b = questLine(q)
+  return "Group: " .. right, r, g, b
+end
+
+-- Ctrl-click: open the panel on this quest (again on the same quest: close).
+function ns.pick(id)
+  if ns.picked == id and panel and panel:IsShown() then ns.show(false) return end
+  ns.show(true)
+  ns.picked = id
+  ns.refresh()
+end
+
+local function questBoardRow(owner)
+  local qb = rawget(_G, "QuestBoard")
+  if type(qb) ~= "table" or type(owner) ~= "table" then return nil end
+  local e = owner.entry
+  if type(e) ~= "table" or type(e.id) ~= "number" or e.id <= 0 then return nil end
+  if e.kind == "area" or e.kind == "town" then return nil end
+  local parent = owner.GetParent and owner:GetParent()
+  if qb.panel and parent ~= qb.panel then return nil end
+  return e
+end
+ns.questBoardRow = questBoardRow
+
+function ns.hookQuestBoard()
+  local qb = rawget(_G, "QuestBoard")
+  if ns.hooked or type(qb) ~= "table" or type(qb.click) ~= "function" then return false end
+  ns.hooked = true
+  local click = qb.click
+  qb.click = function(e, button, ...)
+    if type(e) == "table" and type(e.id) == "number" and e.id > 0 and e.kind ~= "area" and e.kind ~= "town"
+      and call(rawget(_G, "IsControlKeyDown")) then
+      return ns.pick(e.id)
+    end
+    return click(e, button, ...)
+  end
+  local tip = rawget(_G, "GameTooltip")
+  if tip and tip.HookScript then
+    local adding = false
+    tip:HookScript("OnShow", function(t)
+      if adding then return end
+      local e = questBoardRow(t.GetOwner and t:GetOwner())
+      if not e then return end
+      local line, r, g, b = ns.tipLine(e.id)
+      if not line then return end
+      adding = true
+      t:AddLine(line, r, g, b)
+      t:AddLine("Ctrl-click: GroupUp for this quest", 0.5, 0.5, 0.5)
+      t:Show()
+      adding = false
+    end)
+  end
+  return true
 end
 
 ---------------------------------------------------------------------------
@@ -384,6 +496,7 @@ events:SetScript("OnEvent", function(_, event, a, b)
     end
     if ns.db.shown then ns.show(true) end
     ns.updateButton()
+    ns.hookQuestBoard()
   elseif event == "PLAYER_XP_UPDATE" then
     ns.onXP() soon()
   elseif event == "CHAT_MSG_COMBAT_XP_GAIN" then

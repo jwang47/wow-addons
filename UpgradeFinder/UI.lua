@@ -378,7 +378,7 @@ function ns.open()
   frame:Show()
   if #view.all == 0 and not Scan.state.busy then ns.rescan()
   elseif Scan.state.busy then ns.paint()
-  else ns.apply() end -- gear, bags or money may have changed while it was closed
+  else ns.refresh() ns.apply() end -- gear, bags or money may have changed while it was closed
 end
 
 function ns.toggle()
@@ -577,10 +577,18 @@ end
 BINDING_HEADER_UPGRADEFINDER = "UpgradeFinder"
 BINDING_NAME_UPGRADEFINDER_TOGGLE = "Show gear upgrades"
 
-function ns.refresh()
-  if not Scan.lastSources or Scan.state.busy then return end
+-- New bag items the game still loads get looked at again every Scan.WAIT
+-- seconds, up to Scan.PATIENCE times; a newer refresh takes over the wait.
+local refreshGen = 0
+function ns.refresh(tries)
+  if not Scan.lastSources or Scan.state.busy then return end -- a scan's end rereads bags and gear
   view.all = Scan.refresh()
   if frame and frame:IsShown() then ns.apply(true) end
+  refreshGen = refreshGen + 1
+  local gen, n = refreshGen, (tries or 0) + 1
+  if (Scan.state.bagPending or 0) > 0 and n <= Scan.PATIENCE then
+    call(api("C_Timer.After"), Scan.WAIT, function() if gen == refreshGen then ns.refresh(n) end end)
+  end
 end
 
 function ns.specCheck()
