@@ -98,5 +98,24 @@ class SiteTest(unittest.TestCase):
         self.assertIn('href="update.cmd" download', page)
 
 
+class SpareFilesTest(unittest.TestCase):
+    """Each addon's .toc ends with empty SpareN.lua files, so a new file
+    loads with /reload instead of a game restart (AGENTS.md)."""
+
+    def test_every_addon_has_spares(self):
+        root = HERE.parent
+        for toc in sorted(root.glob("*/*.toc")):
+            if toc.stem != toc.parent.name:
+                continue
+            files = [l.strip() for l in toc.read_text(encoding="utf-8").splitlines()
+                     if l.strip() and not l.startswith("#")]
+            spares = [f for f in files if f.startswith("Spare")]
+            with self.subTest(addon=toc.stem):
+                self.assertGreaterEqual(len(spares), 1, "no SpareN.lua left in the .toc")
+                self.assertEqual(files[-len(spares):], spares, "spares go at the end of the .toc")
+                for f in spares:
+                    self.assertTrue((toc.parent / f).exists(), f)
+
+
 if __name__ == "__main__":
     unittest.main()

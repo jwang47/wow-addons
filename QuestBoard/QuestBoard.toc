@@ -2,7 +2,7 @@
 ## Title: QuestBoard: Best Quests Now
 ## Notes: The quests that matter now: ready to turn in, nearest objectives, and quests to pick up that fit your level, by XP per minute. /qb
 ## Author: jwang47
-## Version: 0.1.2
+## Version: 0.2.0
 ## OptionalDeps: Questie
 ## SavedVariables: QuestBoardDB
 
@@ -10,3 +10,8 @@ Data.lua
 Chain.lua
 QuestBoard.lua
 Items.lua
+Spare1.lua
+Spare2.lua
+Spare3.lua
+Spare4.lua
+Spare5.lua
