@@ -16,6 +16,15 @@ the same, and a test checks that every `.toc` version has a section here.
   5% AH cut, or to a vendor when that pays more.
   `/bazaar`, `/ahb`. It reads LootValue's full scan, or Auctionator's
   prices without one.
+
+## Workbench 0.1.0
+
+- New addon: one window for crafting (`/wb`). It lists every recipe of your
+  professions with the cost to craft, what the made item sells for and the
+  profit, best first. The Skill-ups view sorts by what one skill point
+  costs. It opens beside your profession window (`/wb dock` turns that
+  off). It needs UpgradeFinder, which reads the recipes and the prices.
+
 ## LootValue 0.2.2
 
 - New: clear your bags (`/lv clear`). One panel lists what the tooltip

@@ -15,6 +15,9 @@ Classic clients with the same APIs, but we test them only on Forever.
 - **QuestBoard**: a small board of the quests that matter now: what you
   are doing, what to hand in and the best quests to pick up nearby, with
   XP, rewards and distances (`/qb`). Questie adds places and pick-ups.
+- **Workbench** (in testing, not in the releases yet): one window for
+  crafting, with every recipe by profit and the cheapest next skill point
+  (`/wb`). It needs UpgradeFinder.
 - **Glance** (in testing, not in the releases yet): a lighter HUD with a
   keyboard-shaped action bar, a square minimap and small floating unit
   frames (`/glance`).
@@ -452,6 +455,42 @@ that is not in the `.toc` needs a full restart) and call
 `apply(true)` runs at each login and when it is turned on, `apply(false)`
 only when it is turned off. Rename the spare file and add a new spare in
 the release that ships it.
+
+## Workbench (in development)
+
+**Workbench: Crafting Profit and Skill-ups** is one window for your
+professions (`/wb`). It is not in the release yet (not in `tools/release.py`
+`ADDONS`); try it with `dev.ps1 Workbench`. It needs UpgradeFinder
+(`## Dependencies`), and an UpgradeFinder that has `UpgradeFinderAPI.known`
+(the recipe list, from "Omni: search recipes").
+
+- UpgradeFinder reads your recipes when you open a profession window, and
+  a trainer's recipes when you visit the trainer. Workbench shows that
+  saved list, so it works with the windows closed. The list is as old as
+  your last visit.
+- **Profit** view: each recipe with the cost to craft, what the made item
+  sells for (the best of AH after the cut, vendor and disenchant; "~" marks
+  an estimate) and the profit, best first. Recipes with no price for the
+  made item come last.
+- **Skill-ups** view: what one skill point costs with each recipe, cheapest
+  first. A craft costs its reagents less what the made item sells for. A
+  recipe that pays for itself shows "free". Orange gives a point each
+  craft. The game does not give the chance for yellow and green, so
+  Workbench uses 75% and 25% (`L.CHANCE` in `Workbench/Logic.lua`) and marks
+  those costs with "*": a guide, not a promise. Grey recipes are left out.
+- The recipe name has its skill-up colour. Three buttons: the profession
+  (click for the next, then all), the view, and **My recipes / With
+  trainer**. With trainer adds the recipes you do not know, in grey, with
+  the skill they need and the training price; the Skill-ups view counts the
+  ones you can learn now.
+- Hover a row for the made item's tooltip and the numbers. Shift-click
+  links the item in chat. The mouse wheel scrolls.
+- It opens beside the profession window on that profession, and closes
+  with it. `/wb dock` turns that off; `/wb` shows or hides it anywhere;
+  `/wb profit` and `/wb skill` pick the view; `/wb reset` moves it back.
+- Plan: Workbench becomes the home for crafting. The crafting tooltip
+  lines and the shopping list (now in UpgradeFinder) move here once their
+  pull requests are merged.
 
 ## QuestBoard
 
