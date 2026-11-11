@@ -2,8 +2,10 @@
 -- at a vendor or on the AH) and on a recipe in your profession window, the
 -- tooltip says what the reagents cost, what the made item sells for, the
 -- profit or loss, and the score of the made item against what you wear.
--- Prices come from Auctionator (and LootValue's disenchant estimate when it
--- is loaded); /uf craft turns the lines off.
+-- Prices come from Auctionator, or with LootValue from its own full scans:
+-- the fair price (outliers dropped) weighed by the chance it sells, so a
+-- lone high listing or a dead market does not look like profit. /uf craft
+-- turns the lines off.
 local _, ns = ...
 local S, Scan = ns.score, ns.scan
 local call, api = ns.call, ns.api
@@ -145,6 +147,16 @@ function C.sale(item, bop)
     if not de or de <= 0 then de = call(lv.estimateDisenchant, it.link) end
     out.de = de and de > 0 and de or nil
   end
+  -- LootValue's market quote: the AH counts at its expected value (the
+  -- chance it sells in 24 h), and says how sure that is.
+  if not bop and type(lv) == "table" and lv.marketQuote then
+    local sure = math.max(out.vendor or 0, out.de or 0)
+    local q = call(lv.marketQuote, it.id, it.link, sure, out.vendor)
+    if q then
+      out.quote = q
+      out.ah = q.expected or q.net
+    end
+  end
   for _, o in ipairs({ { "AH", out.ah }, { "vendor", out.vendor }, { "disenchant", out.de } }) do
     if o[2] and (not out.best or o[2] > out.best) then out.best, out.how = o[2], o[1] end
   end
@@ -184,11 +196,21 @@ function C.lines(r)
       local each = sale.best * made
       local label = made ~= 1 and string.format("Sells for (x%s)", (made % 1 == 0) and made or string.format("%.1f", made))
         or "Sells for"
-      table.insert(out, { label, (sale.how == "vendor" and "" or "~") .. money(each) .. " " .. sale.how, GOLD, WHITE })
+      local q = sale.how == "AH" and sale.quote
+      local how = sale.how
+      if q and q.expected then how = "AH, expected" end
+      table.insert(out, { label, (sale.how == "vendor" and "" or "~") .. money(each) .. " " .. how, GOLD, WHITE })
+      -- How sure the AH price is (LootValue's scans).
+      if q then
+        local warn = q.confidence ~= "ok"
+        table.insert(out, { "  " .. (warn and (q.confidence == "thin" and "Thin market: " or "Unsure: ") or "") .. q.note
+          .. (q.expected and q.expected < q.net and ("; listed at ~" .. money(q.price)) or ""), nil, warn and RED or GREY })
+      end
       if cost.total > 0 or not unknown then
         local diff = each - cost.total
-        local text = (diff >= 0 and "+" or "-") .. money(math.abs(diff)) .. (unknown and " ?" or "")
-        table.insert(out, { diff >= 0 and "Profit" or "Loss", text, GOLD, diff >= 0 and GREEN or RED })
+        local unsure = unknown or (q and q.confidence ~= "ok")
+        local text = (diff >= 0 and "+" or "-") .. money(math.abs(diff)) .. (unsure and " ?" or "")
+        table.insert(out, { diff >= 0 and "Profit" or "Loss", text, GOLD, diff >= 0 and (unsure and GREY or GREEN) or RED })
       end
     else
       table.insert(out, { "Sells for", "no price", GOLD, GREY })

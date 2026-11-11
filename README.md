@@ -73,6 +73,40 @@ the 5% cut, the disenchant value).
   from local midnight, so an item seen only last night is "1 day old" in
   the morning.
 
+- Your own sales: the tooltip adds "Your AH sales: sold 18 of 20 (90%),
+  ~1s15c each, 2 up, last 3h ago" for an item you sold or posted. It
+  counts your posts and your "Auction successful" and "Auction expired"
+  mails (read when you open the mailbox, each mail once; counts start when
+  you install this version). "each" is what you got per item after the AH
+  cut. Under half of 4+ finished auctions sold makes the AH advice count
+  the market as slow. `/lv sales` lists your best sellers; `/lv sales
+  reset` clears the counts.
+- The whole market: "AH market: ~34 sold at ~9s in 2d, 120 listed, fair price ~9s".
+  LootValue reads each full scan (its Scan button above the AH window,
+  or Auctionator's Full Scan) and keeps every auction: item, seller,
+  stack, buyout, time left. An auction gone in the next scan with more
+  time left than passed counts as sold; the same seller posting the same
+  stack at another price is a repost. Two or three scans a day are enough.
+  It reads a few milliseconds a frame, so the game does not freeze; stay
+  at the AH until the status above the window says "read", then walk
+  away. `/lv scan` prints the status, `/lv scan now` starts a scan (one
+  per 15 minutes). The "fair price" drops outliers (the cheapest 15-30%
+  of the items listed, without a lone undercut or silly listing), and
+  the AH advice uses it for a day after the scan instead of Auctionator's
+  lowest price.
+- How likely an AH sale is: "AH 57s (80% sells in 24h, ~5h)". Buyers
+  take the cheapest first, so LootValue counts the auctions listed under
+  the fair price against the rate auctions sold between your scans. Only
+  scan gaps under 8 hours show sales (a longer gap cannot tell a sale
+  from an expiry), so it needs 3+ hours of such gaps; a quiet stretch is
+  smoothed, and your own sold and expired mails for the item pull the
+  chance toward your own sell-through. With that chance the AH wins when
+  the sale times the chance, plus the sure option if it does not sell,
+  less the deposit, is 1.2x the sure option and 1s more. It does not know
+  who posts after you, so it is rough. Your own auctions, bid-only
+  auctions and reposts (the same seller posting the item again) never
+  count as sales.
+
 ### Auto-loot
 
 LootValue also loots for you and leaves cheap junk (murloc fins and the

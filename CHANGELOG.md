@@ -5,6 +5,46 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## LootValue 0.3.0
+
+- Your AH sales on the item tooltip: "Your AH sales: sold 18 of 20 (90%),
+  ~1s15c each, 2 up, last 3h ago". LootValue counts the auctions you post
+  and your "Auction successful" and "Auction expired" mails, per item. It
+  reads the mail when you open your mailbox, and counts each mail once.
+  "~1s15c each" is what you got per item, after the AH cut.
+- When under half of your last 4 or more finished auctions of an item
+  sold, the AH advice counts the market as slow ("AH 57s (you sold 2 of
+  6)"), so it asks for a bigger margin before it says AH.
+- `/lv sales` lists the items you sold most, with sold and finished
+  auctions. `/lv sales reset` clears the counts.
+- What sells on the whole AH, from full scans: "AH market: ~34 sold at
+  ~9s in 2d, 120 listed, fair price ~9s". LootValue reads each full
+  scan (its own Scan button above the AH window, or Auctionator's Full
+  Scan) and keeps every
+  auction. An auction that is gone in the next scan while it still had
+  more time left than passed counts as sold; a seller who posts the same
+  stack again at another price counts as a repost, not a sale.
+- The scan does not freeze the game: it reads the rows a few milliseconds
+  a frame. Stay at the AH until the status says "read" (a second or two),
+  then walk away; the compare goes on in the background. The status and
+  the percentage show above the AH window on every tab. `/lv scan` prints
+  it, `/lv scan now` starts a full scan.
+- A fair price from each full scan, with outliers dropped: the cheapest
+  15-30% of the items listed, without a lone cheap undercut or a silly
+  listing. The AH advice uses it for a day after the scan, in place of
+  Auctionator's lowest price. "sold at" is the median price per item of
+  what sold, so one big stack does not pull it.
+- How likely it sells: the AH entry says "AH 57s (80% sells in 24h,
+  ~5h)". It counts the auctions listed cheaper than the fair price
+  (buyers take those first) and the rate auctions sold between your
+  scans, smoothed, and moved toward your own sell-through for the item.
+  The advice then weighs the AH by that chance (an unsold listing comes
+  back, less the deposit) and wants 1.2x the sure option.
+- Scan gaps of 8 hours or more cannot tell a sale from an expiry, so they
+  add no sales and no time; the tooltip asks for a scan within 8 hours.
+  Your own auctions, bid-only auctions and reposts never count as sales.
+- With 10+ listed and none sold across your scans, the AH advice counts
+  the market as slow ("none sold in 8h").
 
 ## Bazaar 0.1.0
 
@@ -62,6 +102,15 @@ the same, and a test checks that every `.toc` version has a section here.
   craft gains or loses ("Make into Bolt of Silk Cloth (4 each)").
 - Reagents the client has not seen yet get their AH price too: UpgradeFinder
   learns the item names in the Auctionator scan once and saves them.
+- With LootValue 0.3.0, the AH sale of a made item counts at its expected
+  value: LootValue's fair price (outliers dropped) times the chance it
+  sells in 24 hours, from your full scans. A line under "Sells for" says
+  how many are listed, how many sell a day and the chance. A thin market
+  (under 3 listed, or no sales seen) or a price with no LootValue scan
+  today is marked in red, and the profit gets "?". Without scan odds the
+  AH counts as a 35% chance, moved by your own sold and expired mails for
+  the item (you sold 0 of 2: about 23%), so an unproven market is never
+  counted as a sure sale.
 - New: shop for several crafts. The **Shop xN** button in the profession
   window (N is the Create box) lists the reagents for N crafts less what is
   in your bags and bank, with the estimated cost, and makes the Auctionator
