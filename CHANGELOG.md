@@ -36,6 +36,12 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## Omni 0.1.3
 
+- Where to get an item (`from:`) also lists the quests that give it as a
+  reward, with the first quest of their chain ("chain start, 3 quests").
+  They come before the vendors, because a vendor may sell the item only
+  after the quest ("Sold by (may need the quest first)").
+- Enter on a quest that starts at an object (a note, a bag) opens the map
+  at the object and pins it.
 - The item tooltip says "AH full scan 3h ago" like LootValue, and "not in
   today's full scan" next to an old price.
 
