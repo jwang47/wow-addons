@@ -377,7 +377,8 @@ local function tooltip(r)
   end
   local verb = e.kind == "turnin" and "Turn in at " or e.toFinisher and "Hand in to " or (e.kind == "pickup" or e.kind == "party") and "Get it from " or "Nearest: "
   if e.target then
-    tip:AddLine(verb .. e.target .. (e.dist and ("  " .. D.yards(e.dist) .. " " .. D.compass(e.angle)) or ""), 1, 1, 1)
+    local where = D.zoneName(e.zone)
+    tip:AddLine(verb .. e.target .. (where and (", " .. where) or "") .. (e.dist and ("  " .. D.yards(e.dist) .. " " .. D.compass(e.angle)) or ""), 1, 1, 1)
   end
   if e.fromItem then
     local how = e.dropHow == "vendor" and ", sold by " or e.dropHow == "object" and ", found in " or ", drops from "

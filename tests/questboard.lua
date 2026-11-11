@@ -1113,6 +1113,14 @@ check("stops: pick-ups do not count in a hand-in stop's XP", stops[3].hand == 1 
 check("stops: a pick-up stop shows the quest's XP and time as a guess", stops[2].xp == 1300 and stops[2].secs == 240 and stops[2].guess)
 check("stops: what you do there", strip(ns.stopWhat(stops[1])) == "3 hand-ins" and strip(ns.stopWhat(stops[3])) == "1 hand-in, 1 pick-up"
   and strip(ns.stopWhat(stops[4])) == "1 to finish" and strip(ns.stopWhat(stops[2])) == "1 pick-up")
+local realZoneName, realZoneText = D.zoneName, GetRealZoneText
+D.zoneName = function(z) return z == 15 and "Dustwallow Marsh" or nil end
+camp1.zone = 15
+GetRealZoneText = function() return "Stranglethorn Vale" end
+check("stops: a stop in another zone names it", strip(ns.stopWhat(stops[1])) == "3 hand-ins  Dustwallow Marsh")
+GetRealZoneText = function() return "Dustwallow Marsh" end
+check("stops: not when you are in that zone", strip(ns.stopWhat(stops[1])) == "3 hand-ins" and ns.zoneOf(camp1) == "Dustwallow Marsh")
+D.zoneName, GetRealZoneText, camp1.zone = realZoneName, realZoneText, nil
 check("stops: the head's numbers", ns.stopStats(stops[1]) == "4.0k xp  <1 min" and ns.stopStats(stops[2]) == "1.3k xp  ~4 min" and ns.stopPlace(stops[3]) == "2.8k yd")
 check("stops: ? to hand in, ! to pick up, a grey ? to finish",
   ns.stopMark(camp1) == "|cffffd100?|r" and ns.stopMark(thorsen) == "|cffffd100!|r" and ns.stopMark(crystal) == "|cff909090?|r")

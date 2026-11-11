@@ -41,6 +41,9 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.2.0
 
+- The zone of a place: a quest's tooltip names it ("Turn in at Viktori
+  Prism'Antras, Dustwallow Marsh"), a stop's tooltip too, and a stop in
+  another zone than yours shows it on its line.
 - Travel time counts flights and boats. For a place 1500 yd or more away
   on your continent, the trip is the shorter of the run and a flight: the
   run to the flight master nearest you, the flight (a straight line at

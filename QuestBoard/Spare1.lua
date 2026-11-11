@@ -84,13 +84,25 @@ function ns.stops(list)
   return out
 end
 
+-- The zone a quest's place is in ("Dustwallow Marsh"), or nil.
+function ns.zoneOf(e) return e and e.zone and D.zoneName(e.zone) or nil end
+-- The stop's zone when it is not the zone you are in, else nil.
+function ns.stopZone(s)
+  local zone = ns.zoneOf(s.seed)
+  local here = D.call(rawget(_G, "GetRealZoneText"))
+  if zone and zone ~= here then return zone end
+  return nil
+end
+
 -- "3 hand-ins", "1 hand-in, 2 pick-ups", "1 to finish". Hand-ins in green.
+-- Then the zone, when the stop is in another one.
 function ns.stopWhat(s)
   local parts = {}
   if s.hand > 0 then table.insert(parts, "|cff" .. GREEN .. plural(s.hand, "hand-in") .. "|r") end
   if s.pick > 0 then table.insert(parts, plural(s.pick, "pick-up")) end
   if s.todo > 0 then table.insert(parts, s.todo .. " to finish") end
-  return table.concat(parts, ", ")
+  local zone = ns.stopZone(s)
+  return table.concat(parts, ", ") .. (zone and ("  " .. zone) or "")
 end
 
 -- How far, or why there is no distance ("far", "no place").
@@ -213,7 +225,8 @@ function ns.stopTip(h)
   if not (tip and s) then return end
   tip:SetOwner(h, "ANCHOR_LEFT")
   local dir = s.dist and s.angle and (" " .. D.compass(s.angle)) or ""
-  tip:AddLine("Stop: " .. ns.stopPlace(s) .. dir, 1, 1, 1)
+  local zone = ns.zoneOf(s.seed)
+  tip:AddLine("Stop: " .. ns.stopPlace(s) .. dir .. (zone and (", " .. zone) or ""), 1, 1, 1)
   local VERB = { hand = "hand in to ", pick = "get it from ", todo = "" }
   for _, e in ipairs(s.list) do
     local role = ns.stopRole(e)
