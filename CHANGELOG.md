@@ -5,6 +5,22 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+## LootValue 0.2.2
+
+- New: clear your bags (`/lv clear`). One panel lists what the tooltip
+  advice says to do with what you carry: sell to a vendor (grey junk, and
+  gear the vendor pays most for), disenchant, or post on the Auction House.
+  It opens by itself at a merchant and at the Auction House when there is
+  something to do (`/lv clear auto` turns that off).
+- At a merchant, Sell sells the ticked rows. Gear at or above the item
+  level you wear in that slot is not ticked; click a row to tick or untick
+  it, and LootValue remembers that per item. One press sells at most 12
+  items that are not grey, so all of them stay on the Buyback tab.
+- With Enchanting, a button disenchants the next ticked item, one click
+  each.
+- At the Auction House, a click on a row puts the item into Auctionator's
+  Selling tab.
+
 ## UpgradeFinder 0.2.0
 
 - New: crafting lines on recipes. Hover a pattern or other recipe item, or
