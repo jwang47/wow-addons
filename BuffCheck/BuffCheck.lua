@@ -223,10 +223,12 @@ end
 -- Players near you who are not in your group (nameplates, your target and
 -- mouseover), by full name. The game blocks CheckInteractDistance in combat
 -- ("Interface action failed because of an AddOn"), so in a fight nobody
--- counts as near; Next offers nothing in combat anyway.
+-- counts as near; Next offers nothing in combat anyway. So in combat it
+-- does not look at all (up to 42 units and their auras on each refresh).
 local function strangers()
   local seen, list = {}, {}
   local combat = inCombat()
+  if combat then return list, seen end
   local function add(unit)
     if not call(G("UnitExists"), unit) or not call(G("UnitIsPlayer"), unit) then return end
     if call(G("UnitIsUnit"), unit, "player") or inGroup(unit) then return end
@@ -650,10 +652,15 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3)
   end
 end)
 
+-- How often the grid is read again: every IDLE_SECS, or DIRTY_SECS after
+-- an event (an aura, the roster, the bags). In combat only every IDLE_SECS:
+-- the game hides aura names there and locks the buttons, so an event can
+-- change nothing but a countdown, and a fight fires UNIT_AURA all the time.
+ns.IDLE_SECS, ns.DIRTY_SECS = 1, 0.5
 local acc = 0
 ev:SetScript("OnUpdate", function(_, elapsed)
   acc = acc + (elapsed or 0)
-  if acc >= 1 or (st.dirty and acc >= 0.2) then
+  if acc >= ns.IDLE_SECS or (st.dirty and acc >= ns.DIRTY_SECS and not inCombat()) then
     acc, st.dirty = 0, false
     if ns.db and panel then ns.refresh() end
   end

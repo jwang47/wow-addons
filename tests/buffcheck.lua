@@ -340,6 +340,28 @@ do
   ns.refresh()
 end
 
+-- The refresh timer: an event waits DIRTY_SECS out of combat, and in
+-- combat the grid is read once every IDLE_SECS whatever fires.
+do
+  local old, n = ns.refresh, 0
+  ns.refresh = function() n = n + 1 end
+  local tick = ev.scripts.OnUpdate
+  tick(ev, 5)
+  n = 0
+  ns.st.dirty = true
+  tick(ev, 0.3)
+  check("an event does not refresh at once", n == 0)
+  tick(ev, 0.3)
+  check("it refreshes half a second after an event", n == 1)
+  W.combat = true
+  for _ = 1, 9 do ns.st.dirty = true tick(ev, 0.1) end
+  check("in combat events do not refresh", n == 1)
+  tick(ev, 0.2)
+  check("in combat it refreshes once a second", n == 2)
+  W.combat = false
+  ns.refresh = old
+end
+
 -- Ready check ---------------------------------------------------------------
 do
   load("Ready.lua")

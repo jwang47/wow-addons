@@ -197,6 +197,10 @@ the same, and a test checks that every `.toc` version has a section here.
   other players near you. BuffCheck asked the game how far they were
   (`CheckInteractDistance`), which the game blocks in combat. It now asks
   only out of combat.
+- Less work in a fight: the grid is read again once a second in combat
+  (before: up to 5 times a second, on every aura change), and at most
+  twice a second out of combat. In combat it no longer looks at the players
+  near you.
 - New: a ready check. When you leave an inn or a city, or enter a dungeon,
   one line in chat and on screen says what you are short of: reagents for
   the spells you know (Rune of Teleportation, Arcane Powder, Light Feather
