@@ -69,6 +69,11 @@ the same, and a test checks that every `.toc` version has a section here.
   AH counts as a 35% chance, moved by your own sold and expired mails for
   the item (you sold 0 of 2: about 23%), so an unproven market is never
   counted as a sure sale.
+- New: shop for several crafts. The **Shop xN** button in the profession
+  window (N is the Create box) lists the reagents for N crafts less what is
+  in your bags and bank, with the estimated cost, and makes the Auctionator
+  shopping list "UpgradeFinder crafts" with the amounts to buy.
+  Shift-click adds another recipe to the list. `/uf shop [N]` does the same.
 - Fix: an item that comes into your bags before the game has loaded it (a
   quest reward you just handed in) now shows in the list. Before, it was
   missing until the next full Rescan. UpgradeFinder now asks the game for
@@ -86,6 +91,12 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## Omni 0.1.3
 
+- Where to get an item (`from:`) also lists the quests that give it as a
+  reward, with the first quest of their chain ("chain start, 3 quests").
+  They come before the vendors, because a vendor may sell the item only
+  after the quest ("Sold by (may need the quest first)").
+- Enter on a quest that starts at an object (a note, a bag) opens the map
+  at the object and pins it.
 - The item tooltip says "AH full scan 3h ago" like LootValue, and "not in
   today's full scan" next to an old price.
 
@@ -233,6 +244,10 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - New: a home for small nice-to-haves (`/nice`). The first one zooms the
   camera out as far as the game allows (`/nice zoom` toggles it).
+- Blocked-action report (`blocked`, on by default): when the game says
+  "Interface action failed because of an AddOn", Niceties says which addon
+  it was and the call the game refused. `/nice blocked` lists the last 20.
+  It also turns on the game's taint log (`Logs\taint.log`).
 
 ## Glance 0.1.0
 
