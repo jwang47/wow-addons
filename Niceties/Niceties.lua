@@ -9,7 +9,9 @@ function ns.say(msg)
   DEFAULT_CHAT_FRAME:AddMessage("|cff88ccffNiceties:|r " .. msg)
 end
 
--- f = { key, name, help, default (true when nil), apply(on, data, why) }.
+-- f = { key, name, help, default (true when nil), apply(on, data, why),
+-- status(data), show(data) }. With show, "/nice KEY" alone calls show
+-- instead of toggling; "/nice KEY on|off" still sets it.
 -- apply(true, ...) runs at each login and when the player turns it on;
 -- apply(false, ...) runs only when the player turns it off. data is the
 -- feature's own saved table. why is "login" or "toggle".
@@ -82,5 +84,6 @@ SlashCmdList.NICETIES = function(text)
   if not f then list() return end
   if arg == "on" then ns.Set(key, true)
   elseif arg == "off" then ns.Set(key, false)
+  elseif f.show then f.show(ns.Data(key))
   else ns.Set(key, not ns.IsOn(key)) end
 end

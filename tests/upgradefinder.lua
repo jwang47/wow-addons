@@ -1141,6 +1141,12 @@ tt = fakeTooltip("FakeTipI", "|Hitem:121::|h[Earthen Hood]|h")
 tt:AddLine("Pattern: Earthen Hood")
 Cr.onTooltip(tt)
 check("craft: the learned name gives the price", tt:find("Cost to craft") == "42s 00c" and tt:find("Profit") == "+43s 50c")
+-- The made item's name is learned from the AH scan like the reagents' names.
+UpgradeFinderDB.names["Earthen Hood"] = 121
+local sum = UpgradeFinderAPI.recipe(120)
+check("API: recipe summary for other addons", sum and sum.skill == "Tailoring" and sum.rank == 150 and sum.cost == 4200
+  and sum.profit == 4350 and sum.how == "AH" and sum.made == "Earthen Hood")
+check("API: not a recipe gives nil", UpgradeFinderAPI.recipe(106) == nil)
 SlashCmdList.UPGRADEFINDER("craft names")
 check("/uf craft names says how many names it knows", chat[#chat]:match("item names: %d+ learned") ~= nil)
 C_Item.GetItemInfo = infoNow
@@ -1169,12 +1175,163 @@ GetTradeSkillNumMade = function() return 1, 1 end
 Cr.readTradeSkills()
 check("transform: recipes learned from the profession window", UpgradeFinderDB.recipes[2840]
   and UpgradeFinderDB.recipes[2840].reagents[1][1] == 2770)
+-- Known recipes and the trainer's list, for Omni ("tailoring").
+GetTradeSkillLine = function() return "Mining", 60, 75 end
+Cr.readTradeSkills()
+GetNumTrainerServices = function() return 3 end
+GetTrainerServiceInfo = function(i) return ({ "Bolt of Silk Cloth", "Copper Bar", "Mining" })[i], "", i == 3 and "header" or "available" end
+GetTrainerServiceSkillReq = function(i) if i == 1 then return "Tailoring", 125 elseif i == 2 then return "Mining", 1 end end
+GetTrainerServiceItemLink = function(i) return ({ "|Hitem:4305::|h[Bolt]|h", "|Hitem:2840::|h[Bar]|h" })[i] end
+GetTrainerServiceNumReagents = function(i) return i == 1 and 1 or 0 end
+GetTrainerServiceReagentInfo = function() return "Silk Cloth", "icon", 4, 0 end
+GetTrainerServiceReagentLink = function() return "|Hitem:4306::|h[Silk Cloth]|h" end
+GetTrainerServiceCost = function() return 900 end
+Cr.readTrainer()
+local kn, byName = UpgradeFinderAPI.known(), {}
+for _, r in ipairs(kn or {}) do byName[r.name] = r end
+local bar, bolt = byName["Copper Bar"], byName["Bolt of Silk Cloth"]
+check("known: a profession window recipe with rank and skill-up colour", bar and bar.source == "known"
+  and bar.prof == "Mining" and bar.kind == "optimal" and bar.rank == 60 and bar.max == 75 and bar.profit == -50)
+check("known: a trainer recipe with its skill and price", bolt and bolt.source == "trainer" and bolt.prof == "Tailoring"
+  and bolt.req == 125 and bolt.price == 900 and bolt.cost == 4000 and bolt.profit == 750)
+check("known: a trainer recipe you know is left out", #kn == 2)
+-- The modern profession window (C_TradeSkillUI), as on Forever.
+C_TradeSkillUI = {
+  GetFilteredRecipeIDs = function() return { 1, 2 } end,
+  GetRecipeInfo = function(id) return ({ { name = "Bolt of Silk Cloth", learned = true, relativeDifficulty = 1 },
+    { name = "Silk Headband", learned = false, relativeDifficulty = 0 } })[id] end,
+  GetRecipeSchematic = function(id) return ({ { outputItemID = 4305, quantityMin = 1,
+    reagentSlotSchematics = { { quantityRequired = 4, reagents = { { itemID = 4306 } } } } },
+    { outputItemID = 7050, reagentSlotSchematics = { { quantityRequired = 3, reagents = { { itemID = 4306 } } } } } })[id] end,
+  GetBaseProfessionInfo = function() return { professionName = "Tailoring", skillLevel = 130, maxSkillLevel = 150 } end,
+}
+Cr.readTradeSkills()
+kn, byName = UpgradeFinderAPI.known(), {}
+for _, r in ipairs(kn or {}) do byName[r.prof .. ":" .. r.name] = r end
+local bolt2, band = byName["Tailoring:Bolt of Silk Cloth"], byName["Tailoring:Silk Headband"]
+check("modern window: a learned recipe is known, with its colour and rank", bolt2 and bolt2.source == "known"
+  and bolt2.kind == "medium" and bolt2.rank == 130 and bolt2.profit == 750)
+check("modern window: an unlearned recipe goes with the ones to learn", band and band.source == "trainer"
+  and band.cost == 3000)
+local schematics = 0
+local getSch = C_TradeSkillUI.GetRecipeSchematic
+C_TradeSkillUI.GetRecipeSchematic = function(...) schematics = schematics + 1 return getSch(...) end
+Cr.readTradeSkills()
+Cr.readProfession()
+check("modern window: the same list is not read again within a minute", schematics == 0)
+local k1 = UpgradeFinderAPI.known()
+check("known: the list is kept between keystrokes", UpgradeFinderAPI.known() == k1)
+C_TradeSkillUI = nil
 tt = fakeTooltip("FakeTipK", "item:2770")
 Cr.onTooltip(tt)
 check("transform: a loss shows red", tt:find("Make into Copper Bar (1 each)") == "-50c (1s 00c -> 50c)")
 local n2 = #tt.lines
 Cr.onTooltip(tt)
 check("transform: added once", #tt.lines == n2)
+-- Shopping for several crafts: 4 Silk Cloth and 1 Fine Thread per bolt.
+local BAGS = { [4306] = 6, [901] = 10 }
+GetItemCount = function(id, bank) return bank and BAGS[id] or 0 end
+local made, conv = nil, {}
+Auctionator.API.v1.ConvertToSearchString = function(_, t)
+  table.insert(conv, t)
+  return '"' .. t.searchString .. '";;;;;;;;;;;;;;' .. tostring(t.quantity)
+end
+Auctionator.API.v1.CreateShoppingList = function(_, name, terms) made = { name = name, terms = terms } end
+GetTradeSkillSelectionIndex = function() return 3 end
+GetTradeSkillInfo = function(i) return ({ "Smelting", "Copper Bar", "Bolt of Silk Cloth" })[i], i == 1 and "header" or "optimal" end
+GetTradeSkillNumReagents = function(i) return i == 3 and 2 or (i == 2 and 1 or 0) end
+GetTradeSkillReagentInfo = function(i, r)
+  if i == 3 then return r == 1 and "Silk Cloth" or "Fine Thread", "icon", r == 1 and 4 or 1, 0 end
+  return "Copper Ore", "icon", 1, 0
+end
+GetTradeSkillReagentItemLink = function(i, r)
+  if i == 3 then return r == 1 and "|Hitem:4306::|h[Silk Cloth]|h" or "|Hitem:901::|h[Fine Thread]|h" end
+  return "|Hitem:2770::|h[Copper Ore]|h"
+end
+TradeSkillInputBox = widget("TradeSkillInputBox")
+function TradeSkillInputBox:GetNumber() return 3 end
+local nChat = #chat
+SlashCmdList.UPGRADEFINDER("shop")
+local said = table.concat(chat, "\n", nChat + 1)
+check("shop: the Create box count and what to buy", said:find("Shopping for 3x Bolt of Silk Cloth", 1, true)
+  and said:find("Silk Cloth: buy 6 (need 12, have 6), 10s 00c each", 1, true) ~= nil)
+check("shop: a reagent you have enough of", said:find("You have enough Fine Thread", 1, true) ~= nil)
+check("shop: the estimated cost", said:find("Cost: about 60s 00c at the AH.", 1, true) ~= nil)
+check("shop: the Auctionator list has the amount to buy", made and made.name == "UpgradeFinder crafts"
+  and #made.terms == 1 and made.terms[1]:find('^"Silk Cloth"') and conv[1].quantity == 6 and conv[1].isExact)
+check("shop: the bank is not counted before a visit", said:find("open your bank once", 1, true) ~= nil)
+-- Shift: add 2 copper bars; the bank was seen.
+Cr.bankSeen(true)
+GetTradeSkillSelectionIndex = function() return 2 end
+nChat = #chat
+SlashCmdList.UPGRADEFINDER("shop add 2")
+said = table.concat(chat, "\n", nChat + 1)
+check("shop add: both recipes in one list", said:find("Shopping for 3x Bolt of Silk Cloth, 2x Copper Bar (less your bags and bank)", 1, true)
+  and said:find("Copper Ore: buy 2 (need 2, have 0)", 1, true) and #made.terms == 2
+  and said:find("Cost: about 62s 00c at the AH.", 1, true) ~= nil)
+BAGS[4306], BAGS[2770] = 20, 5
+nChat = #chat
+local rows = Cr.shop(3, false, 3)
+said = table.concat(chat, "\n", nChat + 1)
+check("shop: nothing to buy", said:find("You have every reagent.", 1, true) ~= nil and rows[1].buy == 0)
+GetTradeSkillSelectionIndex = function() return 1 end
+nChat = #chat
+SlashCmdList.UPGRADEFINDER("shop")
+check("shop: a header is not a recipe", chat[#chat]:find("pick a recipe", 1, true) ~= nil)
+SlashCmdList.UPGRADEFINDER("shop clear")
+check("/uf shop clear", UpgradeFinderDB.shop == nil)
+TradeSkillFrame, TradeSkillReagentLabel = widget("TradeSkillFrame"), widget("TradeSkillReagentLabel")
+local sb = Cr.shopButton()
+check("shop: a Shop button with the Create box count", sb and sb:GetText() == "Shop x3" and Cr.shopButton() == sb)
+GetTradeSkillSelectionIndex = function() return 3 end
+sb.scripts.OnClick(sb)
+check("shop: the button shops for the selected recipe", UpgradeFinderDB.shop and UpgradeFinderDB.shop.crafts[1] == "3x Bolt of Silk Cloth")
+nChat = #chat
+SlashCmdList.UPGRADEFINDER("shop debug")
+check("/uf shop debug says where the button is", tostring(chat[nChat + 1]):find("UpgradeFinderShopButton: shown", 1, true) ~= nil
+  and tostring(chat[#chat]):find("last error", 1, true) ~= nil)
+TradeSkillFrame, TradeSkillReagentLabel = nil, nil
+-- Forever's modern profession window: ProfessionsFrame and C_TradeSkillUI.
+GetTradeSkillSelectionIndex, GetTradeSkillInfo = nil, nil
+Cr.forgetShopButton()
+UpgradeFinderDB.shop = nil
+BAGS[4306], BAGS[901] = 6, 10
+local form = widget("SchematicForm")
+form.Reagents = widget("Reagents")
+form.Reagents.Label = widget("ReagentsLabel")
+function form:GetRecipeInfo() return { recipeID = 3914, name = "Earthen Silk Hood" } end
+function form:GetCurrentRecipeLevel() return 1 end
+local inits = {}
+function form:Init() end
+hooksecurefunc = hooksecurefunc or function(t, k, fn) inits[#inits + 1] = fn end
+local multi = widget("CreateMultipleInputBox")
+function multi:GetValue() return 3 end
+ProfessionsFrame = { CraftingPage = { SchematicForm = form, CreateMultipleInputBox = multi } }
+Enum = Enum or {}
+Enum.CraftingReagentType = { Basic = 0, Optional = 1 }
+C_TradeSkillUI = { GetRecipeSchematic = function(id)
+  if id ~= 3914 then return nil end
+  return { reagentSlotSchematics = {
+    { reagentType = 0, quantityRequired = 4, reagents = { { itemID = 4306 } } },
+    { reagentType = 0, quantityRequired = 1, reagents = { { itemID = 901 } } },
+    { reagentType = 1, quantityRequired = 1, reagents = { { itemID = 2770 } } }, -- optional: not bought
+  } }
+end }
+local rn, rr = Cr.selectedRecipe()
+check("professions: the selected recipe and its basic reagents", rn == "Earthen Silk Hood" and #rr == 2
+  and rr[1][1] == 4306 and rr[1][2] == 4 and rr[1][3] == "Silk Cloth")
+local pb = Cr.shopButton()
+check("professions: the Shop button on the recipe pane", pb and pb:GetText() == "Shop x3")
+nChat = #chat
+pb.scripts.OnClick(pb)
+said = table.concat(chat, "\n", nChat + 1)
+check("professions: shop for 3 crafts", said:find("Shopping for 3x Earthen Silk Hood", 1, true)
+  and said:find("Silk Cloth: buy 6 (need 12, have 6)", 1, true) ~= nil)
+ProfessionsFrame, C_TradeSkillUI = nil, nil
+Cr.forgetShopButton()
+Cr.bankSeen(false)
+Auctionator.API.v1.CreateShoppingList, Auctionator.API.v1.ConvertToSearchString = nil, nil
+GetItemCount, TradeSkillInputBox = nil, nil
 C_Item.GetItemInfo, Auctionator.API.v1.GetAuctionPriceByItemID = infoT, ahT
 SlashCmdList.UPGRADEFINDER("craft")
 tt = fakeTooltip("FakeTipD", "item:118")
