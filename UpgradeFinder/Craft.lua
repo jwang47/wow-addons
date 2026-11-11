@@ -15,6 +15,7 @@ ns.craft = C
 C.LABEL = "Cost to craft"
 C.INTO = "Make into "
 C.CUT = 0.95 -- the AH keeps 5% of a sale
+C.KNOWN_TTL = 15 -- seconds a priced recipe list or summary is kept
 
 local GOLD, GREY, BLUE = { 1, 0.82, 0 }, { 0.6, 0.6, 0.6 }, { 0.41, 0.8, 0.94 }
 local GREEN, RED, WHITE = { 0.3, 1, 0.3 }, { 1, 0.35, 0.35 }, { 1, 1, 1 }
@@ -273,7 +274,19 @@ end
 -- profit): { made, skill, rank, cost, unknown, sale, how, profit }. nil
 -- while the recipe's tooltip is still loading or it is not a recipe.
 -- profit is nil when the made item has no price.
+-- Omni asks for every recipe on each search: a summary is kept
+-- C.KNOWN_TTL seconds (prices change slowly).
+local summaries = {}
 function C.summary(id)
+  local now = call(rawget(_G, "GetTime")) or 0
+  local hit = summaries[id]
+  if hit and now - hit.at < C.KNOWN_TTL then return hit.out end
+  local out = C.summaryNow(id)
+  if out then summaries[id] = { at = now, out = out } end
+  return out
+end
+
+function C.summaryNow(id)
   local r = C.recipe(id)
   if not r then return nil end
   local cost = C.cost(r.reagents)
@@ -554,7 +567,6 @@ end
 -- "trainer"), kind, req, price, rank, max, cost, unknown, sale, how,
 -- profit }. A trainer recipe you know already is left out.
 -- Prices change slowly: the list is kept C.KNOWN_TTL seconds.
-C.KNOWN_TTL = 15
 function C.known()
   local now = call(rawget(_G, "GetTime")) or 0
   if knownCache and now - knownCache.at < C.KNOWN_TTL then return knownCache.list end
