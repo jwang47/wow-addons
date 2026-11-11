@@ -374,8 +374,11 @@ function A.detail(e)
         table.insert(parts, "|cffffd100" .. r.skill .. (r.rank and (" " .. r.rank) or "") .. "|r")
       end
       if r.profit then
-        table.insert(parts, (r.profit >= 0 and "|cff40ff40+" or "|cffff6060-") .. ns.money(math.abs(r.profit))
-          .. (r.unknown and " ?" or "") .. "|r")
+        -- Grey with "?" when LootValue is not sure the AH sale happens.
+        local unsure = ns.sources.unsure(r)
+        local color = unsure and "|cff9d9d9d" or (r.profit >= 0 and "|cff40ff40" or "|cffff6060")
+        table.insert(parts, color .. (r.profit >= 0 and "+" or "-") .. ns.money(math.abs(r.profit))
+          .. ((r.unknown or unsure) and " ?" or "") .. "|r")
       elseif r.made and r.made:match("^Enchant ") then
         table.insert(parts, "costs " .. ns.money(r.cost))
       else
@@ -466,6 +469,9 @@ function A.tooltip(tt, e)
     if r and r.cost and r.sale then
       tt:AddLine(string.format("One craft: reagents %s%s, sells for %s (%s), profit %s", ns.money(r.cost),
         r.unknown and " + ?" or "", ns.money(r.sale), r.how or "?", r.profit and ns.money(r.profit) or "?"), 1, 0.82, 0)
+      if ns.sources.unsure(r) then
+        tt:AddLine("Not sure it sells at that price (" .. r.confidence .. " market): the profit is a guess.", 1, 0.4, 0.4, true)
+      end
     end
   elseif k == "spell" and tt.SetSpellByID then
     tt:SetSpellByID(e.spellID)
