@@ -337,6 +337,19 @@ shows or hides it. It is not in the release yet (not in `tools/release.py`
 | Kill XP in a group | Your share of the solo kill XP: in your group now (by level), or for a group of 2 to 5 at your level when you are solo. A warning when a member is so far above you that mobs at your level are grey for them (kill XP is worked out from the highest level in the group, so nobody gets XP). |
 | Your quests | Each open quest with what a group does for it: "needs a group" (an Elite, Group or Dungeon tag, or a suggested group size), "kills count for all" (kill objectives left), "drops or clicks" (only item or object objectives left) or "talk or explore". "+Name" shows the party members who have the quest too. |
 
+**Pinned quests.** When you pin quests in QuestBoard (Alt-click a row: "I'm
+doing this"), GroupUp judges only those. The top line says "for your pins",
+the list is "Your pinned quests (QuestBoard)", and one line counts the
+other quests in your log. A pinned quest that you have not taken yet shows
+"not taken yet" (or "needs a group" when it has a group tag). With no pins,
+GroupUp judges every quest in your log, as before.
+
+**From QuestBoard.** With both addons on, the tooltip of a QuestBoard quest
+row has a "Group: ..." line with the GroupUp verdict. Ctrl-click a quest row
+to open the GroupUp panel with that quest at the top ("Asked about");
+Ctrl-click it again to close the panel. GroupUp adds this from its side, so
+QuestBoard works the same without GroupUp.
+
 How it works, and what to keep in mind:
 
 - Classic splits kill XP: the group gets the kill XP times a bonus (1x for

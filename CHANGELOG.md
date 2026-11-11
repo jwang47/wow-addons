@@ -160,6 +160,16 @@ the same, and a test checks that every `.toc` version has a section here.
   there (row limit, level, far away, a pre-quest first, or not in
   Questie's data).
 
+## GroupUp 0.2.0
+
+- GroupUp now judges the quests you pinned in QuestBoard (Alt-click, "I'm
+  doing this"). The lean, the quest list and the invite summary use only
+  the pins; one line counts the rest of your log. A pinned quest you have
+  not taken yet shows "not taken yet". With no pins, it judges your whole
+  log as before.
+- QuestBoard quest tooltips get a "Group: ..." line, and Ctrl-click on a
+  QuestBoard quest row opens GroupUp with that quest at the top.
+
 ## GroupUp 0.1.0
 
 - New: a panel that helps you decide whether to group up (`/gu`). It
