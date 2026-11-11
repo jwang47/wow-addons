@@ -167,7 +167,11 @@ nothing). Fuzzy hits rank below exact ones.
 Filters: `i:` items, `p:` places, `@` or `w:` people, `s:` spells, `n:` NPCs,
 `q:` quests (your log and Questie), `l:` your log only, `c:` commands,
 `d:` dungeons, `loot:` one dungeon's drops and quests (`loot: bfd`),
-`from:` where to get an item (`from: linen cloth`),
+`from:` where to get an item (`from: linen cloth`), `r:` or a recipe word
+anywhere ("bag recipes") recipes with the skill and the profit of one craft
+(with UpgradeFinder), a profession word ("tailoring bag") that profession's
+recipes: the ones you know, your trainer's and recipe items (UpgradeFinder
+learns them when you open the profession window and the trainer window),
 `near:` or `nb:` nearby NPCs (alone: everything nearby, nearest first). The Nearby group always comes first. An empty box lists the 5 nearest NPCs, then what you used last.
 
 Ranking: a name that starts with the query first, then names where each

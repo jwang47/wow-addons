@@ -13,6 +13,7 @@ ns.craft = C
 C.LABEL = "Cost to craft"
 C.INTO = "Make into "
 C.CUT = 0.95 -- the AH keeps 5% of a sale
+C.KNOWN_TTL = 15 -- seconds a priced recipe list or summary is kept
 
 local GOLD, GREY, BLUE = { 1, 0.82, 0 }, { 0.6, 0.6, 0.6 }, { 0.41, 0.8, 0.94 }
 local GREEN, RED, WHITE = { 0.3, 1, 0.3 }, { 1, 0.35, 0.35 }, { 1, 1, 1 }
@@ -239,10 +240,44 @@ function C.recipe(id)
   for _, l in ipairs(lines) do
     if l == rawget(_G, "RETRIEVING_ITEM_INFO") or l:match("^Retrieving item") then return nil end
   end
-  local made, reagents, bop = Scan.recipeParts(lines)
+  local made, reagents, bop, craft = Scan.recipeParts(lines)
   if not made or #reagents == 0 then return nil end
-  recipes[id] = { made = made, reagents = reagents, bop = bop }
+  local skill, rank
+  if craft then skill, rank = craft:match(Scan.PROFESSION) end
+  recipes[id] = { made = made, reagents = reagents, bop = bop, skill = skill, rank = tonumber(rank) }
   return recipes[id]
+end
+
+-- The numbers for one recipe item, for other addons (Omni lists recipes by
+-- profit): { made, skill, rank, cost, unknown, sale, how, profit }. nil
+-- while the recipe's tooltip is still loading or it is not a recipe.
+-- profit is nil when the made item has no price.
+-- Omni asks for every recipe on each search: a summary is kept
+-- C.KNOWN_TTL seconds (prices change slowly).
+local summaries = {}
+function C.summary(id)
+  local now = call(rawget(_G, "GetTime")) or 0
+  local hit = summaries[id]
+  if hit and now - hit.at < C.KNOWN_TTL then return hit.out end
+  local out = C.summaryNow(id)
+  if out then summaries[id] = { at = now, out = out } end
+  return out
+end
+
+function C.summaryNow(id)
+  local r = C.recipe(id)
+  if not r then return nil end
+  local cost = C.cost(r.reagents)
+  local out = { made = r.made, skill = r.skill, rank = r.rank, cost = cost.total, unknown = #cost.missing > 0 }
+  if not r.made:match("^Enchant ") then
+    local sale = C.sale(r.made, r.bop)
+    if sale then
+      out.sale, out.how = sale.best, sale.how
+      out.confidence = sale.how == "AH" and sale.quote and sale.quote.confidence or nil
+      if cost.total > 0 or not out.unknown then out.profit = sale.best - cost.total end
+    end
+  end
+  return out
 end
 
 -- product: the made item's id when the caller knows it (the game's recipe
@@ -330,24 +365,71 @@ function C.saveRecipe(product, reagents, made)
   recipesDB()[product] = r
 end
 
+-- The modern profession window (Forever uses it): C_TradeSkillUI lists
+-- every recipe of the open profession, learned or not. relativeDifficulty
+-- 0-3 is the skill-up colour.
+C.DIFFICULTY = { [0] = "optimal", [1] = "medium", [2] = "easy", [3] = "trivial" }
+C.REREAD = 60
+local lastRead = { at = -math.huge }
+function C.readProfession()
+  -- Blizzard's own list uses GetFilteredRecipeIDs; GetAllRecipeIDs skips
+  -- the window's filters where the client has it.
+  local ids = call(api("C_TradeSkillUI.GetAllRecipeIDs"))
+  if type(ids) ~= "table" or #ids == 0 then ids = call(api("C_TradeSkillUI.GetFilteredRecipeIDs")) end
+  if type(ids) ~= "table" or #ids == 0 then return false end
+  -- The window fires its update events often (every bag change, every
+  -- craft): read the same list once a minute at most.
+  local now, sig = call(rawget(_G, "GetTime")) or 0, #ids .. ":" .. tostring(ids[1]) .. ":" .. tostring(ids[#ids])
+  if lastRead.sig == sig and now - lastRead.at < C.REREAD then return true end
+  lastRead.sig, lastRead.at = sig, now
+  local list, unlearned = {}, {}
+  for _, rid in ipairs(ids) do
+    local r = call(api("C_TradeSkillUI.GetRecipeInfo"), rid)
+    local sch = call(api("C_TradeSkillUI.GetRecipeSchematic"), rid, false)
+    if type(r) == "table" and r.name and type(sch) == "table" then
+      local product = sch.outputItemID
+      local reagents = {}
+      for _, slot in ipairs(sch.reagentSlotSchematics or {}) do
+        local first = slot.reagents and slot.reagents[1]
+        if first and first.itemID then table.insert(reagents, { first.itemID, slot.quantityRequired or 1 }) end
+      end
+      C.saveRecipe(product, reagents, ((sch.quantityMin or 1) + (sch.quantityMax or sch.quantityMin or 1)) / 2)
+      local entry = { product = product, kind = C.DIFFICULTY[r.relativeDifficulty] }
+      if r.learned == false then unlearned[r.name] = entry else list[r.name] = entry end
+    end
+  end
+  local p = call(api("C_TradeSkillUI.GetBaseProfessionInfo")) or call(api("C_TradeSkillUI.GetChildProfessionInfo"))
+  if type(p) ~= "table" then
+    local name, rank, max = call(rawget(_G, "GetTradeSkillLine"))
+    p = { professionName = name, skillLevel = rank, maxSkillLevel = max }
+  end
+  C.saveKnown(p.professionName, p.skillLevel, p.maxSkillLevel, list, unlearned)
+  return true
+end
+
 -- Every recipe of the open profession window.
 function C.readTradeSkills()
+  if C.readProfession() then return end
   local g = function(n) return rawget(_G, n) end
+  local list = {}
   for i = 1, call(g("GetNumTradeSkills")) or 0 do
-    local _, kind = call(g("GetTradeSkillInfo"), i)
+    local name, kind = call(g("GetTradeSkillInfo"), i)
     if kind ~= "header" then
       local product = idOf(call(g("GetTradeSkillItemLink"), i))
       local reagents = {}
       for r = 1, call(g("GetTradeSkillNumReagents"), i) or 0 do
-        local name, _, count = call(g("GetTradeSkillReagentInfo"), i, r)
+        local rname, _, count = call(g("GetTradeSkillReagentInfo"), i, r)
         local id = idOf(call(g("GetTradeSkillReagentItemLink"), i, r))
-        if id and name then C.learn(name, id) end
-        table.insert(reagents, { id or name, count or 1 })
+        if id and rname then C.learn(rname, id) end
+        table.insert(reagents, { id or rname, count or 1 })
       end
       local lo, hi = call(g("GetTradeSkillNumMade"), i)
       C.saveRecipe(product, reagents, ((lo or 1) + (hi or lo or 1)) / 2)
+      if name then list[name] = { product = product, kind = kind } end
     end
   end
+  local prof, rank, max = call(g("GetTradeSkillLine"))
+  C.saveKnown(prof, rank, max, list)
 end
 
 -- The transformation lines for a material: one per made item.
@@ -379,6 +461,133 @@ function C.forMaterial(id)
   end
   table.sort(out, function(a, b) return a[1] < b[1] end)
   return out
+end
+
+---------------------------------------------------------------------------
+-- The recipes you know and the ones your trainer teaches, for other
+-- addons (Omni: "tailoring"). The profession window saves what you know
+-- (UpgradeFinderDB.known[profession]); a trainer window saves what it
+-- teaches (UpgradeFinderDB.trainer[profession]). Neither is in the game
+-- API while the window is closed.
+---------------------------------------------------------------------------
+local function dbTable(key)
+  local db = ns.db()
+  db[key] = db[key] or {}
+  return db[key]
+end
+
+-- Saves the open profession window's line (name, rank) and its recipes:
+-- name -> { product, kind } (kind is the skill-up colour: optimal, medium,
+-- easy, trivial). Recipes merge in, so a filtered window loses nothing.
+-- unlearned: recipes the modern window lists that you do not know yet;
+-- they go with the trainer's (UpgradeFinderDB.trainer).
+local knownCache -- { at, list }: C.known() is asked on every Omni keystroke
+function C.saveKnown(prof, rank, max, list, unlearned)
+  if type(prof) ~= "string" or prof == "" then return end
+  knownCache = nil
+  local all = dbTable("known")
+  local p = all[prof] or { recipes = {} }
+  p.rank, p.max = rank, max
+  for name, r in pairs(list) do p.recipes[name] = r end
+  all[prof] = p
+  if unlearned and next(unlearned) then
+    local t = dbTable("trainer")
+    t[prof] = t[prof] or {}
+    for name, r in pairs(unlearned) do
+      if not t[prof][name] then t[prof][name] = { product = r.product, kind = r.kind } end
+    end
+  end
+end
+
+function C.readTrainer()
+  local g = function(n) return rawget(_G, n) end
+  local out = {}
+  for i = 1, call(g("GetNumTrainerServices")) or 0 do
+    local name, _, kind = call(g("GetTrainerServiceInfo"), i)
+    local skill, req = call(g("GetTrainerServiceSkillReq"), i)
+    local product = idOf(call(g("GetTrainerServiceItemLink"), i))
+    if name and kind ~= "header" and type(skill) == "string" and product then
+      local reagents = {}
+      for r = 1, call(g("GetTrainerServiceNumReagents"), i) or 0 do
+        local rname, _, count = call(g("GetTrainerServiceReagentInfo"), i, r)
+        local id = idOf(call(g("GetTrainerServiceReagentLink"), i, r))
+        if id and rname then C.learn(rname, id) end
+        if id or rname then table.insert(reagents, { id or rname, count or 1, rname }) end
+      end
+      out[skill] = out[skill] or {}
+      out[skill][name] = { product = product, req = tonumber(req), price = call(g("GetTrainerServiceCost"), i),
+        reagents = reagents }
+    end
+  end
+  knownCache = nil
+  local all = dbTable("trainer")
+  for skill, list in pairs(out) do
+    all[skill] = all[skill] or {}
+    for name, r in pairs(list) do all[skill][name] = r end
+  end
+end
+
+-- Cost, sale and profit of one craft: fills t and returns it.
+local function priced(t, reagents, product, made)
+  local cost = C.cost(reagents)
+  t.cost, t.unknown = cost.total, #cost.missing > 0
+  local sale = product and C.sale(product)
+  if sale then
+    t.sale, t.how = sale.best * (made or 1), sale.how
+    -- How sure an AH sale is (LootValue's quote): "ok", "thin" or "no scan".
+    t.confidence = sale.how == "AH" and sale.quote and sale.quote.confidence or nil
+    if cost.total > 0 or not t.unknown then t.profit = t.sale - cost.total end
+  end
+  return t
+end
+
+-- Every saved recipe: { prof, name, product, source ("known" or
+-- "trainer"), kind, req, price, rank, max, cost, unknown, sale, how,
+-- profit }. A trainer recipe you know already is left out.
+-- Prices change slowly: the list is kept C.KNOWN_TTL seconds.
+function C.known()
+  local now = call(rawget(_G, "GetTime")) or 0
+  if knownCache and now - knownCache.at < C.KNOWN_TTL then return knownCache.list end
+  local out = C.knownNow()
+  knownCache = { at = now, list = out }
+  return out
+end
+
+function C.knownNow()
+  local out, have = {}, {}
+  local recipes = recipesDB()
+  for prof, p in pairs(dbTable("known")) do
+    have[prof] = {}
+    for name, r in pairs(p.recipes or {}) do
+      have[prof][name] = true
+      local saved = r.product and recipes[r.product]
+      table.insert(out, priced({ prof = prof, name = name, product = r.product, source = "known", kind = r.kind,
+        rank = p.rank, max = p.max }, saved and saved.reagents or {}, r.product, saved and saved.made))
+    end
+  end
+  for prof, list in pairs(dbTable("trainer")) do
+    local p = dbTable("known")[prof]
+    for name, r in pairs(list) do
+      if not (have[prof] and have[prof][name]) then
+        table.insert(out, priced({ prof = prof, name = name, product = r.product, source = "trainer", req = r.req,
+          price = r.price, rank = p and p.rank, max = p and p.max },
+          (r.reagents and #r.reagents > 0 and r.reagents) or (recipes[r.product] and recipes[r.product].reagents) or {}, r.product,
+          recipes[r.product] and recipes[r.product].made or 1))
+      end
+    end
+  end
+  return out
+end
+
+-- Runs fn once, C.READ_DELAY seconds after the first of a burst of events.
+C.READ_DELAY = 1
+local soonPending = {}
+function C.soon(key, fn)
+  local after = api("C_Timer.After")
+  if not after then return C.guard(fn) end
+  if soonPending[key] then return end
+  soonPending[key] = true
+  after(C.READ_DELAY, function() soonPending[key] = nil C.guard(fn) end)
 end
 
 -- Errors are reported once in chat, so a broken line does not fail silently.
@@ -749,10 +958,13 @@ function C.hook()
       -- Learn the names soon after login, before the first recipe hover.
       local after = api("C_Timer.After")
       if after then after(5, function() C.guard(C.learnNames) end) end
-    elseif ev == "TRADE_SKILL_SHOW" or ev == "TRADE_SKILL_UPDATE" then
-      C.guard(C.readTradeSkills)
-      C.guard(C.shopButton)
-      pcall(shopText)
+    elseif ev == "TRADE_SKILL_SHOW" or ev == "TRADE_SKILL_UPDATE" or ev == "TRADE_SKILL_LIST_UPDATE" then
+      C.soon("trade", C.readTradeSkills)
+      if ev ~= "TRADE_SKILL_LIST_UPDATE" then
+        C.guard(C.shopButton)
+        pcall(shopText)
+      end
+    elseif ev == "TRAINER_SHOW" or ev == "TRAINER_UPDATE" then C.soon("trainer", C.readTrainer)
     elseif ev == "BANKFRAME_OPENED" then C.bankSeen(true)
     elseif name == "Blizzard_TradeSkillUI" or name == "Blizzard_Professions" then C.hookRows() C.guard(C.shopButton) end
   end)
@@ -761,6 +973,9 @@ function C.hook()
   pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
   pcall(f.RegisterEvent, f, "TRADE_SKILL_SHOW")
   pcall(f.RegisterEvent, f, "TRADE_SKILL_UPDATE")
+  pcall(f.RegisterEvent, f, "TRADE_SKILL_LIST_UPDATE")
+  pcall(f.RegisterEvent, f, "TRAINER_SHOW")
+  pcall(f.RegisterEvent, f, "TRAINER_UPDATE")
   pcall(f.RegisterEvent, f, "BANKFRAME_OPENED")
 end
 C.hook()

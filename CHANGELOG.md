@@ -23,6 +23,13 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## UpgradeFinder 0.2.0
 
+- `UpgradeFinderAPI.recipe(itemID)` gives other addons a recipe's skill,
+  craft cost, sale price and profit (Omni uses it to list recipes).
+- UpgradeFinder now remembers the recipes you know (when you open a
+  profession window) and the recipes a trainer teaches (when you open the
+  trainer window). `UpgradeFinderAPI.known()` gives them to other addons
+  with the skill-up colour, the skill a trainer recipe needs, and the
+  profit of one craft.
 - New: crafting lines on recipes. Hover a pattern or other recipe item, or
   a recipe in your profession window, to see the cost to craft, what the
   made item sells for (AH, vendor or disenchant), the profit or loss, and
@@ -57,6 +64,17 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## Omni 0.1.3
 
+- Search recipes: a recipe word anywhere ("bag recipes", "patterns
+  silk") or `r:` lists the recipes Omni knows (bags, bank, mail, the AH
+  scan). "bag" also finds packs, pouches and satchels. With UpgradeFinder,
+  each row shows the skill it needs and the profit of one craft, best
+  profit first. Hover a row for the recipe tooltip with the full craft lines.
+- A profession word ("tailoring", "tailoring bag") lists that
+  profession's recipes: the ones you know (with the skill-up colour), the
+  ones to learn (from the trainer window with the skill it needs and the
+  cost to learn, and the unlearned ones in Forever's profession window),
+  then recipe items. Each group puts the best profit first. Open the
+  profession window and its trainer once, so Omni knows them.
 - Where to get an item (`from:`) also lists the quests that give it as a
   reward, with the first quest of their chain ("chain start, 3 quests").
   They come before the vendors, because a vendor may sell the item only
