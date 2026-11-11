@@ -12,6 +12,7 @@ the same, and a test checks that every `.toc` version has a section here.
   profit, best first. The Skill-ups view sorts by what one skill point
   costs. It opens beside your profession window (`/wb dock` turns that
   off). It needs UpgradeFinder, which reads the recipes and the prices.
+
 ## LootValue 0.2.2
 
 - New: clear your bags (`/lv clear`). One panel lists what the tooltip
