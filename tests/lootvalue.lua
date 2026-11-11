@@ -477,6 +477,15 @@ T = T2
 check("scan: an item that left the AH counts too", SC.stats(2592) and SC.stats(2592).sold == 1)
 check("scan: chat summary", has(chat[#chat], "about 2 auctions sold"))
 
+-- A full scan nobody saw requested (another addon's) is read by its size.
+SC.FULL_ROWS = 2
+T = T + 3600
+local snapBefore = LootValueDB.snap
+ev("AUCTION_ITEM_LIST_UPDATE")
+runTimers()
+check("scan: an unrequested full scan is read too", LootValueDB.snap ~= snapBefore and SC.job.state == "idle")
+SC.FULL_ROWS = 1000
+
 -- The AH closes before the rows are read: the scan is dropped.
 T = T + 3600
 local before = LootValueDB.snap

@@ -31,6 +31,7 @@ S.READ_MS = 10        -- per frame while the AH window is open
 S.WORK_MS = 3         -- per frame for the compare, which runs anywhere
 S.SLICE = 100         -- rows between clock checks
 S.GAP = 15 * 60       -- the server allows one full scan per 15 minutes
+S.FULL_ROWS = 1000    -- a list this long is a full scan, even unrequested
 S.MIN_DT = 120        -- a scan this soon after the last one is ignored
 S.KEEP = 3 * 86400    -- compare results kept per item
 S.KEEP_N = 8
@@ -837,8 +838,9 @@ if f then
         if job.state == "waiting" then setState("failed", { why = "the AH closed before the server sent the scan" }) end
       elseif event == "REPLICATE_ITEM_LIST_UPDATE" then S.onList()
       elseif event == "AUCTION_ITEM_LIST_UPDATE" then
-        -- Plain searches fire this too; only a full scan request counts.
-        if job.state == "waiting" then S.onList() end
+        -- Plain searches fire this too (50 rows a page); a full scan we
+        -- did not see requested still shows by its size.
+        if job.state == "waiting" or S.api.num() > S.FULL_ROWS then S.onList() end
       end
     end)
     if not ok and not S.reported then
