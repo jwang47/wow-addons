@@ -811,6 +811,7 @@ check("build: delete", #Bd.names() == 0)
 Bd.reset()
 
 -- Leveling-speed score (Spare1.lua) --------------------------------------------
+do -- its own block: a Lua 5.1 function holds at most 200 locals
 local G = ns.grind
 check("spell text: area spells", SPL.isArea("Ice shards pelt the target area doing 352 Frost damage over 8 sec.")
   and SPL.isArea("causing 97 to 105 Arcane damage to all targets within 10 yards")
@@ -955,6 +956,7 @@ check("lasts: not for an item above your level", #Lx.lines(lrows[4], lrows, 26) 
 local Cal = ns.calib
 check("calib: crit bonus needs enough crits", Cal.critBonus({ n = 30, d = 3000, cn = 3, cd = 600 }) == nil)
 check("calib: crit bonus from full hits and crits", math.abs(Cal.critBonus({ n = 30, d = 3000, cn = 12, cd = 2400 }) - 1) < 1e-9)
+end
 GetActionInfo, GetSpellInfo, GetSpellDescription, GetSpellBaseCooldown, GetSpellPowerCost = nil, nil, nil, nil, nil
 
 -- Resizable window --------------------------------------------------------------
