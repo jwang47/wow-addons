@@ -386,6 +386,19 @@ function ns.toggle()
 end
 UpgradeFinder_Toggle = ns.toggle
 
+-- For other addons: UpgradeFinderAPI.recipe(itemID) (see C.summary).
+UpgradeFinderAPI = {
+  recipe = function(id)
+    local ok, out = pcall(ns.craft.summary, id)
+    if ok then return out end
+  end,
+  -- The recipes you know and your trainer's (see C.known).
+  known = function()
+    local ok, out = pcall(ns.craft.known)
+    if ok then return out end
+  end,
+}
+
 -- A button on the Auction House window.
 local ahButton
 function ns.addAHButton(tries)
@@ -420,6 +433,7 @@ local HELP = {
   "/uf reset - forget the saved item scores (they are kept between sessions)",
   "/uf where - turn the \"Get it:\" lines on item tooltips on or off (needs Questie)",
   "/uf craft - turn the crafting lines on recipes on or off (cost to craft, sale price, profit, score); /uf craft names shows how many item names it has learned",
+  "/uf shop [N] - shop for N crafts of the recipe selected in your profession window, less what you have (also the Shop button there); /uf shop add [N] adds it to the list, /uf shop clear empties it",
   "/uf dungeons - turn the dungeon drops in the list on or off (the From button filters them)",
   "/uf build - the Build window: try items in each slot, save builds, compare them (Alt-click a row to add it)",
   "/uf calib - the Forever formulas measured from your client (crit per Int and Agi, your spells); /uf calib reset; /uf calib log turns on the combat log (Forever blocks it)",
@@ -529,6 +543,16 @@ function ns.slash(msg)
     local o = ns.db().opts
     o.where = o.where == false
     say("\"Get it:\" lines on item tooltips " .. (o.where and "on" or "off"))
+  elseif cmd == "shop" and a == "debug" then
+    ns.craft.guard(ns.craft.shopButton)
+    for _, l in ipairs(ns.craft.shopDebug()) do say(l) end
+  elseif cmd == "shop" and a == "clear" then
+    ns.db().shop = nil
+    say("crafting shopping list cleared")
+  elseif cmd == "shop" then
+    -- /uf shop [N] or /uf shop add [N]: the selected recipe in your profession window.
+    local add = a == "add"
+    ns.craft.guard(ns.craft.shop, tonumber(add and b or a), add)
   elseif cmd == "craft" and a == "names" then
     ns.craft.learnNames()
     say(ns.craft.namesStatus())

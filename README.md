@@ -97,7 +97,37 @@ like) on the body. It is on by default; `/lv` shows the settings.
   Auto Loot option off (it can only choose when the game does not take
   everything first), and `off` puts your old setting back.
 
-Its functions are on the global `LootValue` table (`adviceLine`,
+### Clear your bags
+
+`/lv clear` opens a panel that acts on the tooltip advice for everything in
+your bags. It opens by itself at a merchant and at the Auction House when it
+has something for you (`/lv clear auto` turns that on and off).
+
+| List | What is in it | What you do |
+| --- | --- | --- |
+| Vendor | grey junk, and weapons and armor whose best option is the vendor | At a merchant, press **Sell** |
+| Disenchant | green and blue gear whose best option is to disenchant it (with Enchanting) | Press **Disenchant**, one click an item |
+| Auction House | unbound items the AH clearly pays more for (the tooltip rule) | At the AH, click a row: the item goes into Auctionator's Selling tab |
+
+- A ticked row ("+") will be sold or disenchanted. Gear whose item level is
+  at or above what you wear in that slot may be an upgrade, so it starts
+  unticked and says why ("item level 31, you wear 28"). Click a row to tick
+  or untick it. LootValue remembers that per item; `/lv clear reset` forgets.
+- It never lists quest items, epics, or locked slots. Cloth, potions,
+  recipes and other items that are not gear are never sold or disenchanted;
+  they can show in the Auction House list. Right-click an AH row to hide it.
+- One press of Sell sells every grey item and at most 12 others
+  (`BUYBACK`), so each item that is not junk is still on the merchant's
+  Buyback tab. Press again for the rest.
+- The game allows a cast only on a real click, so the Disenchant button
+  does one item a click. The panel hides when combat starts.
+- Leatrix Plus and other addons that sell grey junk work beside it: the
+  panel opens a moment after the merchant does and lists what is left.
+- The AH click uses Auctionator's own Selling-tab code (checked against
+  Auctionator 344). If a later Auctionator changes it, the click prints a
+  hint and you pick the item in the Selling tab yourself.
+
+Its functions are on the global `LootValue` table (`adviceLine`, `options`,
 `marketInfo`, `ahWins`, `money`, `scanText`). Another addon can set
 `LootValue.deferTo = "<its name>"` and draw the line itself; LootValue's own
 tooltip hook then stays quiet. (Jiahua's private MageMentor addon does this.)
@@ -140,7 +170,11 @@ nothing). Fuzzy hits rank below exact ones.
 Filters: `i:` items, `p:` places, `@` or `w:` people, `s:` spells, `n:` NPCs,
 `q:` quests (your log and Questie), `l:` your log only, `c:` commands,
 `d:` dungeons, `loot:` one dungeon's drops and quests (`loot: bfd`),
-`from:` where to get an item (`from: linen cloth`),
+`from:` where to get an item (`from: linen cloth`), `r:` or a recipe word
+anywhere ("bag recipes") recipes with the skill and the profit of one craft
+(with UpgradeFinder), a profession word ("tailoring bag") that profession's
+recipes: the ones you know, your trainer's and recipe items (UpgradeFinder
+learns them when you open the profession window and the trainer window),
 `near:` or `nb:` nearby NPCs (alone: everything nearby, nearest first). The Nearby group always comes first. An empty box lists the 5 nearest NPCs, then what you used last.
 
 Ranking: a name that starts with the query first, then names where each
@@ -206,6 +240,20 @@ the price to buy the made item on the AH instead.
   in; other such recipes are read each time you open a profession window
   and saved in `UpgradeFinderDB.recipes`. `/uf craft` turns the lines off
   and on.
+- Shopping for several crafts: the profession window has a **Shop xN**
+  button beside "Reagents:". It takes N from the Create box, works out the
+  reagents for N crafts of the selected recipe less what is in your bags
+  and bank (`GetItemCount(id, true)`; the game counts the bank only after
+  you open it, and chat says so until then), and says in chat what to buy,
+  what you have enough of and the estimated cost (AH and vendor prices as
+  for the crafting lines). It also makes the Auctionator shopping list
+  "UpgradeFinder crafts" with each reagent's exact name and the amount to
+  buy (`Auctionator.API.v1.CreateShoppingList`); open it on Auctionator's
+  Shopping tab. A reagent a vendor sells for less stays off the list.
+  Shift-click adds the recipe to the list you have, so two recipes that
+  share a reagent count it once. `/uf shop [N]`, `/uf shop add [N]` and
+  `/uf shop clear` do the same from chat. The Enchanting window (a
+  different frame) has no button yet.
 - Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
   **Any price / Can afford**, and **All sources / AH only / Dungeons / Bags
@@ -387,11 +435,14 @@ turned off. It is not in the release yet (not in `tools/release.py`
 `ADDONS`); try it with `dev.ps1 Niceties`.
 
 `/nice` lists the features and their state. `/nice KEY` toggles one,
-`/nice KEY on|off` sets it. The state is in `NicetiesDB` (SavedVariables).
+`/nice KEY on|off` sets it (a feature with a list, such as `blocked`,
+shows the list on `/nice KEY`). The state is in `NicetiesDB` (SavedVariables).
 
 | Key | What it does |
 | --- | --- |
 | `zoom` | Max camera distance (on by default). Sets the `cameraDistanceMaxZoomFactor` CVar to the highest value the client keeps, at each login and loading screen, so you can scroll the camera out much further. The Options slider stops at 2.0; the addon tries 4.0, 3.4, 2.6 and 2.0 and keeps the first one the client takes (or the value the client clamps it to). Off puts back the value you had before. Moving the Options slider changes it until the next login. |
+| `cpu` | CPU tracker (on by default). The game's AddOn list shows only the total addon CPU and its peak since the last `/reload`. This feature reads the game's addon profiler (`C_AddOnProfiler`) once a second and saves a history in `NicetiesDB`: each **spike** (a frame where one addon ran 50 ms or more, or a new session peak of 50 ms or more) with the time, the zone, combat and the open windows (profession, auction house, vendor, map ...), and one line a minute with the busiest addons. Spikes in the first 15 s after a loading screen are marked "loading" (the 98% peak in the AddOn list is often the login frame). It keeps 300 spikes and 24 h of minutes. `/cpu` opens a window (addons now, then the last spikes); `/cpu top`, `/cpu spikes [N]`, `/cpu worst [hours]` (who spikes most, loading frames counted last), `/cpu history [minutes]` and `/cpu reset` print to chat. The game may reset its counters on `/reload`; the tracker handles that. |
+| `blocked` | Blocked-action report (on by default). The game prints only "Interface action failed because of an AddOn". Niceties listens for `ADDON_ACTION_BLOCKED` and `ADDON_ACTION_FORBIDDEN`, says once per session which addon it was and the call it refused (and if you were in combat), and keeps the last 20 in `NicetiesDB` (`/nice blocked` lists them). It also sets the `taintLog` CVar to 1, so the game writes `Logs\taint.log`; off puts the old value back. |
 
 To add a feature: put it in the next free `SpareN.lua` (the `.toc` already
 lists five empty ones, so the game loads it after `/reload`; a new file
@@ -657,6 +708,19 @@ small grid (`/buffs`). It is not in the release yet.
   from the last read before the fight: a buff counts as on until its end
   time. Drag the header to move the grid; `/buffs reset` moves it back,
   `/buffs` hides or shows it.
+- **Ready check**: when you leave a rest area (an inn or a city) or enter
+  a dungeon, one line in chat and in the middle of the screen says what
+  you are short of ("Before you go: no Rune of Teleportation, 8 conjured
+  water, gear at 22% (repair)"). It says nothing when all is well, and it
+  does not repeat the same line within 5 minutes. It checks:
+  reagents for spells you know (under 2 Rune of Teleportation, Rune of
+  Portals, Arcane Powder or Light Feather for a mage; `R.REAGENTS` in
+  `Ready.lua` has the other classes), conjured water under 20 and food
+  under 10 when you know the Conjure spell, the most worn item at 30%
+  durability or less, fewer than 5 free bag slots, and unspent talent
+  points. `/buffs ready` runs it now; `/buffs ready off` turns the automatic
+  line off. The reagent table and item IDs are from Classic: a reagent
+  counts only when you know one of its spells.
 - It replaces the third-party Manners addon: turn Manners off in the
   AddOns list so that the two do not both prompt you.
 
@@ -796,6 +860,12 @@ your saved Key Bindings.
   [Gethe/wow-ui-source](https://github.com/Gethe/wow-ui-source/tree/forever).
   `Blizzard_APIDocumentationGenerated/` documents the `C_` functions.
   Check every new call there first.
+- The profession window is the modern `ProfessionsFrame`
+  (`Blizzard_Professions`, `C_TradeSkillUI`), restyled. `TradeSkillFrame`
+  and the old `GetTradeSkill*` functions do not exist. The recipe pane is
+  `ProfessionsFrame.CraftingPage.SchematicForm` (`.Reagents.Label` is the
+  "Reagents:" text) and the Create box is
+  `ProfessionsFrame.CraftingPage.CreateMultipleInputBox`.
 - The Auction House window is the modern `AuctionHouseFrame`. It is
   load-on-demand, so it can be nil when an `AUCTION_HOUSE_SHOW` handler
   runs first: look again a moment later.
@@ -814,6 +884,10 @@ your saved Key Bindings.
 - Health (and sometimes power) is secret, but `AbbreviateLargeNumbers` takes
   secret values and the result can be joined into a string for `SetText`.
   Wrap it in `pcall` and fall back to the bare value.
+- `CheckInteractDistance` is blocked in combat: a call there raises
+  `ADDON_ACTION_BLOCKED` with the function name `UNKNOWN()` and the game
+  prints "Interface action failed because of an AddOn". Call it only when
+  `InCombatLockdown()` is false.
 - `UnitDistanceSquared` works only for party and raid members. For any
   other unit, bracket the distance with `C_Spell.IsSpellInRange` over the
   spellbook and `CheckInteractDistance` (out of combat).

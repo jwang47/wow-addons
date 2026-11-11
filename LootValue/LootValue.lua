@@ -266,10 +266,11 @@ end
 local ACTION = { Vendor = "Vendor", AH = "AH", ["AH (if tradable)"] = "AH if tradable", Disenchant = "Disenchant" }
 local OTHER = { Vendor = "vendor", AH = "AH", ["AH (if tradable)"] = "AH if tradable", Disenchant = "disenchant" }
 
--- The advice tooltip line for an item, or nil. isGear: the item can be
--- disenchanted (equippable gear). ctx (from the tooltip text): bound = this
--- copy can't be auctioned; without ctx the AH entry says "if tradable".
-function LV.adviceLine(link, isGear, ctx)
+-- The options for an item, best first: { { kind, copper, note }, ... } with
+-- kind "Vendor", "Disenchant", "AH" or "AH (if tradable)". Also deUnknown
+-- (gear with no disenchant price) and ah (the raw AH price, or nil). nil
+-- without an item ID or Auctionator. isGear and ctx as for adviceLine.
+function LV.options(link, isGear, ctx)
   local id = itemID(link)
   if not id or not LV.hasAuctionator() then return nil end
   local ah = call("GetAuctionPriceByItemLink", link) or call("GetAuctionPriceByItemID", id)
@@ -300,6 +301,15 @@ function LV.adviceLine(link, isGear, ctx)
       table.insert(options, 2, entry)
     end
   end
+  return options, deUnknown, ah
+end
+
+-- The advice tooltip line for an item, or nil. isGear: the item can be
+-- disenchanted (equippable gear). ctx (from the tooltip text): bound = this
+-- copy can't be auctioned; without ctx the AH entry says "if tradable".
+function LV.adviceLine(link, isGear, ctx)
+  local options, deUnknown, ah = LV.options(link, isGear, ctx)
+  if not options then return nil end
   if #options == 0 or (#options < 2 and not deUnknown and not options[1][1]:find("^AH")) then return nil end
   local function note(o) return o[3] and (" (" .. o[3] .. ")") or "" end
   local best = options[1]

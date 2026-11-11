@@ -12,9 +12,31 @@ the same, and a test checks that every `.toc` version has a section here.
   profit, best first. The Skill-ups view sorts by what one skill point
   costs. It opens beside your profession window (`/wb dock` turns that
   off). It needs UpgradeFinder, which reads the recipes and the prices.
+## LootValue 0.2.2
+
+- New: clear your bags (`/lv clear`). One panel lists what the tooltip
+  advice says to do with what you carry: sell to a vendor (grey junk, and
+  gear the vendor pays most for), disenchant, or post on the Auction House.
+  It opens by itself at a merchant and at the Auction House when there is
+  something to do (`/lv clear auto` turns that off).
+- At a merchant, Sell sells the ticked rows. Gear at or above the item
+  level you wear in that slot is not ticked; click a row to tick or untick
+  it, and LootValue remembers that per item. One press sells at most 12
+  items that are not grey, so all of them stay on the Buyback tab.
+- With Enchanting, a button disenchants the next ticked item, one click
+  each.
+- At the Auction House, a click on a row puts the item into Auctionator's
+  Selling tab.
 
 ## UpgradeFinder 0.2.0
 
+- `UpgradeFinderAPI.recipe(itemID)` gives other addons a recipe's skill,
+  craft cost, sale price and profit (Omni uses it to list recipes).
+- UpgradeFinder now remembers the recipes you know (when you open a
+  profession window) and the recipes a trainer teaches (when you open the
+  trainer window). `UpgradeFinderAPI.known()` gives them to other addons
+  with the skill-up colour, the skill a trainer recipe needs, and the
+  profit of one craft.
 - New: crafting lines on recipes. Hover a pattern or other recipe item, or
   a recipe in your profession window, to see the cost to craft, what the
   made item sells for (AH, vendor or disenchant), the profit or loss, and
@@ -27,6 +49,11 @@ the same, and a test checks that every `.toc` version has a section here.
   craft gains or loses ("Make into Bolt of Silk Cloth (4 each)").
 - Reagents the client has not seen yet get their AH price too: UpgradeFinder
   learns the item names in the Auctionator scan once and saves them.
+- New: shop for several crafts. The **Shop xN** button in the profession
+  window (N is the Create box) lists the reagents for N crafts less what is
+  in your bags and bank, with the estimated cost, and makes the Auctionator
+  shopping list "UpgradeFinder crafts" with the amounts to buy.
+  Shift-click adds another recipe to the list. `/uf shop [N]` does the same.
 - Fix: an item that comes into your bags before the game has loaded it (a
   quest reward you just handed in) now shows in the list. Before, it was
   missing until the next full Rescan. UpgradeFinder now asks the game for
@@ -44,6 +71,23 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## Omni 0.1.3
 
+- Search recipes: a recipe word anywhere ("bag recipes", "patterns
+  silk") or `r:` lists the recipes Omni knows (bags, bank, mail, the AH
+  scan). "bag" also finds packs, pouches and satchels. With UpgradeFinder,
+  each row shows the skill it needs and the profit of one craft, best
+  profit first. Hover a row for the recipe tooltip with the full craft lines.
+- A profession word ("tailoring", "tailoring bag") lists that
+  profession's recipes: the ones you know (with the skill-up colour), the
+  ones to learn (from the trainer window with the skill it needs and the
+  cost to learn, and the unlearned ones in Forever's profession window),
+  then recipe items. Each group puts the best profit first. Open the
+  profession window and its trainer once, so Omni knows them.
+- Where to get an item (`from:`) also lists the quests that give it as a
+  reward, with the first quest of their chain ("chain start, 3 quests").
+  They come before the vendors, because a vendor may sell the item only
+  after the quest ("Sold by (may need the quest first)").
+- Enter on a quest that starts at an object (a note, a bag) opens the map
+  at the object and pins it.
 - The item tooltip says "AH full scan 3h ago" like LootValue, and "not in
   today's full scan" next to an old price.
 
@@ -191,6 +235,10 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - New: a home for small nice-to-haves (`/nice`). The first one zooms the
   camera out as far as the game allows (`/nice zoom` toggles it).
+- Blocked-action report (`blocked`, on by default): when the game says
+  "Interface action failed because of an AddOn", Niceties says which addon
+  it was and the call the game refused. `/nice blocked` lists the last 20.
+  It also turns on the game's taint log (`Logs\taint.log`).
 
 ## Glance 0.1.0
 
@@ -320,6 +368,22 @@ the same, and a test checks that every `.toc` version has a section here.
   corner grip to set its max height and scroll for the rest.
 
 ## BuffCheck 0.1.0
+
+- Fix: "Interface action failed because of an AddOn" in a fight with
+  other players near you. BuffCheck asked the game how far they were
+  (`CheckInteractDistance`), which the game blocks in combat. It now asks
+  only out of combat.
+- Less work in a fight: the grid is read again once a second in combat
+  (before: up to 5 times a second, on every aura change), and at most
+  twice a second out of combat. In combat it no longer looks at the players
+  near you.
+- New: a ready check. When you leave an inn or a city, or enter a dungeon,
+  one line in chat and on screen says what you are short of: reagents for
+  the spells you know (Rune of Teleportation, Arcane Powder, Light Feather
+  and the other classes' reagents), conjured water and food, gear at 30%
+  durability or less, fewer than 5 free bag slots, and unspent talent
+  points. It says nothing when all is well. `/buffs ready` runs it by hand;
+  `/buffs ready off` turns it off.
 
 - New addon: your buffs and your group's in a small grid (`/buffs`).
   Green on, yellow ending (minutes left), red missing. Click a row to buff

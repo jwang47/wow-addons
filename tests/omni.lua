@@ -179,10 +179,14 @@ local NPC = { [234] = { name = "Gryan Stoutmantle", subName = "The People's Mili
   [639] = { name = "Edwin VanCleef", spawns = { [1581] = { { -1, -1 } } } } }
 local QUEST = { [65] = { name = "The Defias Brotherhood", startedBy = { { 234 } }, questLevel = 18 },
   [6563] = { name = "The Essence of Aku'Mai", startedBy = { { 12736 } }, questLevel = 22, zoneOrSort = 719 },
-  [6921] = { name = "Amongst the Ruins", questLevel = 27, zoneOrSort = 10020 } }
+  [6921] = { name = "Amongst the Ruins", questLevel = 27, zoneOrSort = 10020 },
+  [79975] = { name = "A Spot to Rest", questLevel = 30, preQuestSingle = { 79974 } },
+  [79974] = { name = "Weary Traveler", questLevel = 28 },
+  [79976] = { name = "This Must Be The Place", questLevel = 32, preQuestSingle = { 79975 }, startedBy = { nil, { 50 } } } }
 local ITEM = { [3307] = { name = "Gnoll Paw", npcDrops = { 235 } }, [4306] = { name = "Silk Cloth" },
   [7000] = { name = "Heartwood Girdle", questRewards = { 6563 } },
   [2589] = { name = "Linen Cloth", objectDrops = { 50 }, vendors = { 234 } },
+  [211527] = { name = "Cozy Sleeping Bag", vendors = { 234 }, questRewards = { 79976 } },
   [280132] = { name = "Perfect Razormaw Egg", objectDrops = { 671892, 671931 }, relatedQuests = { 65 } } }
 local OBJECT = { [50] = { name = "Old Crate", spawns = { [10] = { { 40, 60 } } } } }
 local AREA = { [40] = 1436, [10] = 1431, [1581] = 9002 }
@@ -626,6 +630,17 @@ do
   src = ns.search("from: perfect razormaw egg")
   check("unknown objects get one row that says so", titles(src) == "Found in,For quests"
     and src[1].entries[1].name == "2 objects Questie has no location for")
+  -- A quest reward also sold by a vendor (who may want the quest done first):
+  -- the chain start, then the reward quest, before the vendor.
+  ns.fromID, ns.fromName = 211527, "cozy sleeping bag"
+  local bag = ns.search("from: cozy sleeping bag")
+  check("reward quests come before the vendor", titles(bag) == "Reward from,Sold by (may need the quest first)")
+  check("chain start, then the quest that gives it", names(bag, "quest") == "Weary Traveler,This Must Be The Place")
+  calls = {}
+  ns.actions.run(bag[1].entries[2])
+  check("a quest that starts at an object pins the object", chat[#chat]:find("This Must Be The Place %(at Old Crate%)") ~= nil)
+  check("chain notes", strip(ns.actions.detail(bag[1].entries[1])):find("chain start, 3 quests") ~= nil
+    and strip(ns.actions.detail(bag[1].entries[2])):find("gives it, quest 3 of 3") ~= nil)
   check("the quest that needs it", src[2].entries[1].kind == "quest" and src[2].entries[1].name == "The Defias Brotherhood")
 end
 g = ns.search("silk cloth")
@@ -778,6 +793,10 @@ do
   local s1, s2 = shop("ShoppingTooltip1", 300, 400), shop("ShoppingTooltip2", 300, 400)
   ns.open("silk")
   GameTooltip.owner = OmniFrame
+  s2.NumLines = function() return 0 end
+  ns.placeCompare()
+  check("compare: an empty comparison is hidden", not s2:IsShown())
+  s2.NumLines, s2.shown = nil, true
   UIParent.GetRight = function() return 1700 end
   local tl, tr, tb = 700, 1000, 600
   GameTooltip.GetLeft = function() return tl end
@@ -947,6 +966,74 @@ do
   check("other dungeons don't list it", (ns.search("loot: dm")[#ns.search("loot: dm")].title:find("^Quest") == nil))
   check("loot: unknown dungeon is empty", #ns.search("loot: nowhere") == 0)
   ns.close()
+end
+
+-- Recipes: "bag recipes" lists recipe items, best profit first (UpgradeFinderAPI).
+do
+  local M = ns.match
+  check("a recipe word lists recipes", select(1, M.parse("bag recipes")) == "recipe" and select(2, M.parse("bag recipes")) == "bag")
+  check("r: filter", select(1, M.parse("r: silk")) == "recipe")
+  local E = ns.sources.entry
+  local list = { E("item", 5000, "Pattern: Small Silk Pack"), E("item", 5001, "Pattern: Linen Bag"),
+    E("item", 5002, "Pattern: Silk Robe"), E("item", 5003, "Linen Bag"), E("item", 5004, "Pattern: Red Linen Bag") }
+  local instant = C_Item.GetItemInfoInstant
+  C_Item.GetItemInfoInstant = function(id) return id, "", "", "", 0, id == 5003 and 1 or 9, 2 end
+  local SUM = { [5000] = { skill = "Tailoring", rank = 150, profit = 5000, cost = 3000 },
+    [5001] = { skill = "Tailoring", rank = 45, profit = -200, cost = 400 },
+    [5002] = { skill = "Tailoring", rank = 125, profit = 9000, cost = 100 } }
+  UpgradeFinderAPI = { recipe = function(id) return SUM[id] end }
+  local g, loading = ns.sources.recipes({ list }, "bag")
+  local got = {}
+  for _, e in ipairs(g[1] and g[1].entries or {}) do table.insert(got, e.name) end
+  check("bag recipes: packs too, not the bag itself, best profit first",
+    table.concat(got, ",") == "Pattern: Small Silk Pack,Pattern: Linen Bag,Pattern: Red Linen Bag")
+  check("a recipe still loading is retried", loading == true)
+  check("recipe row: skill and profit", strip(ns.actions.detail(g[1].entries[1])):find("^Tailoring 150  %+50s 0c") ~= nil)
+  check("recipe row: a loss", strip(ns.actions.detail(g[1].entries[2])):find("^Tailoring 45  %-2s 0c") ~= nil)
+  -- "tailoring": the recipes you know, then your trainer's, then recipe items.
+  check("a profession word lists recipes", select(1, M.parse("tailoring bag")) == "recipe"
+    and select(2, M.parse("tailoring bag")) == "tailoring bag")
+  local KNOWN = {
+    { prof = "Tailoring", name = "Linen Bag", product = 4238, source = "known", kind = "trivial", rank = 140, max = 150,
+      profit = 300 },
+    { prof = "Tailoring", name = "Small Silk Pack", product = 4245, source = "known", kind = "optimal", rank = 140,
+      max = 150, profit = 2500 },
+    { prof = "Tailoring", name = "Green Woolen Bag", product = 4241, source = "trainer", req = 145, price = 900,
+      rank = 140, max = 150, profit = 800 },
+    { prof = "Mining", name = "Copper Bar", product = 2840, source = "known", kind = "optimal", profit = 10 },
+  }
+  UpgradeFinderAPI = { recipe = function(id) return SUM[id] end, known = function() return KNOWN end }
+  g = ns.sources.recipes({ list }, "tailoring bag")
+  local titles = {}
+  for _, x in ipairs(g) do table.insert(titles, x.title) end
+  check("tailoring bag: known, trainer, items", #g == 3 and g[1].title == "Tailoring you know (skill 140/150), best profit first"
+    and g[1].entries[1].name == "Small Silk Pack" and g[1].entries[2].name == "Linen Bag"
+    and g[2].entries[1].name == "Green Woolen Bag" and g[3].title:find("^Recipe items") ~= nil)
+  check("known row: skill-up colour and profit", strip(ns.actions.detail(g[1].entries[1])):find("^skill%-up  %+25s 0c") ~= nil
+    and strip(ns.actions.detail(g[1].entries[2])):find("^no skill%-up  %+3s 0c") ~= nil)
+  check("trainer row: skill needed, cost to learn, profit",
+    strip(ns.actions.detail(g[2].entries[1])):find("^Tailoring 145  learn 9s 0c  %+8s 0c") ~= nil)
+  KNOWN[1].confidence, KNOWN[1].profit = "thin", 9000
+  g = ns.sources.recipes({ list }, "tailoring bag")
+  check("an unsure profit sorts after a sure one", g[1].entries[1].name == "Small Silk Pack"
+    and g[1].entries[2].name == "Linen Bag")
+  check("an unsure profit is grey with ?", strip(ns.actions.detail(g[1].entries[2])):find("%+90s 0c %?") ~= nil,
+    strip(ns.actions.detail(g[1].entries[2])))
+  KNOWN[1].confidence, KNOWN[1].profit = nil, 300
+  local asked = 0
+  local ufRecipe = UpgradeFinderAPI.recipe
+  UpgradeFinderAPI.recipe = function(id) asked = asked + 1 return ufRecipe(id) end
+  ns.sources.recipes({ list }, "mining")
+  check("recipe items of another profession are not priced", asked == 0)
+  UpgradeFinderAPI.recipe = ufRecipe
+  g = ns.sources.recipes({ list }, "mining")
+  check("another profession: only its recipes", g[1].entries[1].name == "Copper Bar" and #g[1].entries == 1)
+  g = ns.sources.recipes({ list }, "cooking")
+  check("a profession not seen yet: says to open its window", g[#g].title:find("Open your Cooking window") ~= nil)
+  UpgradeFinderAPI = nil
+  g = ns.sources.recipes({ list }, "")
+  check("without UpgradeFinder: recipes by name, title says why", #g[1].entries == 4 and g[1].title:find("UpgradeFinder") ~= nil)
+  C_Item.GetItemInfoInstant = instant
 end
 
 -- Omni's dungeon table is a copy of UpgradeFinder's: the two must match.

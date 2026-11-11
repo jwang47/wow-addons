@@ -566,6 +566,128 @@ function S.questsByZone(short)
 end
 
 ---------------------------------------------------------------------------
+-- Recipes ("bag recipes", "r: silk"): recipe items Omni knows (bags, bank,
+-- mail, the Auctionator scan), with what crafting gives when UpgradeFinder
+-- is loaded (UpgradeFinderAPI.recipe: skill, cost, sale, profit), best
+-- profit first.
+---------------------------------------------------------------------------
+S.RECIPE_CLASS = 9
+S.RECIPES_MAX = 40
+-- [item id] = recipe subclass (the profession, from the item alone: no
+-- server data) or false for an item that is not a recipe.
+local recipeClass = {}
+local function isRecipe(id)
+  if recipeClass[id] == nil then
+    local instant = api("C_Item.GetItemInfoInstant") or rawget(_G, "GetItemInfoInstant")
+    local _, _, _, _, _, class, sub = call(instant, id)
+    if class == nil then return false end -- not known yet: ask again next time
+    recipeClass[id] = class == S.RECIPE_CLASS and (sub or 0) or false
+  end
+  return recipeClass[id]
+end
+-- Recipe item subclass -> profession.
+S.RECIPE_SUBCLASS = { [1] = "Leatherworking", [2] = "Tailoring", [3] = "Engineering", [4] = "Blacksmithing",
+  [5] = "Cooking", [6] = "Alchemy", [7] = "First Aid", [8] = "Enchanting", [9] = "Fishing" }
+
+-- Splits a profession word off q: ("Tailoring", "bag") from "tailoring bag".
+local function professionOf(q)
+  local prof, rest = nil, {}
+  for w in q:gmatch("%S+") do
+    if not prof and ns.match.PROFESSIONS[w] then prof = ns.match.PROFESSIONS[w] else table.insert(rest, w) end
+  end
+  return prof, table.concat(rest, " ")
+end
+
+-- An AH sale LootValue is not sure of ("thin" market, no scan today).
+function S.unsure(r)
+  return type(r) == "table" and r.confidence ~= nil and r.confidence ~= "ok"
+end
+
+local function byProfit(a, b)
+  local pa, pb = a.recipe and a.recipe.profit or nil, b.recipe and b.recipe.profit or nil
+  if (pa ~= nil) ~= (pb ~= nil) then return pa ~= nil end
+  -- A sure profit before an unsure one: a thin market is bait.
+  local ua, ub = S.unsure(a.recipe), S.unsure(b.recipe)
+  if pa and pb and ua ~= ub then return not ua end
+  if pa and pb and pa ~= pb then return pa > pb end
+  return a.name < b.name
+end
+
+local function group(title, hits)
+  table.sort(hits, byProfit)
+  local g = { kind = "recipe", title = title, entries = {}, more = math.max(0, #hits - S.RECIPES_MAX) }
+  for i = 1, math.min(#hits, S.RECIPES_MAX) do g.entries[i] = hits[i] end
+  return g
+end
+
+-- Groups and whether any recipe is still loading its tooltip. Three
+-- groups: the recipes you know (from your profession windows), the ones
+-- your trainer teaches (from the trainer window), and recipe items in your
+-- bags, bank, mail and the AH scan.
+function S.recipes(lists, q)
+  local uf = rawget(_G, "UpgradeFinderAPI")
+  local recipe = type(uf) == "table" and type(uf.recipe) == "function" and uf.recipe
+  local known = type(uf) == "table" and type(uf.known) == "function" and uf.known() or {}
+  local prof, words = professionOf(q)
+  local mine, trainer, profs = {}, {}, {}
+  for _, r in ipairs(known) do
+    if r.product and (not prof or r.prof == prof) and ns.match.allWords(norm(r.name), words) then
+      local hits = r.source == "trainer" and trainer or mine
+      local e = entry("item", r.product, r.name, { recipe = r })
+      e.key = r.source .. ":" .. r.prof .. ":" .. r.name
+      table.insert(hits, e)
+    end
+    if r.source == "known" then profs[r.prof] = r end
+  end
+  local items, seen, loading = {}, {}, false
+  for _, src in ipairs(lists) do
+    for _, e in ipairs(src) do
+      local sub = e.kind == "item" and not seen[e.id] and isRecipe(e.id)
+      -- Filter on the name and the profession first: each recipe asked of
+      -- UpgradeFinder costs a tooltip read and a price lookup.
+      local skill = sub and S.RECIPE_SUBCLASS[sub]
+      if sub and (not prof or skill == prof)
+        and ns.match.allWords(e.lname .. (skill and (" " .. norm(skill)) or ""), words) then
+        local sum = recipe and recipe(e.id)
+        do
+          seen[e.id] = true
+          if recipe and not sum then loading = true end
+          table.insert(items, entry("item", e.id, e.name, { where = e.where, owned = e.owned, recipe = sum or false }))
+        end
+      end
+    end
+  end
+  local groups = {}
+  -- "tailoring" is also a MageMentor command: commands that match stay on top.
+  if prof then
+    local cmds = {}
+    for _, src in ipairs(lists) do
+      for _, e in ipairs(src) do
+        if e.kind == "command" and ns.match.allWords(e.lname, q) then table.insert(cmds, e) end
+      end
+    end
+    if #cmds > 0 then table.insert(groups, { kind = "command", title = "Commands", entries = cmds }) end
+  end
+  local p = prof and profs[prof]
+  local mineTitle = (prof or "Recipes") .. " you know"
+    .. (p and p.rank and (" (skill " .. p.rank .. (p.max and ("/" .. p.max) or "") .. ")") or "") .. ", best profit first"
+  if #mine > 0 then table.insert(groups, group(mineTitle, mine)) end
+  if #trainer > 0 then table.insert(groups, group("To learn (trainer, profession window), best profit first", trainer)) end
+  if #items > 0 then
+    local title = recipe and "Recipe items (bags, bank, mail, AH), best profit first"
+      or "Recipe items (load UpgradeFinder for the profit)"
+    table.insert(groups, group(title, items))
+  end
+  -- A profession whose window you have not opened yet: say how to add it
+  -- (a header row with no entries).
+  if prof and not p and recipe then
+    table.insert(groups, { kind = "recipe", entries = {},
+      title = "|cff9d9d9dOpen your " .. prof .. " window (and its trainer) once, so Omni knows your recipes|r" })
+  end
+  return groups, loading
+end
+
+---------------------------------------------------------------------------
 -- Dungeons: ns.DUNGEONS (Dungeons.lua), found by name or short name ("bfd").
 -- Enter opens "loot: <short>", which lists each boss's drops as items.
 ---------------------------------------------------------------------------
@@ -663,6 +785,24 @@ function S.hasSources(id)
     if #ids(call(qdb.QueryItemSingle, id, k[1])) > 0 then return true end
   end
   return #ids(call(qdb.QueryItemSingle, id, "relatedQuests")) > 0
+    or #ids(call(qdb.QueryItemSingle, id, "questRewards")) > 0
+end
+
+-- The quests before qid (preQuestSingle, else preQuestGroup), first quest
+-- first, qid last. Stops at S.CHAIN_MAX or a loop.
+S.CHAIN_MAX = 25
+function S.questChain(qdb, qid)
+  local chain, seen = { qid }, { [qid] = true }
+  local at = qid
+  for _ = 1, S.CHAIN_MAX do
+    local pre = ids(call(qdb.QueryQuestSingle, at, "preQuestSingle"))[1]
+      or ids(call(qdb.QueryQuestSingle, at, "preQuestGroup"))[1]
+    if not pre or seen[pre] then break end
+    seen[pre] = true
+    table.insert(chain, 1, pre)
+    at = pre
+  end
+  return chain
 end
 
 -- Groups of source entries for an item, nearest first.
@@ -736,6 +876,35 @@ function S.itemSources(id)
       end
       table.insert(groups, g)
     end
+  end
+  -- Quests that give it: the reward quest, and the first quest of its chain
+  -- (where you start). A vendor may sell it only after such a quest.
+  local rewards = {}
+  for _, qid in ipairs(ids(call(qdb.QueryItemSingle, id, "questRewards"))) do
+    local name = call(qdb.QueryQuestSingle, qid, "name")
+    if type(name) == "string" and name ~= "" then
+      local chain = S.questChain(qdb, qid)
+      if #chain > 1 then
+        local first = call(qdb.QueryQuestSingle, chain[1], "name")
+        if type(first) == "string" and first ~= "" then
+          table.insert(rewards, entry("quest", chain[1], first, { questie = true,
+            chainNote = string.format("chain start, %d quests", #chain) }))
+        end
+      end
+      table.insert(rewards, entry("quest", qid, name, { questie = true,
+        chainNote = #chain > 1 and string.format("gives it, quest %d of %d", #chain, #chain) or "gives it" }))
+    end
+  end
+  if #rewards > 0 then
+    local at = #groups + 1
+    for i, g in ipairs(groups) do
+      if g.title == "Sold by" then
+        g.title = "Sold by (may need the quest first)"
+        at = i
+        break
+      end
+    end
+    table.insert(groups, at, { kind = "quest", title = "Reward from", entries = rewards })
   end
   -- The quests that need it: their giver is often near where it is found.
   local quests = {}

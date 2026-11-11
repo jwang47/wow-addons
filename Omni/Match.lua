@@ -19,7 +19,7 @@ for i, k in ipairs(M.GROUPS) do ORDER[k] = i end
 -- quests in your log (their entries have also = "quest").
 M.FILTERS = { i = "item", item = "item", s = "spell", spell = "spell", p = "place", z = "place",
   place = "place", w = "person", person = "person", n = "npc", npc = "npc", q = "quest", quest = "quest", l = "log", log = "log",
-  c = "command", cmd = "command", near = "near", nb = "near", d = "dungeon", dungeon = "dungeon", loot = "loot", from = "from" }
+  c = "command", cmd = "command", near = "near", nb = "near", d = "dungeon", dungeon = "dungeon", loot = "loot", from = "from", r = "recipe", recipe = "recipe" }
 
 function M.norm(s)
   s = tostring(s or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
@@ -33,7 +33,40 @@ function M.parse(text)
   local tag, rest = q:match("^(%a+):%s*(.*)$")
   if tag and M.FILTERS[tag] then return M.FILTERS[tag], rest end
   if q:sub(1, 1) == "@" then return "person", M.norm(q:sub(2)) end
+  -- "bag recipes", "patterns silk": a recipe word anywhere lists recipes.
+  local rest, found = {}, false
+  for w in q:gmatch("%S+") do
+    if M.RECIPE_WORDS[w] then found = true else table.insert(rest, w) end
+  end
+  if found then return "recipe", table.concat(rest, " ") end
+  -- "tailoring", "tailoring bag": a profession lists its recipes too.
+  for w in q:gmatch("%S+") do
+    if M.PROFESSIONS[w] then return "recipe", q end
+  end
   return nil, q
+end
+
+M.RECIPE_WORDS = { recipe = true, recipes = true, pattern = true, patterns = true, formula = true, formulas = true,
+  plans = true, schematic = true, schematics = true }
+-- Profession words ("tailoring" or "tailor") -> the game's profession name.
+M.PROFESSIONS = { tailoring = "Tailoring", tailor = "Tailoring", leatherworking = "Leatherworking",
+  blacksmithing = "Blacksmithing", alchemy = "Alchemy", engineering = "Engineering", enchanting = "Enchanting",
+  cooking = "Cooking", mining = "Mining" }
+-- Words that also match other names: "bag" finds packs and pouches.
+M.SYNONYMS = { bag = { "bag", "pack", "pouch", "satchel", "sack", "quiver" } }
+
+-- Does every word of q appear in lname (a word, its singular, or a synonym)?
+function M.allWords(lname, q)
+  for w in q:gmatch("%S+") do
+    local single = w:match("^(.-)s$")
+    local opts = M.SYNONYMS[w] or (single and M.SYNONYMS[single]) or { w, single }
+    local hit = false
+    for _, o in ipairs(opts) do
+      if o ~= "" and lname:find(o, 1, true) then hit = true break end
+    end
+    if not hit then return false end
+  end
+  return true
 end
 
 local function words(q)
