@@ -793,6 +793,10 @@ do
   local s1, s2 = shop("ShoppingTooltip1", 300, 400), shop("ShoppingTooltip2", 300, 400)
   ns.open("silk")
   GameTooltip.owner = OmniFrame
+  s2.NumLines = function() return 0 end
+  ns.placeCompare()
+  check("compare: an empty comparison is hidden", not s2:IsShown())
+  s2.NumLines, s2.shown = nil, true
   UIParent.GetRight = function() return 1700 end
   local tl, tr, tb = 700, 1000, 600
   GameTooltip.GetLeft = function() return tl end

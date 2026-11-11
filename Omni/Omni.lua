@@ -157,7 +157,11 @@ local function shopping(tt)
     or { rawget(_G, "ShoppingTooltip1"), rawget(_G, "ShoppingTooltip2") }
   local out = {}
   for _, s in ipairs(list) do
-    if type(s) == "table" and s.IsShown and s:IsShown() then table.insert(out, s) end
+    if type(s) == "table" and s.IsShown and s:IsShown() then
+      -- An empty comparison (seen on Forever for a bag) is a blank box: hide it.
+      if s.NumLines and call(s.NumLines, s) == 0 then s:Hide()
+      else table.insert(out, s) end
+    end
   end
   return out
 end
