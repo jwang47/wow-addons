@@ -1,0 +1,3 @@
+-- Empty on purpose. The .toc lists this file, so new code can go here and
+-- load with /reload; a file the .toc does not list needs a full game restart.
+-- Use the next free SpareN.lua, then rename it before a release (AGENTS.md).
