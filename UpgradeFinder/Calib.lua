@@ -150,11 +150,25 @@ function C.record(id, name, amount, crit, resisted, absorbed, sp)
     spells[id] = t
   end
   t.dmg = t.dmg + amount
-  if crit then t.crits = t.crits + 1 return end
+  if crit then
+    t.crits = t.crits + 1
+    -- Full crits, for the crit bonus (C.critBonus).
+    if (resisted or 0) == 0 and (absorbed or 0) == 0 then t.cn, t.cd = (t.cn or 0) + 1, (t.cd or 0) + amount end
+    return
+  end
   t.hits = t.hits + 1
   if (resisted or 0) > 0 or (absorbed or 0) > 0 then return end
   t.n, t.sp, t.d = t.n + 1, t.sp + sp, t.d + amount
   t.spsp, t.spd = t.spsp + sp * sp, t.spd + sp * amount
+end
+
+-- The extra damage of a crit of this spell (0.5 = +50%), measured: the
+-- average full crit against the average full hit. nil below MIN_CRITS.
+C.MIN_CRITS = 10
+function C.critBonus(t)
+  if not t or (t.cn or 0) < C.MIN_CRITS or (t.n or 0) < C.MIN_HITS or t.d <= 0 then return nil end
+  local b = (t.cd / t.cn) / (t.d / t.n) - 1
+  return math.max(0.25, math.min(1.5, b))
 end
 
 function C.miss(id, name)

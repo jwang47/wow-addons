@@ -156,7 +156,7 @@ ns.DUNGEONS = {
   { "Shadowfang Keep", "SFK", 11, 30, { "Arugal", 111 } },
 }
 
-for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Craft.lua", "Stats.lua", "Calib.lua", "Spells.lua", "Build.lua", "UI.lua", "Weights.lua", "BuildUI.lua" }) do
+for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Craft.lua", "Stats.lua", "Calib.lua", "Spells.lua", "Build.lua", "UI.lua", "Weights.lua", "BuildUI.lua", "Spare1.lua" }) do
   assert(loadfile(root .. "UpgradeFinder/" .. file))("UpgradeFinder", ns)
 end
 local S = ns.score
@@ -809,6 +809,115 @@ check("/uf build opens it", ns.buildFrame:IsShown())
 Bd.delete("hood")
 check("build: delete", #Bd.names() == 0)
 Bd.reset()
+
+-- Leveling-speed score (Spare1.lua) --------------------------------------------
+local G = ns.grind
+check("spell text: area spells", SPL.isArea("Ice shards pelt the target area doing 352 Frost damage over 8 sec.")
+  and SPL.isArea("causing 97 to 105 Arcane damage to all targets within 10 yards")
+  and not SPL.isArea("Launches a bolt of frost at the enemy, causing 174 to 190 Frost damage"))
+BAR = { [1] = 837, [2] = 2137, [3] = 8427, [4] = 865 }
+SPELLS = {
+  [837] = { "Frostbolt", 3000, "Launches a bolt of frost at the enemy, causing 174 to 190 Frost damage.", 0, 100 },
+  [2137] = { "Fire Blast", 0, "Blasts the enemy for 103 to 127 Fire damage.", 8000, 115 },
+  [8427] = { "Blizzard", 0, "Ice shards pelt the target area doing 352 Frost damage over 8 sec.", 0, 520 },
+  [865] = { "Frost Nova", 0, "Blasts enemies near the caster for 52 to 59 Frost damage to all enemies within 10 yards.", 25000, 85 },
+}
+local gbars = SPL.calibrate(SPL.fromBars())
+local function spell(name) for _, s in ipairs(gbars) do if s.name == name then return s end end end
+check("bars: Blizzard is a channel of its whole duration", spell("Blizzard").channel and spell("Blizzard").cast == 8
+  and spell("Blizzard").area and not spell("Frostbolt").area)
+check("bars: area coefficient is a third", math.abs(spell("Blizzard").dotCoef - 1 / 3) < 1e-9)
+local single = SPL.rotation(gbars, 0, 0, 1)
+check("rotation: one target leaves the area spells out", #single.parts == 2 and single.parts[1][1].name == "Frostbolt")
+check("perCast: crit bonus", math.abs(SPL.perCast(spell("Frostbolt"), 0, 0.1, 1, { bonus = 1 }) - 182 * 1.1) < 1e-9
+  and math.abs(SPL.perCast(spell("Frostbolt"), 0, 0.1, 1) - 182 * 1.05) < 1e-9)
+check("perCast: damage over time does not crit", SPL.perCast(spell("Blizzard"), 0, 0.5, 1) == 352)
+local function gstate(mode)
+  return { mode = mode, class = "MAGE", level = 32, school = "frost", sp = 40, crit = 0.05, intPerCrit = 32,
+    manaPerInt = 15, mana = 1700, spi = 60, spiRegen = 0.125, hit = 0, mp5 = 0, drink = G.drinkRate(32),
+    overhead = G.OVERHEAD[mode], mobs = 4, critBonus = 0.5, list = gbars }
+end
+check("water by level", math.abs(G.drinkRate(32) - 1344 / 27) < 1e-9 and math.abs(G.drinkRate(3) - 151 / 18) < 1e-9)
+local sp1, parts = G.speed(gstate("grind"))
+check("speed: DPS times the share of time casting", parts.uptime > 0.3 and parts.uptime < 0.8
+  and math.abs(sp1 - parts.dps * parts.uptime) < 1e-9)
+check("speed: more spell damage is faster", G.change(gstate("grind"), { sp = 10 }) > 0)
+check("speed: Stamina does not change it", G.change(gstate("grind"), { sta = 10 }) == 0)
+local gbase = { sp = 1, frost = 1, fire = 0.3, arcane = 0.3, int = 0.5, spi = 0.4, mp5 = 1, sta = 0.3, armor = 0.02,
+  spcrit = 8, sphit = 8, slay = 0.1 }
+local gw = G.derive(gstate("grind"), gbase)
+print(string.format("     grind: sp %.3f int %.3f spi %.3f mp5 %.3f crit %.3f hit %.3f sta %.3f", gw.sp, gw.int, gw.spi, gw.mp5, gw.spcrit, gw.sphit, gw.sta))
+check("grind weights: spell damage is the unit, frost the same", gw.sp == 1 and gw.frost == 1 and gw.fire == 0.3)
+check("grind weights: Intellect, Spirit, mp5 worth something, below spell damage",
+  gw.int > 0 and gw.int < 1 and gw.spi > 0 and gw.spi < 1 and gw.mp5 > 0.3 and gw.mp5 < 2)
+check("grind weights: 1% crit is worth far less than the hand-set 8", gw.spcrit > 0.5 and gw.spcrit < 4)
+check("grind weights: Stamina and armor keep the hand-set weights", gw.sta == 0.3 and gw.armor == 0.02)
+local capped = gstate("grind")
+capped.hit = 3
+check("grind weights: hit is worth nothing at the cap", G.derive(capped, gbase).sphit == 0 and gw.sphit > 0)
+local twice = gstate("grind")
+twice.critBonus = 1
+check("grind weights: a bigger crit bonus, more for crit", G.derive(twice, gbase).spcrit > gw.spcrit * 1.5)
+local aw, ainfo = G.derive(gstate("aoe"), gbase)
+print(string.format("     aoe:   sp %.3f int %.3f spi %.3f mp5 %.3f crit %.3f hit %.3f sta %.3f", aw.sp, aw.int, aw.spi, aw.mp5, aw.spcrit, aw.sphit, aw.sta))
+check("aoe: Blizzard is the spell", ainfo.parts.spell.name == "Blizzard")
+check("aoe weights: crit is worth nothing (damage over time)", aw.spcrit == 0)
+check("aoe weights: Intellect beats spell damage", aw.int > aw.sp and aw.sp > 0 and aw.sp < 1)
+check("aoe weights: Stamina and armor count double", aw.sta == 0.6 and aw.armor == 0.04)
+local nobars = gstate("aoe")
+nobars.list = { spell("Frostbolt") }
+check("aoe: no area spell, no weights", G.derive(nobars, gbase) == nil)
+-- The mode: /uf mode, the saved weights, the item scores and the tooltip.
+UnitPowerMax = function() return 1700 end
+UnitStat = function() return 60, 60, 0, 0 end
+GetSpellBonusDamage = function() return 40 end
+GetSpellCritChance = function() return 5 end
+P.level = 32
+check("mode: weights by default", G.mode() == "weights" and G.weights() == nil)
+local keyBefore = ns.scan.cacheKey()
+local hood = { "Silk Hood", "Head", "+6 Intellect", "+4 Stamina" }
+local handSet = ns.valueOf(hood)
+chat = {}
+SlashCmdList.UPGRADEFINDER("mode grind")
+check("/uf mode grind turns it on and says the weights", G.mode() == "grind" and G.weights() ~= nil
+  and table.concat(chat, "|"):find("1 point is worth: Spell damage 1, Intellect", 1, true) ~= nil)
+check("mode: the item score uses the model's weights",
+  math.abs(ns.valueOf(hood) - (6 * G.weights().int + 4 * G.weights().sta)) < 1e-9 and ns.valueOf(hood) ~= handSet)
+check("mode: the saved scores get a new key", ns.scan.cacheKey() ~= keyBefore)
+check("mode: the button shows it", ns.modeButton.text == "Mode: Single")
+local goff = St.derive({ sp = 20 }, { class = "MAGE", level = 32, sp = 40, spcrit = 5 }, mw, "INVTYPE_HEAD")
+check("tooltip: leveling speed line", find(goff, "Leveling speed") ~= nil and find(goff, "Leveling speed")[3] == true)
+SlashCmdList.UPGRADEFINDER("mode aoe")
+check("/uf mode aoe", G.mode() == "aoe" and G.weights().spcrit == 0 and UpgradeFinderDB.grind["MAGE:aoe"].spell == "Blizzard")
+SlashCmdList.UPGRADEFINDER("mobs 8")
+check("/uf mobs", G.mobs() == 8 and UpgradeFinderDB.grind["MAGE:aoe"].mobs == 8)
+SlashCmdList.UPGRADEFINDER("critbonus 100")
+check("/uf critbonus", G.critBonus() == 1)
+UpgradeFinderDB.opts.critBonus, UpgradeFinderDB.opts.mobs = nil, nil
+-- A mage with MageMentor: its weights give Stamina and armor.
+MageMentorAPI = { parseStats = function() return {} end,
+  score = function(st) return (st.sta or 0) * 0.7 + (st.armor or 0) * 0.05 + (st.sp or 0) + (st.frost or 0) end }
+SlashCmdList.UPGRADEFINDER("mode grind")
+check("mode: MageMentor's weights for the stats outside the model",
+  G.weights().sta == 0.7 and G.weights().armor == 0.05 and ns.valueOf({ "x", "y", "+10 Stamina" }) == 7)
+MageMentorAPI = nil
+BAR = {}
+chat = {}
+SlashCmdList.UPGRADEFINDER("mode weights")
+SlashCmdList.UPGRADEFINDER("mode aoe")
+check("mode: no spells on the bars, the mode stays off", G.mode() == "weights"
+  and table.concat(chat, "|"):find("no area damage spell", 1, true) ~= nil)
+check("mode: weights again, the hand-set score", ns.valueOf(hood) == handSet and ns.scan.cacheKey() == keyBefore)
+P.class = "WARRIOR"
+chat = {}
+SlashCmdList.UPGRADEFINDER("mode grind")
+check("mode: not for a warrior", G.mode() == "weights" and table.concat(chat, "|"):find("damage casters", 1, true) ~= nil)
+P.class, P.level = "MAGE", 22
+UnitPowerMax, UnitStat, GetSpellBonusDamage, GetSpellCritChance = nil, nil, nil, nil
+-- The crit bonus measured from the combat log (Calib.lua).
+local Cal = ns.calib
+check("calib: crit bonus needs enough crits", Cal.critBonus({ n = 30, d = 3000, cn = 3, cd = 600 }) == nil)
+check("calib: crit bonus from full hits and crits", math.abs(Cal.critBonus({ n = 30, d = 3000, cn = 12, cd = 2400 }) - 1) < 1e-9)
 GetActionInfo, GetSpellInfo, GetSpellDescription, GetSpellBaseCooldown, GetSpellPowerCost = nil, nil, nil, nil, nil
 
 -- Resizable window --------------------------------------------------------------

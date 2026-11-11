@@ -70,6 +70,7 @@ local function labels()
   buttons.sort:SetText(o.sort == "pergold" and "Per gold" or "Biggest gain")
   buttons.money:SetText(o.affordable and "Can afford" or "Any price")
   buttons.from:SetText(ns.FROM_LABEL[o.from or "all"])
+  if buttons.mode then buttons.mode:SetText("Mode: " .. (ns.grind and ns.grind.LABEL[ns.grind.mode()] or "Weights")) end
 end
 
 function ns.paint()
@@ -309,6 +310,25 @@ local function build()
   bbtn:SetText("Build")
   bbtn:SetScript("OnClick", function() ns.toggleBuild() end)
   ns.buildButton = bbtn
+  -- Score mode (Spare1.lua): hand-set weights, or leveling speed.
+  local mbtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  mbtn:SetSize(88, 18)
+  mbtn:SetPoint("RIGHT", bbtn, "LEFT", -4, 0)
+  mbtn:SetScript("OnClick", function() if ns.grind then ns.grind.cycle() ns.paint() end end)
+  mbtn:SetScript("OnEnter", function(self)
+    local tt = rawget(_G, "GameTooltip")
+    if not (tt and ns.grind) then return end
+    tt:SetOwner(self, "ANCHOR_BOTTOM")
+    tt:AddLine("Score mode")
+    tt:AddLine("Weights: the hand-set stat weights.", 0.8, 0.8, 0.8)
+    tt:AddLine("Single: leveling speed, one target at a time.", 0.8, 0.8, 0.8)
+    tt:AddLine("AoE: leveling speed with pulls and your area spell.", 0.8, 0.8, 0.8)
+    for _, l in ipairs(ns.grind.status()) do tt:AddLine(l, 1, 0.82, 0, true) end
+    tt:Show()
+  end)
+  mbtn:SetScript("OnLeave", function() local tt = rawget(_G, "GameTooltip") if tt then tt:Hide() end end)
+  buttons.mode = mbtn
+  ns.modeButton = mbtn
 
   -- Five toggle buttons in one row: slot, level, sort, price, source.
   local x = 10
@@ -416,6 +436,8 @@ local HELP = {
   "/uf config - the Weights panel (also the Weights button on the window)",
   "/uf weights - your stat weights; /uf weight STAT N to change one, /uf weight STAT default to undo it",
   "/uf weight reset - back to the default weights for your spec",
+  "/uf mode grind|aoe|weights - score by leveling speed (one target, or AoE pulls) or by the hand-set weights; /uf mode shows the weights in use",
+  "/uf mobs N - mobs in an AoE pull; /uf critbonus PERCENT - the extra damage of your spell crits (50, or 100 with a talent)",
   "/uf save NAME - save your weights as a preset; /uf load NAME, /uf presets, /uf delete NAME",
   "/uf reset - forget the saved item scores (they are kept between sessions)",
   "/uf where - turn the \"Get it:\" lines on item tooltips on or off (needs Questie)",
@@ -563,6 +585,9 @@ function ns.slash(msg)
   elseif cmd == "weight" and tonumber(b) then
     ns.setWeight(a, tonumber(b))
     ns.reweigh(a .. " = " .. b)
+  elseif (cmd == "mode" or cmd == "mobs" or cmd == "critbonus") and ns.grind then
+    ns.grind.slash(cmd, a)
+    ns.paint()
   elseif cmd == "config" then
     ns.open() ns.toggleWeights(true)
   else ns.toggle() end

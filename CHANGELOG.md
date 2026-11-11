@@ -7,6 +7,16 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## UpgradeFinder 0.2.0
 
+- New: score modes for damage casters (the Mode button, or `/uf mode`).
+  **Single** and **AoE** rank gear by leveling speed (damage times the share
+  of the time you cast and do not drink) and not by burst damage. The stat
+  weights come from your own spells, mana and level. AoE mode uses your
+  area spell (Blizzard): crit counts for nothing there, Intellect and
+  Stamina count for more. **Weights** is the old score. The row tooltip
+  shows the leveling speed change.
+- Fix: the DPS estimate no longer takes Blizzard or Frost Nova for a
+  single-target spell, and it can use a crit bonus above +50%
+  (`/uf critbonus`).
 - New: crafting lines on recipes. Hover a pattern or other recipe item, or
   a recipe in your profession window, to see the cost to craft, what the
   made item sells for (AH, vendor or disenchant), the profit or loss, and

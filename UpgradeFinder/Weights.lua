@@ -41,7 +41,9 @@ function ns.paintWeights()
   local more = #names - PRESETS
   ui.more:SetText(more > 0 and (more .. " more: /uf presets, /uf load NAME") or "")
   local mm = ns.class() == "MAGE" and type(rawget(_G, "MageMentorAPI")) == "table"
-  ui.note:SetText(mm and "|cffff8040A mage with MageMentor uses MageMentor's weights (/mm weight).|r"
+  local mode = ns.grind and ns.grind.mode() ~= "weights" and ns.grind.weights() and ns.grind.LABEL[ns.grind.mode()]
+  ui.note:SetText(mode and ("|cffff8040Score mode " .. mode .. ": the leveling-speed weights are in use (/uf mode). These give Stamina and armor.|r")
+    or mm and "|cffff8040A mage with MageMentor uses MageMentor's weights (/mm weight).|r"
     or "Gold: changed from the default. Enter or click away to apply.")
 end
 
