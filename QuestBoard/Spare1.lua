@@ -111,11 +111,12 @@ function ns.stopPlace(s)
   return (ns.place(s.seed):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
 end
 
--- "4.0k xp  1 min", "~" on a guess.
+-- "24%/h  1 min" (XP per minute as a share of your level per hour), "~" on a guess.
 function ns.stopStats(s)
   local parts = {}
-  if s.xp and s.xp > 0 then table.insert(parts, D.short(s.xp) .. " xp") end
-  if s.secs then table.insert(parts, (s.guess and "~" or "") .. D.mins(s.secs)) end
+  local rate = D.rate(s.xp, s.secs)
+  if rate and rate > 0 then table.insert(parts, (s.guess and "~" or "") .. D.rateText(rate)) end
+  if s.secs then table.insert(parts, D.mins(s.secs)) end
   return table.concat(parts, "  ")
 end
 
