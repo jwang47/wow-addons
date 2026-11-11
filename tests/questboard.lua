@@ -708,8 +708,8 @@ check("turn-in: no item says so", D.rewardTag({ steps = 0, count = 0 }) == "no i
 -- Two-line quest rows: line 1 how far, line 2 the same two numbers on
 -- every quest, then a gear line only when there is gear.
 check("row: line 1 has only the distance", strip(ns.place(q127)) == "300 yd" and strip(ns.place({ kind = "log", left = {} })) == "no place")
-check("row: a hand-in shows its XP and the run", strip(ns.stats(q127)) == "1.5k xp  <1 min")
-check("row: a pick-up shows XP and a guessed time", strip(ns.stats({ kind = "pickup", xp = 625, secs = 180 })):match("^625 xp  ~3 min$") ~= nil)
+check("row: a hand-in shows XP per minute and the run", strip(ns.stats(q127)) == "1.2k xp/m  <1 min")
+check("row: a pick-up shows a guessed XP per minute", strip(ns.stats({ kind = "pickup", xp = 625, secs = 180 })) == "~208 xp/m  3 min")
 check("row: a hand-in names its reward", strip(ns.rewardLine(q127)) == "Reward: [Murloc Charm] or 1 more")
 check("row: a chain names the gear and how far on", strip(ns.rewardLine(q125)) == "Leads to [Ironforge Gladius], 2 quests on")
 check("row: XP only gets no gear line", ns.rewardLine(q122) == nil)
@@ -1144,7 +1144,7 @@ check("stops: a stop in another zone names it", strip(ns.stopWhat(stops[1])) == 
 GetRealZoneText = function() return "Dustwallow Marsh" end
 check("stops: not when you are in that zone", strip(ns.stopWhat(stops[1])) == "3 hand-ins" and ns.zoneOf(camp1) == "Dustwallow Marsh")
 D.zoneName, GetRealZoneText, camp1.zone = realZoneName, realZoneText, nil
-check("stops: the head's numbers", ns.stopStats(stops[1]) == "4.0k xp  <1 min" and ns.stopStats(stops[2]) == "1.3k xp  ~4 min" and ns.stopPlace(stops[3]) == "2.8k yd")
+check("stops: the head's numbers", ns.stopStats(stops[1]) == "17k xp/m  <1 min" and ns.stopStats(stops[2]) == "~325 xp/m  4 min" and ns.stopPlace(stops[3]) == "2.8k yd")
 check("stops: ? to hand in, ! to pick up, a grey ? to finish",
   ns.stopMark(camp1) == "|cffffd100?|r" and ns.stopMark(thorsen) == "|cffffd100!|r" and ns.stopMark(crystal) == "|cff909090?|r")
 check("stops: only a quest to finish has lines under it", #ns.stopLines(camp1) == 0 and #ns.stopLines(thorsen) == 0 and ns.stopLines(crystal)[1]:find("Pendant", 1, true) ~= nil)
@@ -1223,6 +1223,14 @@ D.resetModules()
 mods.DistanceUtils.GetNearestSpawnForQuest = function() error("changed") end
 local rough = D.collect({})
 check("a failing Questie call is skipped", #rough.log == 2)
+
+-- XP as a share of the level, so the player need not work it out.
+UnitXPMax = function() return 50000 end
+check("percent: a quest's XP", D.xpText(600) == "1.2%" and D.xpText(10) == "<0.1%" and D.xpText(6000) == "12%")
+check("percent: XP per minute", D.rateText(250) == "0.5%/m" and D.rateText(0) == "0%/m")
+check("percent: a row shows it", strip(ns.stats({ kind = "pickup", xp = 600, secs = 180 })) == "~0.4%/m  3 min")
+UnitXPMax = nil
+check("percent: raw XP when the game gives no level size", D.xpText(625) == "625 xp" and D.rateText(250) == "250 xp/m")
 
 -- Red quests (Spare4.lua): 0 XP per minute, and the safe ones can be dropped.
 assert(loadfile(root .. "QuestBoard/Spare4.lua"))("QuestBoard", ns);

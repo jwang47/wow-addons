@@ -194,11 +194,11 @@ function ns.place(e)
   return ""
 end
 
--- Line 2, right: the same two numbers on every quest, "625 xp  3 min",
+-- Line 2, right: the same two numbers on every quest, "0.4%/m  3 min",
 -- coloured by how good the XP per minute is. "~" marks a guess.
 function ns.stats(e, kind)
   if e.toFinisher then return "" end
-  if e.red then return "|cffff55550 xp/m, red|r" end
+  if e.red then return "|cffff5555" .. D.rateText(0) .. ", red|r" end
   local secs, guess
   if e.kind == "turnin" then
     secs = e.dist and D.travelSecs(e.dist, e)
@@ -209,9 +209,12 @@ function ns.stats(e, kind)
   else
     secs, guess = e.secs, true
   end
+  -- XP per minute as a share of your level ("0.4%/m"): the number to
+  -- compare. The quest's own XP is in the tooltip.
+  local rate = e.rate or D.rate(e.xp, secs)
   local parts = {}
-  if e.xp and e.xp > 0 then table.insert(parts, D.short(e.xp) .. " xp") end
-  if secs then table.insert(parts, (guess and "~" or "") .. D.mins(secs)) end
+  if rate and rate > 0 then table.insert(parts, (guess and "~" or "") .. D.rateText(rate)) end
+  if secs then table.insert(parts, D.mins(secs)) end
   return D.tierText(e, table.concat(parts, "  "))
 end
 
@@ -244,11 +247,11 @@ function ns.meta(e, kind)
   if e.kind == "log" and not e.done and kind == "active" and e.left and #e.left > 0 then
     table.insert(parts, "~" .. D.mins(D.travelSecs(e.dist, e) + D.workSecs(e)))
   end
-  if e.kind == "turnin" and e.xp then table.insert(parts, D.tierText(e, D.short(e.xp) .. " xp")) end
+  if e.kind == "turnin" and e.xp then table.insert(parts, D.tierText(e, D.xpText(e.xp))) end
   -- A hand-in: the run there, so you can weigh the trip against the XP.
   if e.kind == "turnin" and e.dist then table.insert(parts, D.mins(D.travelSecs(e.dist, e))) end
   if e.toFinisher then table.insert(parts, "|cff909090drop unknown|r")
-  elseif (e.kind == "pickup" or e.kind == "area" or e.kind == "zone") and e.rate then table.insert(parts, D.tierText(e, "~" .. D.short(e.rate) .. " xp/m")) end
+  elseif (e.kind == "pickup" or e.kind == "area" or e.kind == "zone") and e.rate then table.insert(parts, D.tierText(e, "~" .. D.rateText(e.rate))) end
   if e.dist then table.insert(parts, D.yardsText(e.dist))
   elseif e.far then table.insert(parts, "|cff909090far|r")
   elseif e.kind == "log" and not e.done then table.insert(parts, "|cff909090no place|r")
@@ -290,7 +293,7 @@ local function tooltip(r)
   if e.kind == "zone" then
     tip:AddLine(e.name .. (e.dist and ("  (" .. D.yards(e.dist) .. ")") or "  (far)"), 1, 1, 1)
     tip:AddLine(D.zoneText(e), 0.8, 0.8, 0.8)
-    if e.rate then tip:AddLine(string.format("~%s XP per minute, %s XP there, trip counted", D.short(e.rate), D.short(e.xp)), 0.6, 0.8, 1) end
+    if e.rate then tip:AddLine(string.format("~%s of your level per minute (%s XP), %s XP there, trip counted", (D.rateText(e.rate):gsub("/m$", "")), D.short(e.rate), D.short(e.xp)), 0.6, 0.8, 1) end
     for i, s in ipairs(e.stops) do
       if i > 12 then tip:AddLine("  (" .. (#e.stops - 12) .. " more)", 0.6, 0.6, 0.6) break end
       local what = s.kind == "turnin" and "hand in" or (s.kind == "pickup" or s.kind == "party") and "pick up" or "in your log"
@@ -340,7 +343,7 @@ local function tooltip(r)
   if e.kind == "area" then
     tip:AddLine(e.name .. "  (" .. D.yards(e.dist) .. ")", 1, 1, 1)
     tip:AddLine(D.areaText(e), 0.8, 0.8, 0.8)
-    if e.rate then tip:AddLine(string.format("~%s XP per minute, %s XP here", D.short(e.rate), D.short(e.xp)), 0.6, 0.8, 1) end
+    if e.rate then tip:AddLine(string.format("~%s of your level per minute (%s XP), %s XP here", (D.rateText(e.rate):gsub("/m$", "")), D.short(e.rate), D.short(e.xp)), 0.6, 0.8, 1) end
     for _, s in ipairs(e.stops) do
       local what = s.kind == "turnin" and "hand in" or (s.kind == "pickup" or s.kind == "party") and "pick up" or "objective"
       tip:AddLine("- " .. s.name .. "  (" .. what .. ")", rgb(s.color))
@@ -365,14 +368,14 @@ local function tooltip(r)
   tip:AddLine(lvl, 0.8, 0.8, 0.8)
   local red = ns.redNote and ns.redNote(e)   -- Spare4.lua
   if red then tip:AddLine(red, 1, 0.4, 0.4) end
-  if e.xp then tip:AddLine(D.short(e.xp) .. " XP", 0.6, 0.8, 1) end
+  if e.xp then tip:AddLine(D.short(e.xp) .. " XP" .. (D.levelPct(e.xp) and (" (" .. D.xpText(e.xp) .. " of your level)") or ""), 0.6, 0.8, 1) end
   if e.kind == "turnin" and e.dist then
-    tip:AddLine(string.format("About %s to %s, ~%s XP per minute of the trip", D.mins(D.travelSecs(e.dist, e)), e.by == "fly" and "fly there (if you have the flight path)" or "run there", D.short(e.rate)), 0.6, 0.8, 1)
+    tip:AddLine(string.format("About %s to %s, ~%s per minute of the trip", D.mins(D.travelSecs(e.dist, e)), e.by == "fly" and "fly there (if you have the flight path)" or "run there", (D.rateText(e.rate):gsub("/m$", ""))), 0.6, 0.8, 1)
   elseif e.kind == "turnin" and e.far then
     tip:AddLine("On another continent or in an instance: a boat, a flight or a dungeon run", 0.8, 0.5, 0.5)
   elseif e.rate and e.secs then
     local guess = (e.kind == "log" and not e.done) and select(2, D.workSecs(e))
-    tip:AddLine(string.format("~%s XP per minute (about %d min%s)", D.short(e.rate), math.max(1, math.floor(e.secs / 60 + 0.5)),
+    tip:AddLine(string.format("~%s per minute (about %d min%s)", (D.rateText(e.rate):gsub("/m$", "")), math.max(1, math.floor(e.secs / 60 + 0.5)),
       D.runSecs and D.runSecs(e) and (e.tag == "R" and ", a raid run" or ", a dungeon run")
         or guess and ", a guess until you make progress" or ""), 0.6, 0.8, 1)
     if e.by == "fly" then tip:AddLine("The trip is by flight (if you have the flight path)", 0.6, 0.8, 1) end

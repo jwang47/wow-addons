@@ -86,6 +86,10 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.2.0
 
+- XP shows as a share of your level, so you need not work it out: each
+  quest row and stop shows XP per minute as "0.4%/m" next to the time, and
+  the tooltips give the quest's XP as "1.2% of your level". Raw XP when
+  the game gives no level size.
 - Red quests (5 or more levels over you) count as 0 XP per minute and add
   nothing to a zone or an area. `/qb red` lists them and says which are safe
   to drop; `/qb abandon` asks for each safe one with the game's confirm box.

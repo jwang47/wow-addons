@@ -519,6 +519,9 @@ hand-in or a pick-up). It stays while you are within 600 yards
   (`GetQuestTagInfo`, else Questie's `GetQuestTagInfo`, else the suggested
   group size). `/qb dungeons off` keeps dungeon and raid quests to the Log
   tab (out of Doing, Nearby and Areas) and leaves their pick-ups out.
+- XP shows as a share of your level (`UnitXPMax`): a row shows XP per
+  minute as "0.4%/m" and the time; the tooltip has the quest's XP as a
+  percent and in raw XP.
 - A red quest (5 or more levels over you, not yet done) counts as 0 XP per
   minute: you cannot do it without a carry. It adds nothing to a zone or an
   area. `/qb red` lists the red quests in your log and says which are safe

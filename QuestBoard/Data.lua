@@ -1245,6 +1245,31 @@ function D.short(n)
   return tostring(math.floor(n + 0.5))
 end
 
+-- XP as a share of your level, so you need not work it out: "1.2%" for a
+-- quest, "0.4%/m" for XP per minute. Raw XP when the game gives no level
+-- size (the top level).
+function D.levelPct(xp)
+  local max = D.plain(call(rawget(_G, "UnitXPMax"), "player"))
+  if not (xp and type(max) == "number" and max > 0) then return nil end
+  return xp * 100 / max
+end
+local function pctText(p)
+  if p <= 0 then return "0%" end
+  if p < 0.1 then return "<0.1%" end
+  if p < 10 then return string.format("%.1f%%", p) end
+  return string.format("%d%%", math.floor(p + 0.5))
+end
+function D.xpText(xp)
+  local p = D.levelPct(xp)
+  if p then return pctText(p) end
+  return D.short(xp) .. " xp"
+end
+function D.rateText(rate)
+  local p = D.levelPct(rate)
+  if p then return pctText(p) .. "/m" end
+  return D.short(rate) .. " xp/m"
+end
+
 -- Compass point for an angle (0 = north, counter-clockwise).
 local POINTS = { "N", "NW", "W", "SW", "S", "SE", "E", "NE" }
 function D.compass(angle)
