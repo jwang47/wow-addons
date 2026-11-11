@@ -1,11 +1,16 @@
--- QuestBoard: a small floating list of the quests that matter now. Three
--- groups: quests to turn in (nearest finisher first), quests in your log
--- (nearest objective first) and quests you can pick up that fit your level
--- (best estimated XP per minute first). Click a row to pin the place on the
+-- QuestBoard: a small floating board of the quests that matter now, in
+-- four tabs for what you are doing: Doing (the quest you are on and the
+-- stops on the way), Nearby (what to chain next, best XP per minute with
+-- the walk counted), Areas (zones to go to or swap to) and Log (every
+-- quest in your log, by zone). The board picks Doing or Nearby by itself;
+-- a click on a tab keeps that tab. Click a row to pin the place on the
 -- map. /qb for the commands.
 local addonName, ns = ...
 QuestBoard = ns                     -- global, for /dump
-ns.VERSION = "0.1.1"
+-- GroupUp uses these; keep them stable: QuestBoardDB.doing (questID set),
+-- QuestBoard.click(e, button), QuestBoard.panel, row.entry. Ctrl-click on a
+-- quest row belongs to GroupUp.
+ns.VERSION = "0.2.0"
 local D = ns.data
 local call, api = D.call, D.api
 
@@ -14,16 +19,20 @@ local defaults = {
   sortLog = "near",      -- near | xp
   sortPickup = "xp",     -- near | xp
   maxAbove = 3,          -- pick-ups at most this many levels over you
-  rows = { active = 4, nearby = 4, area = 3, turnin = 6, log = 8, party = 5, pickup = 8, town = 2 },
+  rows = { onway = 5, next = 8, zones = 8, town = 2, members = 4 },
   collapsed = {},
+  showAll = {},      -- groups opened past their row limit ("+N more")
   combatAlpha = 0.35,
   hideTrackers = false,  -- hide the game's quest tracker (and Questie's)
   locked = false,        -- /qb lock: no dragging
   compact = false,       -- /qb compact: one line per quest, no "what to do" line
+  stops = true,          -- /qb stops: the Doing tab groups its quests by stop (Spare1.lua)
+  dungeons = true,       -- /qb dungeons off: dungeon and raid quests only in the Log tab
   party = true,          -- /qb party off: no party quests here, nor Questie's party objectives on the map
-  focus = true,          -- in combat and instances: only Next and Active until mouse-over
+  focus = true,          -- in combat and instances: only the quests you are on until mouse-over
   point = nil,           -- saved position { point, x, y }
   maxHeight = nil,       -- drag the grip (or /qb height N): scroll past it
+  width = 270,           -- drag the grip sideways (or /qb width N)
 }
 
 local function say(msg)
@@ -36,13 +45,21 @@ ns.say = say
 -- Look: the Glance "floating minimal" style. A see-through dark panel, no
 -- frame art, small text, colour only for quest level.
 ---------------------------------------------------------------------------
-local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6
+local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6   -- W: the board width, from ns.db.width
+local LVL_W = 26                 -- the level column: room for "33D"
+local TEXT_X = LVL_W + 6         -- where the name and the lines under it start
+local WRAP_MAX = 2               -- screen lines one text line may take
+ns.MIN_W, ns.MAX_W = 220, 560
 -- Spacing that shows the grouping: a quest's two lines sit close, quests
 -- have a small gap between them, groups a bigger one.
-local SUB_UP, ROW_GAP, GROUP_GAP = 3, 4, 10
+local SUB_UP, ROW_GAP, GROUP_GAP = 3, 8, 12
+local BAR_GAP = 4                -- space above a quest's progress bar
 local FONT, FONT_DIM = "GameFontHighlightSmall", "GameFontDisableSmall"
-local HEADS = { active = "Active", nearby = "Nearby", area = "Areas", turnin = "Turn in", log = "In your log", party = "Party has", pickup = "Pick up", town = "Town" }
-local ORDER = { "active", "nearby", "area", "turnin", "log", "party", "pickup", "town" }
+-- Where the board shows each kind of quest (for /qb why).
+ns.WHERE = { active = "in the Doing tab (you are on it)", nearby = "in the Log tab, and in Nearby (close by)",
+  turnin = "ready to hand in: the Log tab, and Nearby within 1000 yd", log = "in the Log tab, and in Nearby within 1000 yd",
+  party = "a party quest: Nearby within 1000 yd", pickup = "to pick up: Nearby within 1000 yd, else under its zone in Areas",
+  farPickup = "to pick up, far away: under its zone in the Areas tab" }
 
 local panel, rows, heads = nil, {}, {}
 ns.rows = rows
@@ -55,15 +72,23 @@ local function rgb(name) local c = D.COLORS[name] or D.COLORS.yellow return c[1]
 function ns.todo(e)
   local text = ns.todoWho(e)
   -- A hand-in shows what it gives, so you can judge the trip.
-  local tag = e.kind == "turnin" and D.rewardTag and D.rewardTag(e.chain) or D.chainTag and D.chainTag(e.chain)
+  local tag = e.kind == "turnin" and D.rewardTag and D.rewardTag(e.chain) or ns.chainNote(e)
   if tag then text = (text and (text .. "   ") or "") .. tag end
   return text
+end
+
+-- Where the chain leads, for the line under a quest. "XP only" is left
+-- out (the tooltip says it): only gear at the end is worth a line.
+function ns.chainNote(e)
+  local tag = D.chainTag and D.chainTag(e.chain)
+  if not tag or tag == "XP only" then return nil end
+  return (tag:gsub(", XP only$", ""))
 end
 
 -- The lines under an Active quest: each open objective (the first with
 -- where to find it), who in your party has it, and where the chain leads.
 ns.ACTIVE_LINES = 5
-function ns.activeLines(e)
+function ns.activeLines(e, noTag)
   local lines = {}
   for i, o in ipairs(e.left or {}) do
     local text = o.text
@@ -74,7 +99,7 @@ function ns.activeLines(e)
   end
   if #lines == 0 then local t = ns.todoBase(e) if t then table.insert(lines, t) end end
   if e.party and #e.party > 0 then table.insert(lines, "|cff99ccffParty: " .. D.partyText(e.party) .. "|r") end
-  local tag = D.chainTag and D.chainTag(e.chain)
+  local tag = not noTag and ns.chainNote(e)
   if tag then table.insert(lines, tag) end
   while #lines > ns.ACTIVE_LINES do table.remove(lines) end
   return lines
@@ -92,6 +117,8 @@ end
 
 function ns.todoBase(e)
   if e.kind == "area" then return D.areaText(e) end
+  if e.kind == "member" then return D.memberText(e) end
+  if e.kind == "zone" then return D.zoneText(e) end
   if e.kind == "town" then
     local where = D.zoneName(e.zone)
     return (e.role == "inn" and "Innkeeper" or "Flight master") .. (where and (", " .. where) or "")
@@ -102,7 +129,7 @@ function ns.todoBase(e)
     return (e.target and ("Hand in to " .. e.target) or "Hand it in") .. (where and (" in " .. where) or "")
   end
   if e.fromItem then
-    local what = e.item and ((e.dropHow == "vendor" and "Buy " or "Loot ") .. e.item) or "Starts from an item"
+    local what = e.startItem and ((e.dropHow == "vendor" and "Buy " or "Loot ") .. e.startItem) or "Starts from an item"
     local from = e.dropFrom and (" from " .. e.dropFrom) or (e.kind == "pickup" or e.kind == "party") and " (drop unknown)" or ""
     return what .. from .. (e.finisher and (", hand in to " .. e.finisher) or "")
   end
@@ -147,13 +174,66 @@ function ns.nextStep(st)
   local todo = ns.todoWho(e)
   if e.kind == "turnin" then todo = "Hand in " .. e.name .. (e.target and (" to " .. e.target) or "") end
   -- For a quest you are on: about how long the rest takes, at your pace.
-  local left = e == st.active[1] and e.left and #e.left > 0 and ("  ~" .. D.mins(D.travelSecs(e.dist) + D.workSecs(e)) .. " left") or ""
+  local left = e == st.active[1] and e.left and #e.left > 0 and ("  ~" .. D.mins(D.travelSecs(e.dist, e) + D.workSecs(e)) .. " left") or ""
   return todo and (todo .. (e.dist and ("  " .. D.yards(e.dist)) or "") .. left), e
 end
 
 -- Right-hand text of a row: progress, XP and run time (hand-ins), XP/min
 -- (pick-ups), distance. The
 -- progress is in the "what to do" line unless the board is compact.
+-- Quest rows (not zones, areas, towns or party members) use the two-line
+-- layout: line 1 the name and how far, line 2 what to do and what it pays.
+ns.QUEST_KINDS = { log = true, turnin = true, pickup = true, party = true }
+
+-- Line 1, right: how far, or why there is no distance.
+function ns.place(e)
+  if e.dist then return D.yardsText(e.dist) end
+  if e.far then return "|cff909090far|r" end
+  if e.toFinisher then return "|cff909090drop unknown|r" end
+  if e.kind == "log" and not e.done then return "|cff909090no place|r" end
+  return ""
+end
+
+-- Line 2, right: the same two numbers on every quest, "625 xp  3 min",
+-- coloured by how good the XP per minute is. "~" marks a guess.
+function ns.stats(e, kind)
+  if e.toFinisher then return "" end
+  local secs, guess
+  if e.kind == "turnin" then
+    secs = e.dist and D.travelSecs(e.dist, e)
+  elseif e.kind == "log" and not e.done and e.left and #e.left > 0 then
+    local work
+    work, guess = D.workSecs(e)
+    secs = D.travelSecs(e.dist, e) + work
+  else
+    secs, guess = e.secs, true
+  end
+  local parts = {}
+  if e.xp and e.xp > 0 then table.insert(parts, D.short(e.xp) .. " xp") end
+  if secs then table.insert(parts, (guess and "~" or "") .. D.mins(secs)) end
+  return D.tierText(e, table.concat(parts, "  "))
+end
+
+-- The gear line under a quest, or nil when it gives only XP:
+-- "Reward: [Rose Mantle]" or "Leads to [Seal of Wrynn], 4 quests on".
+function ns.rewardLine(e)
+  local info = e.chain
+  if not info then return nil end
+  local b = info.best
+  local good = b and b.gear and (b.quality or 2) >= 2
+  if e.kind == "turnin" then
+    local text = info.own and ("Reward: " .. D.itemText(info.own) .. (info.count > 1 and (" or " .. (info.count - 1) .. " more") or "")) or nil
+    if good and not info.here then
+      text = (text and (text .. ", then ") or "Leads to ") .. D.itemText(b)
+    end
+    return text
+  end
+  if not good then return nil end
+  if info.here then return "Reward: " .. D.itemText(b) end
+  local steps = info.steps or 0
+  return "Leads to " .. D.itemText(b) .. (steps > 0 and (", " .. steps .. (steps == 1 and " quest on" or " quests on")) or "")
+end
+
 function ns.meta(e, kind)
   local parts = {}
   if e.kind == "log" and ns.db and ns.db.compact then
@@ -161,14 +241,16 @@ function ns.meta(e, kind)
     if p ~= "" then table.insert(parts, p) end
   end
   if e.kind == "log" and not e.done and kind == "active" and e.left and #e.left > 0 then
-    table.insert(parts, "~" .. D.mins(D.travelSecs(e.dist) + D.workSecs(e)))
+    table.insert(parts, "~" .. D.mins(D.travelSecs(e.dist, e) + D.workSecs(e)))
   end
   if e.kind == "turnin" and e.xp then table.insert(parts, D.tierText(e, D.short(e.xp) .. " xp")) end
   -- A hand-in: the run there, so you can weigh the trip against the XP.
-  if e.kind == "turnin" and e.dist then table.insert(parts, D.mins(D.travelSecs(e.dist))) end
-  if (e.kind == "pickup" or e.kind == "area") and e.rate then table.insert(parts, D.tierText(e, "~" .. D.short(e.rate) .. " xp/m")) end
+  if e.kind == "turnin" and e.dist then table.insert(parts, D.mins(D.travelSecs(e.dist, e))) end
+  if e.toFinisher then table.insert(parts, "|cff909090drop unknown|r")
+  elseif (e.kind == "pickup" or e.kind == "area" or e.kind == "zone") and e.rate then table.insert(parts, D.tierText(e, "~" .. D.short(e.rate) .. " xp/m")) end
   if e.dist then table.insert(parts, D.yardsText(e.dist))
   elseif e.far then table.insert(parts, "|cff909090far|r")
+  elseif e.kind == "log" and not e.done then table.insert(parts, "|cff909090no place|r")
   elseif e.fromItem then table.insert(parts, "item") end
   return table.concat(parts, "  ")
 end
@@ -188,7 +270,7 @@ local function facing() return D.plain(call(rawget(_G, "GetPlayerFacing"))) end
 
 local function updateArrow(r)
   local e = r.entry
-  if not (e and e.angle) then r.arrow:Hide() return end
+  if r.noArrow or not (e and e.angle) then r.arrow:Hide() return end
   local f = facing()
   if not f then r.arrow:Hide() return end
   r.arrow:SetRotation(e.angle - f)
@@ -199,6 +281,52 @@ local function tooltip(r)
   local e, tip = r.entry, rawget(_G, "GameTooltip")
   if not (e and tip) then return end
   tip:SetOwner(r, "ANCHOR_LEFT")
+  if e.kind == "more" and e.tab then
+    tip:AddLine("Click: the " .. ns.TAB_NAMES[e.tab] .. " tab", 1, 1, 1)
+    tip:Show()
+    return
+  end
+  if e.kind == "zone" then
+    tip:AddLine(e.name .. (e.dist and ("  (" .. D.yards(e.dist) .. ")") or "  (far)"), 1, 1, 1)
+    tip:AddLine(D.zoneText(e), 0.8, 0.8, 0.8)
+    if e.rate then tip:AddLine(string.format("~%s XP per minute, %s XP there, trip counted", D.short(e.rate), D.short(e.xp)), 0.6, 0.8, 1) end
+    for i, s in ipairs(e.stops) do
+      if i > 12 then tip:AddLine("  (" .. (#e.stops - 12) .. " more)", 0.6, 0.6, 0.6) break end
+      local what = s.kind == "turnin" and "hand in" or (s.kind == "pickup" or s.kind == "party") and "pick up" or "in your log"
+      tip:AddLine("- [" .. (s.level or "?") .. "] " .. s.name .. "  (" .. what .. ")", rgb(s.color))
+    end
+    tip:AddLine(" ")
+    tip:AddLine(e.near and "Click: pin the nearest stop on the map" or "Far away: no pin from here", 0.5, 0.5, 0.5)
+    tip:AddLine(ns.listPinned({ e }) and "Alt-click: unpin these quests" or "Alt-click: pin all of them (keep them in Doing)", 0.5, 0.5, 0.5)
+    tip:Show()
+    return
+  end
+  if e.kind == "more" then
+    tip:AddLine(ns.db.showAll and ns.db.showAll[e.group] and "Click: back to the first rows" or "Click: show the whole group", 1, 1, 1)
+    for _, n in ipairs(e.hidden or {}) do tip:AddLine("- " .. n, 0.8, 0.8, 0.8) end
+    tip:Show()
+    return
+  end
+  if e.kind == "member" then
+    tip:AddLine(e.name .. (e.level and ("  level " .. e.level) or ""), 1, 1, 1)
+    local where = e.dist and (D.yards(e.dist) .. (e.angle and (" " .. D.compass(e.angle)) or "")) or e.zoneName or "place unknown"
+    tip:AddLine((e.status and (e.status .. ", ") or "") .. (e.hp and (e.hp .. "% health, ") or "") .. where, 0.8, 0.8, 0.8)
+    if #(e.shared or {}) > 0 then
+      tip:AddLine(" ")
+      tip:AddLine("Your quests they have (theirs / yours):", 0.6, 0.8, 1)
+      for _, s in ipairs(e.shared) do
+        local theirs = s.progress ~= "" and s.progress or "?"
+        local mine = s.mine ~= "" and s.mine or "-"
+        tip:AddLine("- " .. s.name .. "  " .. theirs .. " / " .. mine, 0.85, 0.85, 0.85)
+      end
+    end
+    if (e.theirs or 0) > 0 then tip:AddLine(e.theirs .. " of their quests you do not have (Party has)", 0.6, 0.6, 0.6) end
+    tip:AddLine(" ")
+    tip:AddLine("Click: pin where they are on the map", 0.5, 0.5, 0.5)
+    tip:AddLine("Progress needs Questie on their side too; /qb party off hides this", 0.5, 0.5, 0.5)
+    tip:Show()
+    return
+  end
   if e.kind == "town" then
     tip:AddLine(e.name .. "  (" .. D.yards(e.dist) .. " " .. D.compass(e.angle) .. ")", 1, 1, 1)
     tip:AddLine(ns.todoBase(e), 0.8, 0.8, 0.8)
@@ -225,28 +353,38 @@ local function tooltip(r)
     return
   end
   tip:AddLine(e.name, rgb(e.color))
+  local slow = (e.kind == "log" or e.kind == "pickup" or e.kind == "party") and not e.done and not D.pace[e.id] and D.levelFactor(e.level) or 1
+  if slow > 1 then
+    tip:AddLine(string.format("%d level%s over you: counted %.1fx slower%s", e.level - D.playerLevel(), e.level - D.playerLevel() == 1 and "" or "s", slow,
+      slow >= D.RED_SLOW and " (hard to do alone)" or ""), 1, 0.6, 0.3)
+  end
+  if e.tag then tip:AddLine("Level " .. (e.level or "?") .. " " .. D.TAG_TEXT[e.tag] .. (D.isDungeon(e) and " (/qb dungeons off hides these outside the Log tab)" or ""), 1, 0.6, 0.3) end
   local lvl = "Level " .. (e.level or "?")
   if e.req and e.req ~= e.level then lvl = lvl .. " (needs " .. e.req .. ")" end
   tip:AddLine(lvl, 0.8, 0.8, 0.8)
   if e.xp then tip:AddLine(D.short(e.xp) .. " XP", 0.6, 0.8, 1) end
   if e.kind == "turnin" and e.dist then
-    tip:AddLine(string.format("About %s to run there, ~%s XP per minute of the trip", D.mins(D.travelSecs(e.dist)), D.short(e.rate)), 0.6, 0.8, 1)
+    tip:AddLine(string.format("About %s to %s, ~%s XP per minute of the trip", D.mins(D.travelSecs(e.dist, e)), e.by == "fly" and "fly there (if you have the flight path)" or "run there", D.short(e.rate)), 0.6, 0.8, 1)
   elseif e.kind == "turnin" and e.far then
     tip:AddLine("On another continent or in an instance: a boat, a flight or a dungeon run", 0.8, 0.5, 0.5)
   elseif e.rate and e.secs then
     local guess = (e.kind == "log" and not e.done) and select(2, D.workSecs(e))
     tip:AddLine(string.format("~%s XP per minute (about %d min%s)", D.short(e.rate), math.max(1, math.floor(e.secs / 60 + 0.5)),
-      guess and ", a guess until you make progress" or ""), 0.6, 0.8, 1)
+      D.runSecs and D.runSecs(e) and (e.tag == "R" and ", a raid run" or ", a dungeon run")
+        or guess and ", a guess until you make progress" or ""), 0.6, 0.8, 1)
+    if e.by == "fly" then tip:AddLine("The trip is by flight (if you have the flight path)", 0.6, 0.8, 1) end
+    if e.far then tip:AddLine("On another continent: about " .. D.mins(D.FAR_TRIP_SECS) .. " counted for the boat or zeppelin, a guess", 0.8, 0.5, 0.5) end
   end
-  local verb = e.kind == "turnin" and "Turn in at " or (e.kind == "pickup" or e.kind == "party") and "Get it from " or "Nearest: "
+  local verb = e.kind == "turnin" and "Turn in at " or e.toFinisher and "Hand in to " or (e.kind == "pickup" or e.kind == "party") and "Get it from " or "Nearest: "
   if e.target then
-    tip:AddLine(verb .. e.target .. (e.dist and ("  " .. D.yards(e.dist) .. " " .. D.compass(e.angle)) or ""), 1, 1, 1)
+    local where = D.zoneName(e.zone)
+    tip:AddLine(verb .. e.target .. (where and (", " .. where) or "") .. (e.dist and ("  " .. D.yards(e.dist) .. " " .. D.compass(e.angle)) or ""), 1, 1, 1)
   end
   if e.fromItem then
     local how = e.dropHow == "vendor" and ", sold by " or e.dropHow == "object" and ", found in " or ", drops from "
-    tip:AddLine("Starts from an item" .. (e.item and (": " .. e.item) or "") .. (e.dropFrom and (how .. e.dropFrom) or ""), 0.8, 0.8, 0.8)
+    tip:AddLine("Starts from an item" .. (e.startItem and (": " .. e.startItem) or "") .. (e.dropFrom and (how .. e.dropFrom) or ""), 0.8, 0.8, 0.8)
     if e.toFinisher then tip:AddLine("Questie does not know where it drops; the distance is to " .. e.finisher, 0.8, 0.5, 0.5) end
-    if e.finisher then tip:AddLine("Hand in to " .. e.finisher, 0.8, 0.8, 0.8) end
+    if e.finisher and not e.toFinisher then tip:AddLine("Hand in to " .. e.finisher, 0.8, 0.8, 0.8) end
   end
   if not e.spawn and not e.spot then tip:AddLine("Questie has no place for this quest", 0.8, 0.5, 0.5) end
   for _, o in ipairs(e.left or {}) do
@@ -279,7 +417,7 @@ local function tooltip(r)
     tip:AddLine(e.pinned and "Alt-click: no longer doing it" or "Alt-click: I'm doing this (keep it in Active)", 0.5, 0.5, 0.5)
   end
   if e.kind ~= "pickup" and e.kind ~= "party" then tip:AddLine("Right-click: open the quest log", 0.5, 0.5, 0.5)
-  else tip:AddLine("Right-click: show the giver on the map", 0.5, 0.5, 0.5) end
+  else tip:AddLine("Right-click: show the giver on the map (not in your quest log yet)", 0.5, 0.5, 0.5) end
   tip:Show()
 end
 
@@ -360,7 +498,7 @@ function ns.sayOnce(key, msg)
 end
 
 function ns.link(e)
-  if e.kind == "town" or e.kind == "area" then return end
+  if e.kind == "town" or e.kind == "area" or e.kind == "member" or e.kind == "more" or e.kind == "zone" then return end
   local link = call(rawget(_G, "GetQuestLink"), e.id) or e.name
   if not call(rawget(_G, "ChatEdit_InsertLink"), link) then call(rawget(_G, "ChatFrame_OpenChat"), link) end
 end
@@ -414,7 +552,7 @@ function ns.toggleDoing(e)
 end
 
 -- Quest entries (not areas or town rows) can be marked as doing.
-function ns.pinnable(e) return e and e.id and e.kind ~= "area" and e.kind ~= "town" and true or false end
+function ns.pinnable(e) return e and e.id and e.kind ~= "more" and e.kind ~= "zone" and e.kind ~= "area" and e.kind ~= "town" and e.kind ~= "member" and true or false end
 
 -- The quests in an area that you can mark as doing: every stop there
 -- (objectives, hand-ins and pick-ups).
@@ -432,6 +570,31 @@ function ns.areaPinned(a)
   return true
 end
 
+-- The quests in a list (an area's stops count as quests), for pin all.
+function ns.listQuests(list)
+  local out, seen = {}, {}
+  local function add(e) if ns.pinnable(e) and not seen[e.id] then seen[e.id] = true table.insert(out, e) end end
+  for _, e in ipairs(list or {}) do
+    if e.kind == "area" or e.kind == "zone" then for _, s in ipairs(e.stops or {}) do add(s) end else add(e) end
+  end
+  return out
+end
+function ns.listPinned(list)
+  local qs = ns.listQuests(list)
+  if #qs == 0 then return false end
+  for _, e in ipairs(qs) do if not (ns.db.doing and ns.db.doing[e.id]) then return false end end
+  return true
+end
+-- Alt-click on a list's heading: pin every quest in it; again to unpin.
+function ns.pinList(list)
+  ns.db.doing = ns.db.doing or {}
+  local off = ns.listPinned(list)
+  for _, e in ipairs(ns.listQuests(list)) do
+    if off then ns.db.doing[e.id] = nil D.heldAt[e.id] = nil else ns.db.doing[e.id] = true end
+  end
+  ns.refresh()
+end
+
 -- Alt-click on an area: mark every quest there as doing; again to unmark.
 function ns.toggleArea(a)
   ns.db.doing = ns.db.doing or {}
@@ -444,6 +607,24 @@ end
 
 function ns.click(e, button)
   if not e then return end
+  if e.kind == "more" and e.tab then return ns.pickTab(e.tab) end
+  -- Alt-click a zone: pin every quest there (your log, hand-ins, pick-ups).
+  if e.kind == "zone" and rawget(_G, "IsAltKeyDown") and IsAltKeyDown() then return ns.pinList({ e }) end
+  if e.kind == "zone" then
+    if e.near then return ns.pin(e.near) end
+    ns.sayOnce("zone:" .. e.name, e.name .. ": far away (another continent); open the map to plan the trip")
+    return false
+  end
+  if e.kind == "more" then
+    ns.db.showAll = ns.db.showAll or {}
+    ns.db.showAll[e.group] = not ns.db.showAll[e.group] or nil
+    return ns.render()
+  end
+  if e.kind == "member" then
+    if e.spot and e.spot.mapID then return ns.pin(e) end
+    ns.sayOnce("noplace:" .. e.name, e.name .. ": the game does not say where they are (a dungeon or too far)")
+    return false
+  end
   if rawget(_G, "IsAltKeyDown") and IsAltKeyDown() and ns.pinnable(e) then
     return ns.toggleDoing(e)
   end
@@ -499,14 +680,47 @@ local function wheel(f)
   f:SetScript("OnMouseWheel", function(_, delta) ns.scrollBy(delta) end)
 end
 
+-- Splits each line that is wider than width into screen lines, at spaces,
+-- at most WRAP_MAX for one line (the last one is cut with "..." by the
+-- game). Measures with a hidden font string; without one, keeps the lines.
+function ns.wrapLines(lines, width)
+  if not ns.probe and panel then
+    -- Shown but clear: a hidden font string may not measure its text.
+    ns.probe = panel:CreateFontString(nil, "BACKGROUND", FONT_DIM)
+    ns.probe:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
+    if ns.probe.SetWordWrap then ns.probe:SetWordWrap(false) end
+    if ns.probe.SetAlpha then ns.probe:SetAlpha(0) end
+  end
+  local probe = ns.probe
+  if not (probe and probe.GetStringWidth and width and width > 0) then return lines end
+  local function wide(text) probe:SetText(text) return (probe:GetStringWidth() or 0) > width end
+  local out = {}
+  for _, line in ipairs(lines) do
+    local rest, parts = line, 0
+    while rest ~= "" and wide(rest) and parts < WRAP_MAX - 1 do
+      local cut
+      for pos in rest:gmatch("() ") do
+        if pos > 1 and not wide(rest:sub(1, pos - 1)) then cut = pos else break end
+      end
+      if not cut then break end
+      table.insert(out, rest:sub(1, cut - 1))
+      rest = "  " .. rest:sub(cut + 1)
+      parts = parts + 1
+    end
+    table.insert(out, rest)
+  end
+  return out
+end
+
 local function makeRow(i)
   local r = CreateFrame("Button", nil, panel)
   r:SetHeight(ROW_H)
   r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   r.lvl = r:CreateFontString(nil, "OVERLAY", FONT)
   r.lvl:SetPoint("TOPLEFT", 0, -1)
-  r.lvl:SetWidth(20)
+  r.lvl:SetWidth(LVL_W)
   r.lvl:SetJustifyH("RIGHT")
+  if r.lvl.SetWordWrap then r.lvl:SetWordWrap(false) end
   r.arrow = r:CreateTexture(nil, "OVERLAY")
   r.arrow:SetTexture("Interface\\Minimap\\MinimapArrow")
   r.arrow:SetSize(14, 14)
@@ -515,28 +729,32 @@ local function makeRow(i)
   r.meta:SetPoint("TOPRIGHT", -16, -1)
   r.meta:SetJustifyH("RIGHT")
   r.name = r:CreateFontString(nil, "OVERLAY", FONT)
-  r.name:SetPoint("LEFT", r.lvl, "RIGHT", 6, 0)
-  r.name:SetPoint("RIGHT", r.meta, "LEFT", -6, 0)
+  r.name:SetPoint("TOPLEFT", r.lvl, "TOPRIGHT", 6, 0)
+  r.name:SetPoint("TOPRIGHT", r.meta, "TOPLEFT", -6, 0)
   r.name:SetJustifyH("LEFT")
   if r.name.SetWordWrap then r.name:SetWordWrap(false) end
   -- The "what to do" line under the name.
   r.sub = r:CreateFontString(nil, "OVERLAY", FONT_DIM)
-  r.sub:SetPoint("TOPLEFT", 26, -ROW_H + SUB_UP)
+  r.sub:SetPoint("TOPLEFT", TEXT_X, -ROW_H + SUB_UP)
   r.sub:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP)
   r.sub:SetJustifyH("LEFT")
   if r.sub.SetWordWrap then r.sub:SetWordWrap(false) end
   r.more = {}   -- extra lines for Active quests
+  r.stats = r:CreateFontString(nil, "OVERLAY", FONT_DIM)
+  r.stats:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP)
+  r.stats:SetJustifyH("RIGHT")
+  if r.stats.SetWordWrap then r.stats:SetWordWrap(false) end
   r.pin = r:CreateTexture(nil, "OVERLAY")
   r.pin:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1")
   r.pin:SetSize(10, 10)
-  r.pin:SetPoint("LEFT", r.lvl, "RIGHT", 5, 0)
+  r.pin:SetPoint("TOPLEFT", r.lvl, "TOPRIGHT", 5, 0)
   r.pin:Hide()
   wheel(r)
   -- Progress bar along the bottom of a quest you are on.
   r.bar = r:CreateTexture(nil, "ARTWORK")
   r.bar:SetColorTexture(0, 0, 0, 0.5)
   r.bar:SetHeight(2)
-  r.bar:SetPoint("BOTTOMLEFT", 26, 0)
+  r.bar:SetPoint("BOTTOMLEFT", TEXT_X, 0)
   r.bar:SetPoint("BOTTOMRIGHT", -16, 0)
   r.bar:Hide()
   r.fill = r:CreateTexture(nil, "OVERLAY")
@@ -574,7 +792,23 @@ local function makeHead(kind)
   h.right = h:CreateFontString(nil, "OVERLAY", FONT_DIM)
   h.right:SetPoint("RIGHT", 0, 1)
   h:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  h:SetScript("OnEnter", function(self)
+    local tip = rawget(_G, "GameTooltip")
+    if not (tip and self.list) then return end
+    if self.stop then return ns.stopTip(self) end
+    tip:SetOwner(self, "ANCHOR_LEFT")
+    local n = #ns.listQuests(self.list)
+    if self.hint then tip:AddLine(self.hint, 1, 1, 1) end
+    tip:AddLine("Click: fold or open", 0.6, 0.6, 0.6)
+    if n > 0 then
+      tip:AddLine(ns.listPinned(self.list) and ("Alt-click: unpin these " .. n .. " quests") or ("Alt-click: pin all " .. n .. " quests (keep them in Doing)"), 0.6, 0.8, 1)
+    end
+    tip:Show()
+  end)
+  h:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
   h:SetScript("OnClick", function(_, button)
+    if h.stop then return ns.stopClick(h, button) end
+    if rawget(_G, "IsAltKeyDown") and IsAltKeyDown() and h.list then return ns.pinList(h.list) end
     if button == "RightButton" and (kind == "log" or kind == "pickup") then
       local key = kind == "pickup" and "sortPickup" or "sortLog"
       ns.db[key] = ns.db[key] == "xp" and "near" or "xp"
@@ -589,24 +823,28 @@ local function makeHead(kind)
   return h
 end
 
--- Group order by context: when you are on no quest and a hand-in is near,
--- the hand-ins come first; else the quests you are doing now.
-ns.TURNIN_TOP_YARDS = 600
-function ns.order(st)
-  local t = st and st.turnin and st.turnin[1]
-  if st and #(st.active or {}) == 0 and t and t.dist and t.dist <= ns.TURNIN_TOP_YARDS then
-    return { "turnin", "nearby", "area", "active", "log", "party", "pickup", "town" }
-  end
-  return ORDER
-end
+ns.TURNIN_TOP_YARDS = 600   -- Nearby: a hand-in this close comes first
 
 ns.scroll = 0            -- pixels scrolled down inside the groups
 ns.MIN_HEIGHT = 80
 
 -- The bar: for log quests not done yet; gold in Active, blue elsewhere.
 ns.BAR_W = W - 2 * PAD - 26 - 16
+-- The board width: ns.db.width within MIN_W..MAX_W.
+function ns.width() return math.max(ns.MIN_W, math.min(ns.MAX_W, (ns.db and ns.db.width) or 270)) end
+-- A quest you can hand in: done in the log, or a hand-in row.
+function ns.complete(e) return e.kind == "turnin" or (e.kind == "log" and e.done) or false end
+
 function ns.setBar(r, e, kind)
-  if e.kind ~= "log" or e.done or not e.frac then r.bar:Hide() r.fill:Hide() return end
+  if ns.complete(e) then
+    -- Complete: a full green bar, on every tab.
+    r.bar:Show()
+    r.fill:SetColorTexture(0.35, 0.85, 0.35, 0.9)
+    r.fill:SetWidth(ns.BAR_W)
+    r.fill:Show()
+    return
+  end
+  if e.kind ~= "log" or not e.frac then r.bar:Hide() r.fill:Hide() return end
   r.bar:Show()
   if kind == "active" then r.fill:SetColorTexture(1, 0.82, 0.25, 0.9) else r.fill:SetColorTexture(0.45, 0.7, 1, 0.7) end
   local w = math.floor(ns.BAR_W * math.max(0, math.min(1, e.frac)) + 0.5)
@@ -615,88 +853,313 @@ function ns.setBar(r, e, kind)
   r.fill:Show()
 end
 
+-- The rows a group shows: the first ns.db.rows[kind], then a "+N more"
+-- line (click: the whole group, then a "show fewer" line), so a quest past
+-- the limit never vanishes without a word.
+function ns.shownRows(kind, list, cap)
+  cap = cap or ns.db.rows[kind] or 6
+  if #list <= cap then return list end
+  local out = {}
+  local all = ns.db.showAll and ns.db.showAll[kind]
+  for i = 1, all and #list or cap do out[i] = list[i] end
+  local hidden = {}
+  for i = cap + 1, #list do table.insert(hidden, list[i].name) end
+  table.insert(out, { kind = "more", group = kind, left = {}, color = "white", hidden = hidden,
+    name = all and "show fewer" or ("+" .. (#list - cap) .. " more: " .. table.concat(hidden, ", ")) })
+  return out
+end
+
+---------------------------------------------------------------------------
+-- Tabs: what the board shows, by what you are doing.
+---------------------------------------------------------------------------
+ns.TABS = { "doing", "nearby", "areas", "log" }
+ns.TAB_NAMES = { doing = "Doing", nearby = "Nearby", areas = "Areas", log = "Log" }
+local ALL = math.huge
+
+-- The tab the board picks: Doing while a quest is Active, else Nearby.
+function ns.autoTab(st) return st and st.active and #st.active > 0 and "doing" or "nearby" end
+-- A tab you click holds until the board's own pick changes (you start or
+-- finish a quest).
+function ns.tab()
+  local auto = ns.autoTab(state)
+  if ns.pickedTab and ns.pickedFor == auto then return ns.pickedTab end
+  ns.pickedTab = nil
+  return auto
+end
+function ns.pickTab(t)
+  local auto = ns.autoTab(state)
+  ns.pickedTab, ns.pickedFor = (t ~= auto) and t or nil, auto
+  ns.scroll = 0
+  ns.render()
+end
+
+-- Every quest in your log, in log order.
+function ns.logAll(st)
+  local list = {}
+  for _, kind in ipairs({ "active", "nearby", "turnin", "log" }) do
+    for _, e in ipairs(st and st[kind] or {}) do table.insert(list, e) end
+  end
+  table.sort(list, function(a, b) return (a.index or 0) < (b.index or 0) end)
+  return list
+end
+
+-- A line that opens another tab ("11 more in your log").
+local function tabLine(text, tab)
+  return { kind = "more", tab = tab, name = text, left = {}, color = "white" }
+end
+
+-- The log quests not in shown: one line that leads to the Log tab.
+local function restLine(st, shown)
+  local seen, n = {}, 0
+  for _, e in ipairs(shown) do seen[e] = true end
+  for _, e in ipairs(ns.logAll(st)) do if not seen[e] then n = n + 1 end end
+  if n == 0 then return nil end
+  return { key = "rest", nohead = true, list = { tabLine(n .. " more in your log: Log tab", "log") }, cap = ALL }
+end
+
+ns.NEXT_YARDS = 1000      -- Nearby: stops within this range
+ns.AREA_STOPS = 3         -- an area with this many stops takes their place in Nearby
+
+-- Nearby: one list of what to chain next. Hand-ins, objectives, pick-ups
+-- and areas (several stops in one trip, in place of their stops), best
+-- XP per minute first with the walk counted; a hand-in close by first.
+function ns.nextList(st)
+  local list, inArea = {}, {}
+  for _, a in ipairs(st.area or {}) do
+    if a.dist and a.dist <= ns.NEXT_YARDS and #a.stops >= ns.AREA_STOPS then
+      table.insert(list, a)
+      for _, s in ipairs(a.stops) do inArea[s] = true end
+    end
+  end
+  for _, kind in ipairs({ "turnin", "nearby", "active", "log", "pickup", "party" }) do
+    for _, e in ipairs(st[kind] or {}) do
+      local take = not inArea[e] and not e.hiddenTag and e.dist and e.dist <= ns.NEXT_YARDS and not (e.kind == "party" and not e.canTake)
+      if take then table.insert(list, e) end
+    end
+  end
+  local function first(e) return e.kind == "turnin" and e.dist and e.dist <= ns.TURNIN_TOP_YARDS end
+  table.sort(list, function(a, b)
+    if first(a) ~= first(b) then return first(a) end
+    if (a.rate or 0) ~= (b.rate or 0) then return (a.rate or 0) > (b.rate or 0) end
+    return (a.dist or math.huge) < (b.dist or math.huge)
+  end)
+  return list
+end
+
+-- The sections of the board for a tab: { key, head, right, list, cap,
+-- nohead, compact }.
+function ns.sections(st, tab)
+  if not st then return {} end
+  tab = tab or ns.tab()
+  local out = {}
+  local function add(s) if s and #s.list > 0 then table.insert(out, s) end end
+  local function members() add({ key = "members", head = "Your party", right = "click: map pin", list = st.members or {} }) end
+  if ns.focused() then
+    -- Combat or a dungeon: only the quest you are on, the rest on hover.
+    add({ key = "active", head = "Doing", right = "hover: all", list = st.active, cap = ALL })
+    return out
+  end
+  -- Your pins sit at the top of every other tab.
+  -- Not in Log: it lists every quest once, and the star marks a pin there.
+  if tab ~= "doing" and tab ~= "log" then
+    local pins = {}
+    for _, e in ipairs(st.active) do if e.pinned then table.insert(pins, e) end end
+    add({ key = "pinned", head = "Pinned", right = "Alt-click: unpin", list = pins, cap = ALL })
+  end
+  if tab == "doing" then
+    local byStop = ns.stopSections and ns.db.stops ~= false
+    if not byStop then add({ key = "active", head = "Doing", right = "your quests now", list = st.active, cap = ALL }) end
+    local cand, isActive = {}, {}
+    for _, e in ipairs(st.active) do isActive[e] = true end
+    for _, kind in ipairs({ "turnin", "nearby", "pickup", "party" }) do
+      for _, e in ipairs(st[kind] or {}) do
+        if not isActive[e] and not e.hiddenTag and not (e.kind == "party" and not e.canTake) then table.insert(cand, e) end
+      end
+    end
+    local way = ns.onWay(cand, st.active)
+    if byStop then
+      -- One group per stop: your quests and the ones on the way, by place.
+      for _, s in ipairs(ns.stopSections(st.active, way, st.turnin)) do add(s) end
+    else
+      add({ key = "onway", head = "On the way", right = "within " .. ns.ON_WAY_YARDS .. " yd", list = way })
+    end
+    members()
+    local shown = {}
+    for _, e in ipairs(st.active) do table.insert(shown, e) end
+    for _, e in ipairs(way) do table.insert(shown, e) end
+    if byStop then for _, sec in ipairs(out) do if sec.stop then for _, e in ipairs(sec.list) do table.insert(shown, e) end end end end
+    add(restLine(st, shown))
+  elseif tab == "nearby" then
+    -- A pinned quest is in Pinned above: not here again.
+    local list = {}
+    for _, e in ipairs(ns.nextList(st)) do if not e.pinned then table.insert(list, e) end end
+    add({ key = "next", head = "Chain next", right = "best XP/min, Alt-click: pin all", list = list })
+    members()
+    local cap = ns.db.rows.next or 8
+    local shown = {}
+    for i = 1, math.min(#list, cap) do shown[i] = list[i] end
+    add(restLine(st, shown))
+    if #list == 0 then add({ key = "rest2", nohead = true, list = { tabLine("Nothing close: see the Areas tab", "areas") }, cap = ALL }) end
+  elseif tab == "areas" then
+    add({ key = "zones", head = "Where to go", right = "XP/min, trip counted", list = st.zones or {} })
+    add({ key = "town", head = "Travel", right = "click: map pin", list = st.town or {} })
+  else
+    -- Log: every quest, under its log zone, never cut.
+    local by, order = {}, {}
+    for _, e in ipairs(ns.logAll(st)) do
+      local z = e.header or "Other"
+      if not by[z] then by[z] = {} table.insert(order, z) end
+      table.insert(by[z], e)
+    end
+    for _, z in ipairs(order) do add({ key = "log:" .. z, head = z, list = by[z], cap = ALL, compact = true }) end
+  end
+  return out
+end
+
 -- Lays out the groups from the last result. The title and the Next line
 -- stay at the top; the groups below scroll when the board is taller than
 -- the max height you set (drag the grip at the bottom right).
 function ns.render()
   if not panel then return end
+  W = ns.width()
+  ns.BAR_W = W - 2 * PAD - TEXT_X - 16
+  panel:SetWidth(W)
   local y = -PAD
   local level = state and state.level or D.playerLevel()
-  panel.title:SetText("Quests")
-  panel.sub:SetText(state and (state.questie and ("level " .. level) or "level " .. level .. "  (no Questie: log only)") or "")
-  if ns.focused() or ns.trimmed() then panel.sub:SetText(panel.sub:GetText() .. "  -  hover: all") end
-  y = y - HEAD_H
-  local nextText = ns.nextStep(state)
-  if nextText then
-    panel.next:SetText("Next: " .. nextText)
-    panel.next:ClearAllPoints()
-    panel.next:SetPoint("TOPLEFT", PAD, y)
-    panel.next:SetPoint("TOPRIGHT", -PAD, y)
-    panel.next:Show()
-    y = y - ROW_H - 2
-  else
-    panel.next:Hide()
+  -- No title line: the tabs are the top of the board. A line under them
+  -- only when something is wrong (no Questie).
+  panel.title:SetText("")
+  panel.sub:SetText("")
+  local warn = state and not state.questie and "No Questie: your log only" or nil
+  -- The tabs: the one shown is gold, the others grey.
+  local cur = ns.tab()
+  local tw = math.floor((W - 2 * PAD) / #ns.TABS)
+  for i, t in ipairs(ns.TABS) do
+    local b = panel.tabs[i]
+    local label = ns.TAB_NAMES[t]
+    b.text:SetText(label)
+    if t == cur then b.text:SetTextColor(1, 0.82, 0.25) b.line:Show() else b.text:SetTextColor(0.5, 0.5, 0.5) b.line:Hide() end
+    b:ClearAllPoints()
+    b:SetPoint("TOPLEFT", PAD + (i - 1) * tw, y)
+    b:SetWidth(tw)
+    b:Show()
+  end
+  panel.next:Hide()
+  y = y - ROW_H - 6
+  if warn then
+    panel.sub:ClearAllPoints()
+    panel.sub:SetPoint("TOPLEFT", PAD, y)
+    panel.sub:SetText(warn)
+    y = y - ROW_H
   end
   local top = y
   -- First pass: what goes where, from the top of the groups (cy).
   local items, cy, used = {}, 0, 0
-  for _, kind in ipairs(ns.order(state)) do
-    local list = state and state[kind] or {}
-    local h = heads[kind] or makeHead(kind)
-    local show = #list > 0 or kind == "pickup" and state and state.questie
-    -- Focus: only the quests you are on now, the rest on mouse-over.
-    if ns.focused() and kind ~= "active" then show = false end
-    -- On a job: Active, plus hand-ins and pick-ups on the way.
-    if show and ns.trimmed() and kind ~= "active" then
-      list = ns.ON_WAY_KINDS[kind] and ns.onWay(list, state.active) or {}
-      show = #list > 0
-    end
-    h:Hide()
-    if show then
-      local collapsed = ns.db.collapsed[kind]
-      h.text:SetText((collapsed and "+ " or "") .. HEADS[kind] .. "  " .. #list)
-      local sortKey = kind == "pickup" and "sortPickup" or kind == "log" and "sortLog"
-      h.right:SetText(kind == "active" and "doing now" or kind == "nearby" and "within 300 yd" or kind == "area" and "best XP" or kind == "town" and "click: map pin"
-        or sortKey and (ns.db[sortKey] == "xp" and "best XP" or "nearest") or "nearest")
-      table.insert(items, { f = h, y = cy, h = HEAD_H, gap = 2 })
-      cy = cy + HEAD_H + 2
+  for _, h in pairs(heads) do h:Hide() end
+  local curName = ns.TAB_NAMES[cur]
+  for si, sec in ipairs(ns.sections(state)) do
+    local kind, list = sec.key, sec.list
+    -- The first group needs no name when the tab already says it.
+    if si == 1 and sec.head == curName then sec.nohead = true end
+    do
+      local collapsed = not sec.nohead and ns.db.collapsed[kind]
+      local cap = sec.cap or ns.db.rows[kind] or 6
+      if not sec.nohead then
+        local h = heads[kind] or makeHead(kind)
+        if sec.stop then
+          ns.stopHead(h, sec)
+        else
+          local count = (#list > cap and not (ns.db.showAll and ns.db.showAll[kind])) and (cap .. " of " .. #list) or #list
+          h.text:SetText((collapsed and "+ " or "") .. sec.head .. "  " .. count)
+          h.right:SetText("")   -- the hint is in the group's tooltip
+          h.hint = sec.right
+          h.list = ns.shownRows(kind, list, cap)   -- pin all takes the rows you see
+        end
+        table.insert(items, { f = h, y = cy, h = HEAD_H, gap = 2, stop = sec.stop })
+        cy = cy + HEAD_H + 2
+      end
       if not collapsed then
-        for i = 1, math.min(#list, ns.db.rows[kind] or 6) do
+        local shown = ns.shownRows(kind, list, cap)
+        for i = 1, #shown do
           used = used + 1
           local r = rows[used] or makeRow(used)
-          local e = list[i]
+          local e = shown[i]
           r.entry = e
-          r.lvl:SetText(e.kind == "area" and #e.stops or e.kind == "town" and (e.role == "inn" and "Inn" or "Fly") or e.level or "?")
+          -- In a stop: a mark before the level, and no arrow (the stop has it).
+          local inStop = sec.stop and e.kind ~= "more"
+          local tx = TEXT_X + (inStop and ns.STOP_INDENT or 0)
+          r.noArrow = inStop or nil
+          r.lvl:SetWidth(LVL_W + (inStop and ns.STOP_INDENT or 0))
+          r.lvl:SetText((inStop and (ns.stopMark(e) .. " ") or "") .. (e.kind == "more" and "" or (e.kind == "area" or e.kind == "zone") and #e.stops or e.kind == "town" and (e.role == "inn" and "Inn" or "Fly") or ((e.level or "?") .. (e.tag or ""))))
           r.lvl:SetTextColor(rgb(e.color))
-          r.name:SetText(e.name)
-          if e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55) else r.name:SetTextColor(0.92, 0.92, 0.92) end
+          r.name:SetText(e.name .. (inStop and ns.gearMark(e) or ""))
+          if e.kind == "more" then r.name:SetTextColor(0.6, 0.6, 0.6)
+          elseif ns.complete(e) then r.name:SetTextColor(0.55, 0.9, 0.55)
+          elseif e.classColor then r.name:SetTextColor(e.classColor[1], e.classColor[2], e.classColor[3])
+          else r.name:SetTextColor(0.92, 0.92, 0.92) end
           -- Your Alt-click mark: a gold star before the name.
           if e.kind == "area" then e.pinned = ns.areaPinned(e) or nil end
+          if e.kind == "zone" then e.pinned = ns.listPinned({ e }) or nil end
           r.name:ClearAllPoints()
-          r.name:SetPoint("LEFT", r.lvl, "RIGHT", e.pinned and 18 or 6, 0)
-          r.name:SetPoint("RIGHT", r.meta, "LEFT", -6, 0)
+          r.name:SetPoint("TOPLEFT", r.lvl, "TOPRIGHT", e.pinned and 18 or 6, 0)
+          r.name:SetPoint("TOPRIGHT", r.meta, "TOPLEFT", -6, 0)
           if e.pinned then r.pin:Show() else r.pin:Hide() end
-          r.meta:SetText(ns.meta(e, kind))
+          local full = not ns.db.compact and not sec.compact
+          local split = full and ns.QUEST_KINDS[e.kind]
+          r.meta:SetText(split and ns.place(e) or ns.meta(e, kind))
           ns.setBar(r, e, kind)
-          local todo = (not ns.db.compact) and (e.kind ~= "pickup" and ns.todo(e) or e.kind == "pickup" and D.chainTag(e.chain))
-          -- An Active quest gets a line per open objective and one for its
-          -- party; the rest keep one what-to-do line.
-          local lines = (not ns.db.compact and kind == "active") and ns.activeLines(e) or nil
-          if lines and #lines < 2 then lines = nil end
-          if lines then todo = lines[1] end
-          r.sub:SetText(todo or "")
-          local n = lines and #lines or (todo and 1 or 0)
+          r.bar:ClearAllPoints()
+          r.bar:SetPoint("BOTTOMLEFT", tx, 0)
+          r.bar:SetPoint("BOTTOMRIGHT", -16, 0)
+          local todo, lines
+          if inStop then
+            -- One line: the name, and at the right who to see. A quest
+            -- still to finish keeps its objectives under it.
+            lines = ns.stopLines(e)
+            todo = lines[1]
+            r.meta:SetText(#lines == 0 and ns.stopWho(e, e.name, W - 2 * PAD - tx - 16 - (e.pinned and 12 or 0)) or "")
+            if ns.complete(e) then r.bar:Hide() r.fill:Hide() end   -- the mark and the green name say it
+            split = false
+          elseif split then
+            -- Quest rows: what to do (each open objective when you are on
+            -- it), your party, then the gear it leads to.
+            lines = kind == "active" and ns.activeLines(e, true) or { ns.todoWho(e) }
+            local reward = ns.rewardLine(e)
+            if reward then table.insert(lines, reward) end
+            todo = lines[1] or ""
+            if ns.complete(e) then todo = "|cff66dd66Complete|r  " .. todo end
+            lines[1] = todo
+          else
+            todo = full and ns.todo(e) or nil
+            -- An Active quest gets a line per open objective and one for its
+            -- party; the rest keep one what-to-do line.
+            lines = (full and kind == "active") and ns.activeLines(e) or nil
+            if lines and #lines < 2 then lines = nil end
+            if lines then todo = lines[1] end
+            lines = lines or (todo and { todo }) or {}
+          end
+          -- The numbers sit at the right of line 2.
+          r.stats:SetText(split and ns.stats(e, kind) or "")
+          local statsW = split and (r.stats.GetStringWidth and r.stats:GetStringWidth() or 0) or 0
+          r.sub:ClearAllPoints()
+          r.sub:SetPoint("TOPLEFT", tx, -ROW_H + SUB_UP)
+          r.sub:SetPoint("TOPRIGHT", -16 - (statsW > 0 and statsW + 8 or 0), -ROW_H + SUB_UP)
+          -- A line too long for the board goes on to the next line.
+          lines = ns.wrapLines(lines, W - 2 * PAD - tx - 16 - (statsW > 0 and statsW + 8 or 0))
+          r.sub:SetText(lines[1] or "")
+          local n = #lines
           for i = 1, math.max(#r.more, n - 1) do
             local fs = r.more[i]
             if i <= n - 1 then
               if not fs then
                 fs = r:CreateFontString(nil, "OVERLAY", FONT_DIM)
-                fs:SetPoint("TOPLEFT", 26, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
-                fs:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
                 fs:SetJustifyH("LEFT")
                 if fs.SetWordWrap then fs:SetWordWrap(false) end
                 r.more[i] = fs
               end
+              fs:ClearAllPoints()
+              fs:SetPoint("TOPLEFT", tx, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
+              fs:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
               fs:SetText(lines[i + 1])
               fs:Show()
             elseif fs then
@@ -704,6 +1167,7 @@ function ns.render()
             end
           end
           local rh = n > 0 and (ROW_H + n * (ROW_H - SUB_UP)) or ROW_H
+          if r.bar:IsShown() then rh = rh + BAR_GAP end   -- room between the last line and the bar
           r:SetHeight(rh)
           local gap = todo and ROW_GAP or 1
           table.insert(items, { f = r, y = cy, h = rh, row = true, gap = gap })
@@ -747,7 +1211,7 @@ function ns.render()
       f:SetPoint("TOPLEFT", PAD, top - at)
       f:SetPoint("TOPRIGHT", -PAD, top - at)
       at = at + it.h + (it.gap or 0)
-      if it.row then updateArrow(f) end
+      if it.row then updateArrow(f) elseif it.stop then ns.stopArrow(f) end
       f:Show()
     else
       f:Hide()
@@ -782,24 +1246,49 @@ end
 
 -- The grip at the bottom right sets the max height: drag it; right-click
 -- takes the limit off.
-local function cursorY()
-  local _, cy = call(rawget(_G, "GetCursorPosition"))
+local function cursorXY()
+  local cx, cy = call(rawget(_G, "GetCursorPosition"))
   local scale = UIParent.GetEffectiveScale and UIParent:GetEffectiveScale() or 1
-  return (cy or 0) / scale
+  return (cx or 0) / scale, (cy or 0) / scale
+end
+-- While you drag, a gold outline shows the max size (the board itself is
+-- only as tall as its rows), with the numbers in it.
+local function showOutline()
+  local o = panel.outline
+  if not o then return end
+  local h = ns.db.maxHeight or panel:GetHeight() or 200
+  o:ClearAllPoints()
+  o:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
+  o:SetWidth(W)
+  o:SetHeight(h)
+  o.text:SetText(W .. " x " .. h)
+  o:Show()
 end
 function ns.sizeStart()
-  ns.sizing = { y = cursorY(), h = panel:GetHeight() or 200 }
+  ns.pinTop()   -- grow right and down from the top-left corner
+  local x, y = cursorXY()
+  ns.sizing = { x = x, y = y, h = ns.db.maxHeight or panel:GetHeight() or 200, w = ns.width() }
+  showOutline()
 end
 function ns.sizeMove()
   if not ns.sizing then return end
-  local h = ns.sizing.h + (ns.sizing.y - cursorY())
+  local x, y = cursorXY()
+  local h = ns.sizing.h + (ns.sizing.y - y)
   ns.db.maxHeight = math.floor(math.max(ns.MIN_HEIGHT, h) + 0.5)
+  ns.db.width = math.floor(math.max(ns.MIN_W, math.min(ns.MAX_W, ns.sizing.w + (x - ns.sizing.x))) + 0.5)
   ns.render()
+  showOutline()
 end
 function ns.sizeStop()
   if not ns.sizing then return end
   ns.sizing = nil
-  say("max height " .. ns.db.maxHeight .. " (right-click the grip, or /qb height off, for no limit)")
+  if panel.outline then panel.outline:Hide() end
+  say("size " .. ns.width() .. " x " .. ns.db.maxHeight .. " max (right-click the grip, or /qb height off, for no height limit)")
+  if ns.updateItems then ns.updateItems(state) end
+end
+function ns.setWidth(w)
+  ns.db.width = w and math.max(ns.MIN_W, math.min(ns.MAX_W, w)) or 270
+  ns.render()
 end
 function ns.setMaxHeight(h)
   ns.db.maxHeight = h and math.max(ns.MIN_HEIGHT, h) or nil
@@ -892,7 +1381,7 @@ function ns.refresh()
   if not (ns.db and ns.db.shown) then return end
   if job then again = true return end
   job = coroutine.create(function()
-    state = D.collect({ party = ns.db.party, doing = ns.db.doing, sortLog = ns.db.sortLog, sortPickup = ns.db.sortPickup, maxAbove = ns.db.maxAbove,
+    state = D.collect({ dungeons = ns.db.dungeons, party = ns.db.party, doing = ns.db.doing, sortLog = ns.db.sortLog, sortPickup = ns.db.sortPickup, maxAbove = ns.db.maxAbove,
       yield = coroutine.yield })
   end)
   runner:SetScript("OnUpdate", step)
@@ -922,7 +1411,7 @@ function ns.focused() return ns.db.focus and ns.busy() and not ns.expanded end
 ns.ON_WAY_YARDS = 300
 ns.ON_WAY_KINDS = { turnin = true, pickup = true, party = true }
 function ns.onJob() return state and state.active and #state.active > 0 or false end
-function ns.trimmed() return ns.db.focus and ns.onJob() and not ns.expanded end
+function ns.trimmed() return false end   -- the Doing tab took its place
 
 -- The entries within ON_WAY_YARDS of you or of an Active quest's place.
 function ns.onWay(list, active)
@@ -942,7 +1431,7 @@ function ns.onWay(list, active)
 end
 
 function ns.hover(over, dt)
-  if not (ns.db.focus and (ns.busy() or ns.onJob())) then ns.expanded = false return end
+  if not (ns.db.focus and ns.busy()) then ns.expanded = false return end
   if over then
     awaySecs = 0
     if not ns.expanded then ns.expanded = true ns.render() end
@@ -958,6 +1447,7 @@ local function tickFn(self, dt)
   if sinceArrow > 0.1 then
     sinceArrow = 0
     for _, r in ipairs(rows) do if r:IsShown() then updateArrow(r) end end
+    for _, h in pairs(heads) do if h.stop and h:IsShown() then ns.stopArrow(h) end end
   end
   if sinceFull > ns.FULL_SECS then
     sinceFull = 0
@@ -982,6 +1472,22 @@ local function build()
   panel.next:SetJustifyH("LEFT")
   panel.next:SetTextColor(1, 0.85, 0.35)
   if panel.next.SetWordWrap then panel.next:SetWordWrap(false) end
+  panel.tabs = {}
+  for i, t in ipairs(ns.TABS) do
+    local b = CreateFrame("Button", nil, panel)
+    b:SetHeight(ROW_H)
+    b.text = b:CreateFontString(nil, "OVERLAY", FONT)
+    b.text:SetPoint("CENTER", 0, 1)
+    b.line = b:CreateTexture(nil, "ARTWORK")
+    b.line:SetColorTexture(1, 0.82, 0.25, 0.8)
+    b.line:SetHeight(1)
+    b.line:SetPoint("BOTTOMLEFT", 6, 0)
+    b.line:SetPoint("BOTTOMRIGHT", -6, 0)
+    b.tab = t
+    b:SetScript("OnClick", function() ns.pickTab(t) end)
+    draggable(b)
+    panel.tabs[i] = b
+  end
   panel.more = panel:CreateFontString(nil, "OVERLAY", FONT_DIM)
   panel.more:SetPoint("BOTTOMLEFT", PAD, PAD - 2)
   panel.more:Hide()
@@ -999,12 +1505,27 @@ local function build()
     local tip = rawget(_G, "GameTooltip")
     if not tip then return end
     tip:SetOwner(self, "ANCHOR_RIGHT")
-    tip:AddLine("Drag: set the board's max height", 1, 1, 1)
+    tip:AddLine("Drag: set the board's width and max height", 1, 1, 1)
     tip:AddLine("Mouse wheel scrolls past it. Right-click: no limit", 0.6, 0.6, 0.6)
     tip:Show()
   end)
   grip:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
   panel.grip = grip
+  -- The max-size outline, shown only while you drag the grip.
+  local o = CreateFrame("Frame", nil, panel)
+  o:SetFrameLevel((panel.GetFrameLevel and panel:GetFrameLevel() or 1) + 5)
+  for _, edge in ipairs({ { "TOPLEFT", "TOPRIGHT", true }, { "BOTTOMLEFT", "BOTTOMRIGHT", true }, { "TOPLEFT", "BOTTOMLEFT", false }, { "TOPRIGHT", "BOTTOMRIGHT", false } }) do
+    local t = o:CreateTexture(nil, "OVERLAY")
+    t:SetColorTexture(1, 0.82, 0.25, 0.9)
+    t:SetPoint(edge[1], 0, 0)
+    t:SetPoint(edge[2], 0, 0)
+    if edge[3] then t:SetHeight(1) else t:SetWidth(1) end
+  end
+  o.text = o:CreateFontString(nil, "OVERLAY", FONT)
+  o.text:SetPoint("BOTTOMRIGHT", -16, 4)
+  o.text:SetTextColor(1, 0.82, 0.25)
+  o:Hide()
+  panel.outline = o
   wheel(panel)
   local p = ns.db.point
   if p then
@@ -1148,10 +1669,15 @@ local help = {
   "/qb lock - stop dragging (again to undo)",
   "/qb focus - show the whole board all the time, not only on mouse-over (again to undo)",
   "/qb compact - one line per quest, without the what-to-do line (again to undo)",
+  "/qb stops - the Doing tab groups its quests by stop, or not (again to undo)",
   "Click a group name to fold it; right-click it to sort by nearest or best XP.",
   "/qb range N - pick-ups at most N levels over you (now %d)",
   "/qb rows N - rows per group (now %d)",
   "/qb height N - at most N pixels tall, scroll for the rest (off: no limit; or drag the grip)",
+  "/qb dungeons off - dungeon and raid quests (28D, 40R) only in the Log tab, no pick-ups (on brings them back)",
+  "/qb width N - the board's width, 220 to 560 (reset: 270; or drag the grip sideways)",
+  "/qb doing | nearby | areas | log - open that tab (the board picks Doing or Nearby by itself)",
+  "/qb why NAME - where a quest is on the board, or why it is not there",
   "/qb town - pin the nearest innkeeper or flight master on the map (/qb inn: innkeeper only)",
   "/qb party off - hide party members' quests here and Questie's party objectives on the map (on brings them back)",
   "/qb reset - put the board back under the minimap",
@@ -1200,6 +1726,10 @@ SlashCmdList.QUESTBOARD = function(text)
   elseif cmd == "compact" then
     ns.db.compact = not ns.db.compact
     return ns.render()
+  elseif cmd == "stops" then
+    ns.db.stops = ns.db.stops == false
+    say(ns.db.stops and "Doing: quests grouped by stop" or "Doing: one list, no stops")
+    return ns.render()
   elseif cmd == "lock" then
     ns.db.locked = not ns.db.locked
     say(ns.db.locked and "locked: dragging does not move the board" or "unlocked: drag the board to move it")
@@ -1208,6 +1738,18 @@ SlashCmdList.QUESTBOARD = function(text)
     ns.setMaxHeight(n)
     say(n and ("max height " .. ns.db.maxHeight .. ", scroll for the rest") or "no max height")
     return
+  elseif cmd == "dungeons" and (rest == "on" or rest == "off") then
+    ns.db.dungeons = rest == "on"
+    say(ns.db.dungeons and "dungeon and raid quests show everywhere" or "dungeon and raid quests show only in the Log tab (and Pick up leaves them out)")
+    return ns.refresh()
+  elseif cmd == "width" and (n or rest == "reset") then
+    ns.setWidth(n)
+    say("width " .. ns.width())
+    return
+  elseif ns.TAB_NAMES[cmd] then
+    ns.pickTab(cmd)
+  elseif cmd == "why" or cmd == "find" then
+    say(D.whyQuest(rest, state, ns.WHERE, ns.db.maxAbove))
   elseif cmd == "town" or cmd == "inn" then
     local st = ns.state()
     local e

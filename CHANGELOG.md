@@ -39,7 +39,99 @@ the same, and a test checks that every `.toc` version has a section here.
 - The item tooltip says "AH full scan 3h ago" like LootValue, and "not in
   today's full scan" next to an old price.
 
-## QuestBoard 0.1.2
+## QuestBoard 0.2.0
+
+- The zone of a place: a quest's tooltip names it ("Turn in at Viktori
+  Prism'Antras, Dustwallow Marsh"), a stop's tooltip too, and a stop in
+  another zone than yours shows it on its line.
+- Travel time counts flights and boats. For a place 1500 yd or more away
+  on your continent, the trip is the shorter of the run and a flight: the
+  run to the flight master nearest you, the flight (a straight line at
+  30 yd per second, 20 s to board), and the run from the flight master
+  nearest the place. A quest or zone on another continent counts a flat
+  15 minutes for the boat or zeppelin, so it has an XP per minute too
+  (a far zone counted no travel at all before). These are estimates: the
+  board does not know which flight paths you have, and the tooltip says
+  when a time counts a flight or a boat.
+- Fix: a pinned quest showed twice in Nearby (in Pinned and in Chain
+  next). It is now only in Pinned. The Log tab has no Pinned group: it
+  lists every quest once, with the star on your pins.
+- The Doing tab groups its quests by stop. Quests whose places are within
+  150 yd of each other make one trip: the stop shows how far it is, what
+  you do there ("3 hand-ins", "1 hand-in, 2 pick-ups") and what it pays,
+  once. Under it each quest is one line with a mark like the ones over
+  NPCs: a gold "?" to hand in, a gold "!" to pick up, a grey "?" to
+  finish (with its objectives under it). A small square after the name
+  means it gives or leads to gear; the tooltip names it. Click a stop to
+  show it on the map, Alt-click to pin all its quests. `/qb stops` goes
+  back to the one list.
+- Hand in first. A quest you can hand in within 600 yd is always in the
+  Doing tab, and its stop is at the top; with several, the best XP per
+  minute of the run first, so two hand-ins in one place beat one. A
+  hand-in farther away joins a stop the board already shows at that
+  place. In a stop the hand-ins come first, then quests to finish, then
+  pick-ups. Hand-ins do not count against the "on the way" row limit.
+- A complete quest is clear at a glance: a full green bar under it, a
+  green name, and "Complete" in green before "Hand in to ...".
+- Cleaner quest rows. Line 1: the name and how far. Line 2: what to do,
+  and at the right the same two numbers on every quest ("625 xp  3 min",
+  coloured by XP per minute; "~" is a guess). A gear line comes only when
+  there is gear: "Reward: [Rose Mantle]" or "Leads to [Seal of Wrynn],
+  4 quests on", in place of "chain +4 ->".
+- A calmer top: no "Quests / level" title line (the tabs are the top), no
+  count on the Log tab, no group name that repeats the tab, and the group
+  hints ("within 300 yd") moved into the group's tooltip.
+- Fix: a Lua error ("Items.lua:60: table index is nil") when a pinned
+  quest that starts from an item was on the board.
+- Fix: a level with a tag ("33G") no longer wraps and pushes the name
+  down over the line under it. A what-to-do line that is too long for the
+  board goes on to a second line in place of being cut.
+- More space between quests than between the lines of one quest, and
+  space above the progress bar. The "XP only" line is gone (the tooltip
+  still says it); a chain shows only when it ends in gear.
+- Fix: pins stay after a /reload or a login. A pin goes only when you
+  hand the quest in.
+- A quest that starts from a world drop (Questie does not know where the
+  item drops) is no longer offered as a pick-up: you cannot go and get it.
+  A pin keeps it, marked "drop unknown", and its tooltip says "Hand in to"
+  in place of "Get it from".
+- Dungeon and raid quests that the game does not tag (most Classic ones,
+  like The Fury Runs Deep) now get their D or R: Questie files them under
+  the dungeon. Their time is a run (about 45 min for a dungeon, 2 h for a
+  raid, less the part you have done), not a few kills, so XP per minute is
+  real.
+- New layout: four tabs for what you are doing, in place of nine groups.
+  Doing (picked by itself while a quest is Active): the quests you are on,
+  the stops on the way, your party, and one line that counts the rest of
+  your log. Nearby (picked by itself otherwise): one list of what to chain
+  next within 1000 yd, best XP per minute with the walk counted, hand-ins,
+  objectives, pick-ups and areas mixed. Areas: zones to go to or swap to,
+  by XP per minute with the trip counted, far ones after; and the nearest
+  inn and flight master. Log: every quest in your log by zone, never cut.
+  A click on a tab keeps it until you start or finish a quest. The "Next:"
+  line is gone: the first row of Nearby is the suggestion.
+- A log quest with no known place says "no place".
+- A quest you finish stays in Doing as a hand-in (pinned until you hand it
+  in; else for 10 minutes after your last progress), so the next step,
+  taking it back, is on top. Your pins also sit in a "Pinned" list at the
+  top of the Nearby, Areas and Log tabs.
+- Alt-click a list's heading (Chain next, On the way, a Log zone) to pin
+  every quest you see in it, the stops of its areas too; they all go to
+  Doing. Alt-click again to unpin them. Alt-click a zone in Areas pins
+  every quest there, far pick-ups too.
+- The grip at the bottom right now sets the width too (drag it sideways,
+  220 to 560, or `/qb width N`). While you drag, a gold outline shows the
+  max size and its numbers, so you see the limit even when the board is
+  shorter.
+- Dungeon, raid and group quests have a tag after the level: 28D, 40R,
+  22G (the game's quest tag, else Questie's, else the group size).
+  `/qb dungeons off` keeps dungeon and raid quests to the Log tab and
+  leaves their pick-ups out; `/qb dungeons on` brings them back.
+- Quests over your level count slower in time left and XP per minute:
+  1.25x at +1, 1.6x at +2, 2.2x at +3, 3.2x at +4, 6x at +5 or more (red,
+  hard alone); 3 or more under, 0.85x. Once you make progress on a quest,
+  your measured pace on it counts instead. The tooltip says when a quest
+  is counted slower.
 
 - Alt-click pins any quest, not only the ones you are working on: a
   hand-in or a pick-up goes to Active with a gold star too. A pinned
@@ -49,6 +141,18 @@ the same, and a test checks that every `.toc` version has a section here.
   quest 3 of 5", then each step with its level, marked done, ">>" (this
   quest), log (in your log) or "..." (later). A long chain shows the 8
   steps around this quest.
+- A "Your party" group: one row per party member with their level (in
+  their class colour), how they are (offline, dead, AFK, health), how far
+  and which way (or their zone), and how many of your quests they share
+  and how many they are behind on. Point at a row for their progress on
+  each shared quest; click pins where they are on the map. `/qb party off`
+  hides it.
+- A group with more quests than its rows no longer drops the rest without
+  a word: its head says "8 of 12", and a last "+4 more: ..." line names
+  them. Click that line for the whole group ("show fewer" folds it).
+- `/qb why NAME` says where a quest is on the board, or why it is not
+  there (row limit, level, far away, a pre-quest first, or not in
+  Questie's data).
 
 ## GroupUp 0.1.0
 
