@@ -41,6 +41,15 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.2.0
 
+- The Doing tab groups its quests by stop. Quests whose places are within
+  150 yd of each other make one trip: the stop shows how far it is, what
+  you do there ("3 hand-ins", "1 hand-in, 2 pick-ups") and what it pays,
+  once. Under it each quest is one line with a mark like the ones over
+  NPCs: a gold "?" to hand in, a gold "!" to pick up, a grey "?" to
+  finish (with its objectives under it). A small square after the name
+  means it gives or leads to gear; the tooltip names it. Click a stop to
+  show it on the map, Alt-click to pin all its quests. `/qb stops` goes
+  back to the one list.
 - A complete quest is clear at a glance: a full green bar under it, a
   green name, and "Complete" in green before "Hand in to ...".
 - Cleaner quest rows. Line 1: the name and how far. Line 2: what to do,

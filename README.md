@@ -432,6 +432,15 @@ hand-in or a pick-up). It stays while you are within 600 yards
   Questie's nearest mob, object or NPC for it ("Underbelly Whelp Scale:
   3/6 (Underbelly Whelp)"), or who takes it in. `/qb compact` drops that
   line.
+- The Doing tab groups its quests by stop: quests whose places are within
+  150 yd of each other are one trip. A stop's line shows how far it is
+  (with the arrow), what you do there ("1 hand-in, 2 pick-ups") and what
+  it pays: the XP of its hand-ins and the run there, else the XP and time
+  of its quests ("~" is a guess). Each quest under it is one line with a
+  mark: a gold "?" to hand in, a gold "!" to pick up, a grey "?" to
+  finish, which keeps its objectives under it. A small square after the
+  name means gear; the tooltip names it. `/qb stops` goes back to one list
+  (the code is in `QuestBoard/Spare1.lua`).
 - A dungeon, raid or group quest has a tag after its level: 28D, 40R, 22G
   (`GetQuestTagInfo`, else Questie's `GetQuestTagInfo`, else the suggested
   group size). `/qb dungeons off` keeps dungeon and raid quests to the Log

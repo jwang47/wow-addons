@@ -26,6 +26,7 @@ local defaults = {
   hideTrackers = false,  -- hide the game's quest tracker (and Questie's)
   locked = false,        -- /qb lock: no dragging
   compact = false,       -- /qb compact: one line per quest, no "what to do" line
+  stops = true,          -- /qb stops: the Doing tab groups its quests by stop (Spare1.lua)
   dungeons = true,       -- /qb dungeons off: dungeon and raid quests only in the Log tab
   party = true,          -- /qb party off: no party quests here, nor Questie's party objectives on the map
   focus = true,          -- in combat and instances: only the quests you are on until mouse-over
@@ -269,7 +270,7 @@ local function facing() return D.plain(call(rawget(_G, "GetPlayerFacing"))) end
 
 local function updateArrow(r)
   local e = r.entry
-  if not (e and e.angle) then r.arrow:Hide() return end
+  if r.noArrow or not (e and e.angle) then r.arrow:Hide() return end
   local f = facing()
   if not f then r.arrow:Hide() return end
   r.arrow:SetRotation(e.angle - f)
@@ -791,6 +792,7 @@ local function makeHead(kind)
   h:SetScript("OnEnter", function(self)
     local tip = rawget(_G, "GameTooltip")
     if not (tip and self.list) then return end
+    if self.stop then return ns.stopTip(self) end
     tip:SetOwner(self, "ANCHOR_LEFT")
     local n = #ns.listQuests(self.list)
     if self.hint then tip:AddLine(self.hint, 1, 1, 1) end
@@ -802,6 +804,7 @@ local function makeHead(kind)
   end)
   h:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
   h:SetScript("OnClick", function(_, button)
+    if h.stop then return ns.stopClick(h, button) end
     if rawget(_G, "IsAltKeyDown") and IsAltKeyDown() and h.list then return ns.pinList(h.list) end
     if button == "RightButton" and (kind == "log" or kind == "pickup") then
       local key = kind == "pickup" and "sortPickup" or "sortLog"
@@ -960,7 +963,8 @@ function ns.sections(st, tab)
     add({ key = "pinned", head = "Pinned", right = "Alt-click: unpin", list = pins, cap = ALL })
   end
   if tab == "doing" then
-    add({ key = "active", head = "Doing", right = "your quests now", list = st.active, cap = ALL })
+    local byStop = ns.stopSections and ns.db.stops ~= false
+    if not byStop then add({ key = "active", head = "Doing", right = "your quests now", list = st.active, cap = ALL }) end
     local cand, isActive = {}, {}
     for _, e in ipairs(st.active) do isActive[e] = true end
     for _, kind in ipairs({ "turnin", "nearby", "pickup", "party" }) do
@@ -969,7 +973,12 @@ function ns.sections(st, tab)
       end
     end
     local way = ns.onWay(cand, st.active)
-    add({ key = "onway", head = "On the way", right = "within " .. ns.ON_WAY_YARDS .. " yd", list = way })
+    if byStop then
+      -- One group per stop: your quests and the ones on the way, by place.
+      for _, s in ipairs(ns.stopSections(st.active, ns.shownRows("onway", way))) do add(s) end
+    else
+      add({ key = "onway", head = "On the way", right = "within " .. ns.ON_WAY_YARDS .. " yd", list = way })
+    end
     members()
     local shown = {}
     for _, e in ipairs(st.active) do table.insert(shown, e) end
@@ -1050,12 +1059,16 @@ function ns.render()
       local cap = sec.cap or ns.db.rows[kind] or 6
       if not sec.nohead then
         local h = heads[kind] or makeHead(kind)
-        local count = (#list > cap and not (ns.db.showAll and ns.db.showAll[kind])) and (cap .. " of " .. #list) or #list
-        h.text:SetText((collapsed and "+ " or "") .. sec.head .. "  " .. count)
-        h.right:SetText("")   -- the hint is in the group's tooltip
-        h.hint = sec.right
-        h.list = ns.shownRows(kind, list, cap)   -- pin all takes the rows you see
-        table.insert(items, { f = h, y = cy, h = HEAD_H, gap = 2 })
+        if sec.stop then
+          ns.stopHead(h, sec)
+        else
+          local count = (#list > cap and not (ns.db.showAll and ns.db.showAll[kind])) and (cap .. " of " .. #list) or #list
+          h.text:SetText((collapsed and "+ " or "") .. sec.head .. "  " .. count)
+          h.right:SetText("")   -- the hint is in the group's tooltip
+          h.hint = sec.right
+          h.list = ns.shownRows(kind, list, cap)   -- pin all takes the rows you see
+        end
+        table.insert(items, { f = h, y = cy, h = HEAD_H, gap = 2, stop = sec.stop })
         cy = cy + HEAD_H + 2
       end
       if not collapsed then
@@ -1065,9 +1078,14 @@ function ns.render()
           local r = rows[used] or makeRow(used)
           local e = shown[i]
           r.entry = e
-          r.lvl:SetText(e.kind == "more" and "" or (e.kind == "area" or e.kind == "zone") and #e.stops or e.kind == "town" and (e.role == "inn" and "Inn" or "Fly") or ((e.level or "?") .. (e.tag or "")))
+          -- In a stop: a mark before the level, and no arrow (the stop has it).
+          local inStop = sec.stop and e.kind ~= "more"
+          local tx = TEXT_X + (inStop and ns.STOP_INDENT or 0)
+          r.noArrow = inStop or nil
+          r.lvl:SetWidth(LVL_W + (inStop and ns.STOP_INDENT or 0))
+          r.lvl:SetText((inStop and (ns.stopMark(e) .. " ") or "") .. (e.kind == "more" and "" or (e.kind == "area" or e.kind == "zone") and #e.stops or e.kind == "town" and (e.role == "inn" and "Inn" or "Fly") or ((e.level or "?") .. (e.tag or ""))))
           r.lvl:SetTextColor(rgb(e.color))
-          r.name:SetText(e.name)
+          r.name:SetText(e.name .. (inStop and ns.gearMark(e) or ""))
           if e.kind == "more" then r.name:SetTextColor(0.6, 0.6, 0.6)
           elseif ns.complete(e) then r.name:SetTextColor(0.55, 0.9, 0.55)
           elseif e.classColor then r.name:SetTextColor(e.classColor[1], e.classColor[2], e.classColor[3])
@@ -1083,8 +1101,19 @@ function ns.render()
           local split = full and ns.QUEST_KINDS[e.kind]
           r.meta:SetText(split and ns.place(e) or ns.meta(e, kind))
           ns.setBar(r, e, kind)
+          r.bar:ClearAllPoints()
+          r.bar:SetPoint("BOTTOMLEFT", tx, 0)
+          r.bar:SetPoint("BOTTOMRIGHT", -16, 0)
           local todo, lines
-          if split then
+          if inStop then
+            -- One line: the name, and at the right who to see. A quest
+            -- still to finish keeps its objectives under it.
+            lines = ns.stopLines(e)
+            todo = lines[1]
+            r.meta:SetText(#lines == 0 and ns.stopWho(e, e.name, W - 2 * PAD - tx - 16 - (e.pinned and 12 or 0)) or "")
+            if ns.complete(e) then r.bar:Hide() r.fill:Hide() end   -- the mark and the green name say it
+            split = false
+          elseif split then
             -- Quest rows: what to do (each open objective when you are on
             -- it), your party, then the gear it leads to.
             lines = kind == "active" and ns.activeLines(e, true) or { ns.todoWho(e) }
@@ -1106,10 +1135,10 @@ function ns.render()
           r.stats:SetText(split and ns.stats(e, kind) or "")
           local statsW = split and (r.stats.GetStringWidth and r.stats:GetStringWidth() or 0) or 0
           r.sub:ClearAllPoints()
-          r.sub:SetPoint("TOPLEFT", TEXT_X, -ROW_H + SUB_UP)
+          r.sub:SetPoint("TOPLEFT", tx, -ROW_H + SUB_UP)
           r.sub:SetPoint("TOPRIGHT", -16 - (statsW > 0 and statsW + 8 or 0), -ROW_H + SUB_UP)
           -- A line too long for the board goes on to the next line.
-          lines = ns.wrapLines(lines, W - 2 * PAD - TEXT_X - 16 - (statsW > 0 and statsW + 8 or 0))
+          lines = ns.wrapLines(lines, W - 2 * PAD - tx - 16 - (statsW > 0 and statsW + 8 or 0))
           r.sub:SetText(lines[1] or "")
           local n = #lines
           for i = 1, math.max(#r.more, n - 1) do
@@ -1117,12 +1146,13 @@ function ns.render()
             if i <= n - 1 then
               if not fs then
                 fs = r:CreateFontString(nil, "OVERLAY", FONT_DIM)
-                fs:SetPoint("TOPLEFT", TEXT_X, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
-                fs:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
                 fs:SetJustifyH("LEFT")
                 if fs.SetWordWrap then fs:SetWordWrap(false) end
                 r.more[i] = fs
               end
+              fs:ClearAllPoints()
+              fs:SetPoint("TOPLEFT", tx, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
+              fs:SetPoint("TOPRIGHT", -16, -ROW_H + SUB_UP - i * (ROW_H - SUB_UP))
               fs:SetText(lines[i + 1])
               fs:Show()
             elseif fs then
@@ -1174,7 +1204,7 @@ function ns.render()
       f:SetPoint("TOPLEFT", PAD, top - at)
       f:SetPoint("TOPRIGHT", -PAD, top - at)
       at = at + it.h + (it.gap or 0)
-      if it.row then updateArrow(f) end
+      if it.row then updateArrow(f) elseif it.stop then ns.stopArrow(f) end
       f:Show()
     else
       f:Hide()
@@ -1410,6 +1440,7 @@ local function tickFn(self, dt)
   if sinceArrow > 0.1 then
     sinceArrow = 0
     for _, r in ipairs(rows) do if r:IsShown() then updateArrow(r) end end
+    for _, h in pairs(heads) do if h.stop and h:IsShown() then ns.stopArrow(h) end end
   end
   if sinceFull > ns.FULL_SECS then
     sinceFull = 0
@@ -1631,6 +1662,7 @@ local help = {
   "/qb lock - stop dragging (again to undo)",
   "/qb focus - show the whole board all the time, not only on mouse-over (again to undo)",
   "/qb compact - one line per quest, without the what-to-do line (again to undo)",
+  "/qb stops - the Doing tab groups its quests by stop, or not (again to undo)",
   "Click a group name to fold it; right-click it to sort by nearest or best XP.",
   "/qb range N - pick-ups at most N levels over you (now %d)",
   "/qb rows N - rows per group (now %d)",
@@ -1686,6 +1718,10 @@ SlashCmdList.QUESTBOARD = function(text)
     return ns.render()
   elseif cmd == "compact" then
     ns.db.compact = not ns.db.compact
+    return ns.render()
+  elseif cmd == "stops" then
+    ns.db.stops = ns.db.stops == false
+    say(ns.db.stops and "Doing: quests grouped by stop" or "Doing: one list, no stops")
     return ns.render()
   elseif cmd == "lock" then
     ns.db.locked = not ns.db.locked

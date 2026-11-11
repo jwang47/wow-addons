@@ -1082,6 +1082,63 @@ D.rewardsByQuest = nil
 D.resetModules()
 
 ---------------------------------------------------------------------------
+-- Stops (Spare1.lua): the Doing tab groups its quests by place.
+;(function()
+assert(loadfile(root .. "QuestBoard/Spare1.lua"))("QuestBoard", ns)
+local function q(name, kind, wx, wy, dist, xp, more)
+  local e = { name = name, kind = kind, wx = wx, wy = wy, inst = 0, dist = dist, xp = xp, level = 33, color = "yellow", left = {}, id = 0 }
+  for k, v in pairs(more or {}) do e[k] = v end
+  return e
+end
+local camp1 = q("Raptor Mastery", "turnin", 0, 100, 100, 1400, { target = "Hemet Nesingwary", pinned = true })
+local camp2 = q("Tiger Mastery", "turnin", 10, 100, 100, 1300, { target = "Ajeck Rouack" })
+local thorsen = q("Jungle Secrets", "pickup", 400, 0, 400, 1300, { target = "Private Thorsen", secs = 240 })
+local bay1 = q("Supply and Demand", "turnin", 0, -2800, 2800, 1200, { target = "Drizzlik" })
+local camp3 = q("Panther Mastery", "turnin", 5, 110, 100, 1300, { target = "Sir S. J. Erlgadin" })
+local bay2 = q("Singing Blue Shards", "pickup", 60, -2850, 2800, 2800, { target = "Crank Fizzlebub", secs = 660 })
+local crystal = q("Crystal in the Mountains", "log", -200, 0, 200, 280, { target = "Bloodscalp Warrior", left = { { text = "Pendant of Myzrael: 0/1" } } })
+local other = q("Elsewhere", "turnin", 5, 100, 100, 500, { inst = 1 })
+local stops = ns.stops({ camp1, camp2, thorsen, bay1, camp3, bay2, crystal, other })
+check("stops: quests at one place make one stop, in list order",
+  #stops == 5 and #stops[1].list == 3 and stops[1].list[3] == camp3 and #stops[2].list == 1 and #stops[3].list == 2 and stops[4].list[1] == crystal)
+check("stops: another continent is another stop", stops[5].list[1] == other)
+check("stops: a stop with hand-ins pays their XP, and takes the run there",
+  stops[1].hand == 3 and stops[1].xp == 4000 and stops[1].dist == 100 and stops[1].secs == D.travelSecs(100) and not stops[1].guess)
+check("stops: pick-ups do not count in a hand-in stop's XP", stops[3].hand == 1 and stops[3].pick == 1 and stops[3].xp == 1200)
+check("stops: a pick-up stop shows the quest's XP and time as a guess", stops[2].xp == 1300 and stops[2].secs == 240 and stops[2].guess)
+check("stops: what you do there", strip(ns.stopWhat(stops[1])) == "3 hand-ins" and strip(ns.stopWhat(stops[3])) == "1 hand-in, 1 pick-up"
+  and strip(ns.stopWhat(stops[4])) == "1 to finish" and strip(ns.stopWhat(stops[2])) == "1 pick-up")
+check("stops: the head's numbers", ns.stopStats(stops[1]) == "4.0k xp  <1 min" and ns.stopStats(stops[2]) == "1.3k xp  ~4 min" and ns.stopPlace(stops[3]) == "2.8k yd")
+check("stops: ? to hand in, ! to pick up, a grey ? to finish",
+  ns.stopMark(camp1) == "|cffffd100?|r" and ns.stopMark(thorsen) == "|cffffd100!|r" and ns.stopMark(crystal) == "|cff909090?|r")
+check("stops: only a quest to finish has lines under it", #ns.stopLines(camp1) == 0 and #ns.stopLines(thorsen) == 0 and ns.stopLines(crystal)[1]:find("Pendant", 1, true) ~= nil)
+check("stops: no gear, no gear mark", ns.gearMark(camp1) == "")
+local noPlace = q("Lost", "log", nil, nil, nil, 100)
+check("stops: a quest with no place is its own stop", #ns.stops({ noPlace, q("Lost too", "log", nil, nil, nil, 100) }) == 2 and ns.stopPlace(ns.stops({ noPlace })[1]) == "no place")
+local moreRow = { kind = "more", group = "onway", name = "+2 more", left = {} }
+local ss = ns.stopSections({ camp1, bay1 }, { camp2, moreRow })
+check("stops: one section per stop, the +N more line last", #ss == 3 and ss[1].stop and #ss[1].list == 2 and ss[2].stop and ss[3].nohead and ss[3].list[1] == moreRow)
+-- On the board: the Doing tab draws stops; /qb stops goes back to one list.
+ns.refresh()
+ns.pickTab("doing")
+local doingSecs = ns.sections(ns.state(), "doing")
+local stopHeads, stopRows = 0, 0
+for _, f in ipairs(frames) do
+  if f.kind == "Button" and f.stop and f.shown then stopHeads = stopHeads + 1 end
+  if f.kind == "Button" and f.entry and f.shown and f.noArrow then stopRows = stopRows + 1 end
+end
+local nStops = 0
+for _, sec in ipairs(doingSecs) do if sec.stop then nStops = nStops + 1 end end
+check("stops: the Doing tab has no Doing or On the way group", nStops > 0 and doingSecs[1].stop ~= nil)
+check("stops: the board draws a head per stop and marks its rows", stopHeads == nStops and stopRows > 0)
+SlashCmdList.QUESTBOARD("stops")
+check("/qb stops: back to one list", QuestBoardDB.stops == false and not ns.sections(ns.state(), "doing")[1].stop)
+SlashCmdList.QUESTBOARD("stops")
+check("/qb stops again: stops", QuestBoardDB.stops == true and ns.sections(ns.state(), "doing")[1].stop ~= nil)
+ns.pickTab("nearby")
+end)()
+
+---------------------------------------------------------------------------
 -- Without Questie: the log only, no errors.
 questieOn = false
 D.resetModules()
