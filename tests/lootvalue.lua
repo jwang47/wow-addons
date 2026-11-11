@@ -464,6 +464,12 @@ local qt = LV.marketQuote(2589, "|Hitem:2589:0|h[Linen Cloth]|h", 13, 13)
 check("market quote: fair price, odds, expected", qt and qt.price == 93 and qt.fresh and qt.expected
   and qt.expected < qt.net and qt.auctions == 3 and has(qt.note, "3 listed") and has(qt.note, "sells in 24h"))
 check("market quote: no scan is unsure", LV.marketQuote(9003).confidence == "no scan")
+-- Bait: no scan odds, and you sold 0 of 2. The AH must not count as sure.
+LootValueDB.sales["Thing"] = { posted = 2, sold = 0, expired = 2, cancelled = 0, soldItems = 0, net = 0 }
+local bait = LV.marketQuote(9003, "|Hitem:9003:0|h[Thing]|h", 300, 300)
+check("bait: no odds and 0 of 2 sold pulls the value down", bait and math.abs(bait.chance - 1.4 / 6) < 0.001
+  and bait.expected < bait.net and has(bait.note, "you sold 0 of 2") and has(bait.note, "assumed 23% sells"))
+LootValueDB.sales["Thing"] = nil
 local T2 = T
 T = T + 2 * 86400
 check("an old scan's fair price is not used", LV.fairPrice(2589) == nil)
