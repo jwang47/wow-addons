@@ -431,6 +431,14 @@ function Scan.run(onStep, onDone)
   end
   local function after(still, got)
     if gen ~= state.gen then return end
+    -- Bags changed during the scan (a quest reward, loot): those items
+    -- join the rows too, and the next pass loads the ones not seen yet.
+    bagIDs(sources)
+    local seen = {}
+    for _, id in ipairs(still) do seen[id] = true end
+    for id, src in pairs(sources) do
+      if src == "bags" and not seen[id] and not Scan.item(id) then table.insert(still, id) end
+    end
     local n = ask(still)
     if got > 0 or n > 0 then idle = 0 else idle = idle + 1 end
     state.busy, state.pending = false, #still
@@ -462,13 +470,22 @@ end
 
 -- Bags changed or gear moved: rebuild the "bags" sources (an item you
 -- equipped is no longer a free candidate; an AH copy stays), score new bag
--- items, reread what you wear and return fresh rows.
+-- items, reread what you wear and return fresh rows. A new bag item the
+-- game has not loaded yet (a quest reward just handed in) is asked for,
+-- and state.bagPending counts them so the caller can look again.
 function Scan.refresh()
   local sources = {}
   auctionatorIDs(sources)
   dungeonIDs(sources)
   bagIDs(sources)
-  for id, src in pairs(sources) do if src == "bags" then Scan.item(id) end end
+  local pending = 0
+  for id, src in pairs(sources) do
+    if src == "bags" and not Scan.item(id) then
+      pending = pending + 1
+      call(api("C_Item.RequestLoadItemDataByID"), id)
+    end
+  end
+  state.bagPending = pending
   Scan.readWorn()
   return Scan.rows(sources)
 end
