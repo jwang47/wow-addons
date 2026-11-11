@@ -593,9 +593,17 @@ local function professionOf(q)
   return prof, table.concat(rest, " ")
 end
 
+-- An AH sale LootValue is not sure of ("thin" market, no scan today).
+function S.unsure(r)
+  return type(r) == "table" and r.confidence ~= nil and r.confidence ~= "ok"
+end
+
 local function byProfit(a, b)
   local pa, pb = a.recipe and a.recipe.profit or nil, b.recipe and b.recipe.profit or nil
   if (pa ~= nil) ~= (pb ~= nil) then return pa ~= nil end
+  -- A sure profit before an unsure one: a thin market is bait.
+  local ua, ub = S.unsure(a.recipe), S.unsure(b.recipe)
+  if pa and pb and ua ~= ub then return not ua end
   if pa and pb and pa ~= pb then return pa > pb end
   return a.name < b.name
 end
