@@ -1246,7 +1246,7 @@ function D.short(n)
 end
 
 -- XP as a share of your level, so you need not work it out: "1.2%" for a
--- quest, "0.4%/m" for XP per minute. Raw XP when the game gives no level
+-- quest, "24%/h" for XP per minute (as a share per hour). Raw XP when the game gives no level
 -- size (the top level).
 function D.levelPct(xp)
   local max = D.plain(call(rawget(_G, "UnitXPMax"), "player"))
@@ -1264,9 +1264,10 @@ function D.xpText(xp)
   if p then return pctText(p) end
   return D.short(xp) .. " xp"
 end
+-- XP per minute in, the share of your level per hour out: "24%/h".
 function D.rateText(rate)
-  local p = D.levelPct(rate)
-  if p then return pctText(p) .. "/m" end
+  local p = D.levelPct(rate and rate * 60)
+  if p then return pctText(p) .. "/h" end
   return D.short(rate) .. " xp/m"
 end
 

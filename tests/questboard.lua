@@ -1222,13 +1222,27 @@ questieOn = true
 D.resetModules()
 mods.DistanceUtils.GetNearestSpawnForQuest = function() error("changed") end
 local rough = D.collect({})
-check("a failing Questie call is skipped", #rough.log == 2)
+check("a failing Questie call is skipped", #rough.log == 2);
+
+-- The "..." menu: every option without a /qb command.
+(function()
+  check("menu: a button right of the tabs", QuestBoardFrame.menuBtn ~= nil)
+  QuestBoardFrame.menuBtn.scripts.OnClick()
+  local m = QuestBoardMenu
+  check("menu: opens with the options", m and m.shown and #m.buttons >= 8)
+  local dun
+  for _, b in ipairs(m.buttons) do if b.text.text == "Show dungeon and raid quests" then dun = b end end
+  local before = QuestBoardDB.dungeons ~= false
+  dun.scripts.OnClick(dun)
+  check("menu: a click runs the option and closes the menu", (QuestBoardDB.dungeons ~= false) ~= before and not m.shown)
+  SlashCmdList.QUESTBOARD(before and "dungeons on" or "dungeons off")
+end)()
 
 -- XP as a share of the level, so the player need not work it out.
 UnitXPMax = function() return 50000 end
 check("percent: a quest's XP", D.xpText(600) == "1.2%" and D.xpText(10) == "<0.1%" and D.xpText(6000) == "12%")
-check("percent: XP per minute", D.rateText(250) == "0.5%/m" and D.rateText(0) == "0%/m")
-check("percent: a row shows it", strip(ns.stats({ kind = "pickup", xp = 600, secs = 180 })) == "~0.4%/m  3 min")
+check("percent: XP per minute", D.rateText(250) == "30%/h" and D.rateText(10) == "1.2%/h" and D.rateText(0) == "0%/h")
+check("percent: a row shows it", strip(ns.stats({ kind = "pickup", xp = 600, secs = 180 })) == "~24%/h  3 min")
 UnitXPMax = nil
 check("percent: raw XP when the game gives no level size", D.xpText(625) == "625 xp" and D.rateText(250) == "250 xp/m")
 

@@ -46,6 +46,7 @@ ns.say = say
 -- frame art, small text, colour only for quest level.
 ---------------------------------------------------------------------------
 local W, ROW_H, HEAD_H, PAD = 270, 15, 16, 6   -- W: the board width, from ns.db.width
+local MENU_W = 20               -- the menu button right of the tabs
 local LVL_W = 26                 -- the level column: room for "33D"
 local TEXT_X = LVL_W + 6         -- where the name and the lines under it start
 local WRAP_MAX = 2               -- screen lines one text line may take
@@ -194,7 +195,7 @@ function ns.place(e)
   return ""
 end
 
--- Line 2, right: the same two numbers on every quest, "0.4%/m  3 min",
+-- Line 2, right: the same two numbers on every quest, "24%/h  3 min",
 -- coloured by how good the XP per minute is. "~" marks a guess.
 function ns.stats(e, kind)
   if e.toFinisher then return "" end
@@ -209,7 +210,7 @@ function ns.stats(e, kind)
   else
     secs, guess = e.secs, true
   end
-  -- XP per minute as a share of your level ("0.4%/m"): the number to
+  -- XP per minute as a share of your level per hour ("24%/h"): the number to
   -- compare. The quest's own XP is in the tooltip.
   local rate = e.rate or D.rate(e.xp, secs)
   local parts = {}
@@ -293,7 +294,7 @@ local function tooltip(r)
   if e.kind == "zone" then
     tip:AddLine(e.name .. (e.dist and ("  (" .. D.yards(e.dist) .. ")") or "  (far)"), 1, 1, 1)
     tip:AddLine(D.zoneText(e), 0.8, 0.8, 0.8)
-    if e.rate then tip:AddLine(string.format("~%s of your level per minute (%s XP), %s XP there, trip counted", (D.rateText(e.rate):gsub("/m$", "")), D.short(e.rate), D.short(e.xp)), 0.6, 0.8, 1) end
+    if e.rate then tip:AddLine(string.format("~%s of your level per hour (%s XP a minute), %s XP there, trip counted", (D.rateText(e.rate):gsub("/[hm]$", "")), D.short(e.rate), D.short(e.xp)), 0.6, 0.8, 1) end
     for i, s in ipairs(e.stops) do
       if i > 12 then tip:AddLine("  (" .. (#e.stops - 12) .. " more)", 0.6, 0.6, 0.6) break end
       local what = s.kind == "turnin" and "hand in" or (s.kind == "pickup" or s.kind == "party") and "pick up" or "in your log"
@@ -343,7 +344,7 @@ local function tooltip(r)
   if e.kind == "area" then
     tip:AddLine(e.name .. "  (" .. D.yards(e.dist) .. ")", 1, 1, 1)
     tip:AddLine(D.areaText(e), 0.8, 0.8, 0.8)
-    if e.rate then tip:AddLine(string.format("~%s of your level per minute (%s XP), %s XP here", (D.rateText(e.rate):gsub("/m$", "")), D.short(e.rate), D.short(e.xp)), 0.6, 0.8, 1) end
+    if e.rate then tip:AddLine(string.format("~%s of your level per hour (%s XP a minute), %s XP here", (D.rateText(e.rate):gsub("/[hm]$", "")), D.short(e.rate), D.short(e.xp)), 0.6, 0.8, 1) end
     for _, s in ipairs(e.stops) do
       local what = s.kind == "turnin" and "hand in" or (s.kind == "pickup" or s.kind == "party") and "pick up" or "objective"
       tip:AddLine("- " .. s.name .. "  (" .. what .. ")", rgb(s.color))
@@ -370,12 +371,12 @@ local function tooltip(r)
   if red then tip:AddLine(red, 1, 0.4, 0.4) end
   if e.xp then tip:AddLine(D.short(e.xp) .. " XP" .. (D.levelPct(e.xp) and (" (" .. D.xpText(e.xp) .. " of your level)") or ""), 0.6, 0.8, 1) end
   if e.kind == "turnin" and e.dist then
-    tip:AddLine(string.format("About %s to %s, ~%s per minute of the trip", D.mins(D.travelSecs(e.dist, e)), e.by == "fly" and "fly there (if you have the flight path)" or "run there", (D.rateText(e.rate):gsub("/m$", ""))), 0.6, 0.8, 1)
+    tip:AddLine(string.format("About %s to %s, ~%s per hour of the trip", D.mins(D.travelSecs(e.dist, e)), e.by == "fly" and "fly there (if you have the flight path)" or "run there", (D.rateText(e.rate):gsub("/[hm]$", ""))), 0.6, 0.8, 1)
   elseif e.kind == "turnin" and e.far then
     tip:AddLine("On another continent or in an instance: a boat, a flight or a dungeon run", 0.8, 0.5, 0.5)
   elseif e.rate and e.secs then
     local guess = (e.kind == "log" and not e.done) and select(2, D.workSecs(e))
-    tip:AddLine(string.format("~%s per minute (about %d min%s)", (D.rateText(e.rate):gsub("/m$", "")), math.max(1, math.floor(e.secs / 60 + 0.5)),
+    tip:AddLine(string.format("~%s of your level per hour (about %d min%s)", (D.rateText(e.rate):gsub("/[hm]$", "")), math.max(1, math.floor(e.secs / 60 + 0.5)),
       D.runSecs and D.runSecs(e) and (e.tag == "R" and ", a raid run" or ", a dungeon run")
         or guess and ", a guess until you make progress" or ""), 0.6, 0.8, 1)
     if e.by == "fly" then tip:AddLine("The trip is by flight (if you have the flight path)", 0.6, 0.8, 1) end
@@ -1043,7 +1044,9 @@ function ns.render()
   local warn = state and not state.questie and "No Questie: your log only" or nil
   -- The tabs: the one shown is gold, the others grey.
   local cur = ns.tab()
-  local tw = math.floor((W - 2 * PAD) / #ns.TABS)
+  local tw = math.floor((W - 2 * PAD - MENU_W) / #ns.TABS)
+  panel.menuBtn:ClearAllPoints()
+  panel.menuBtn:SetPoint("TOPRIGHT", -PAD + 2, y)
   for i, t in ipairs(ns.TABS) do
     local b = panel.tabs[i]
     local label = ns.TAB_NAMES[t]
@@ -1498,6 +1501,23 @@ local function build()
     draggable(b)
     panel.tabs[i] = b
   end
+  -- The menu: every option, so nobody needs the /qb commands.
+  local mb = CreateFrame("Button", nil, panel)
+  mb:SetSize(MENU_W, ROW_H)
+  mb.text = mb:CreateFontString(nil, "OVERLAY", FONT)
+  mb.text:SetPoint("CENTER", 0, 1)
+  mb.text:SetText("...")
+  mb.text:SetTextColor(0.7, 0.7, 0.7)
+  mb:SetScript("OnClick", function() ns.toggleMenu() end)
+  mb:SetScript("OnEnter", function(self)
+    local tip = rawget(_G, "GameTooltip")
+    if not tip then return end
+    tip:SetOwner(self, "ANCHOR_LEFT")
+    tip:AddLine("Options", 1, 1, 1)
+    tip:Show()
+  end)
+  mb:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+  panel.menuBtn = mb
   panel.more = panel:CreateFontString(nil, "OVERLAY", FONT_DIM)
   panel.more:SetPoint("BOTTOMLEFT", PAD, PAD - 2)
   panel.more:Hide()
@@ -1694,6 +1714,77 @@ local help = {
   "/qb tracker off - hide the game's quest tracker (on brings it back)",
   "/qb far on - show enemy nameplates from as far as the game allows (off puts it back)",
 }
+---------------------------------------------------------------------------
+-- Options menu (the "..." button right of the tabs)
+---------------------------------------------------------------------------
+-- The options as { text, run, on (a check mark), off (greyed out) }. Each
+-- one runs the same code as its /qb command.
+function ns.menuItems()
+  local q = SlashCmdList.QUESTBOARD
+  local safe = ns.redQuests and #(ns.redQuests(state)) or 0
+  return {
+    { text = "Drop safe red quests" .. (safe > 0 and (" (" .. safe .. ")") or ""), off = safe == 0, run = function() q("abandon") end },
+    { text = "Red quests: which to keep", run = function() q("red") end },
+    { text = "Show dungeon and raid quests", on = ns.db.dungeons ~= false, run = function() q(ns.db.dungeons == false and "dungeons on" or "dungeons off") end },
+    { text = "Group Doing by stop", on = ns.db.stops ~= false, run = function() q("stops") end },
+    { text = "Compact rows", on = ns.db.compact and true or false, run = function() q("compact") end },
+    { text = "In combat: Doing only", on = ns.db.focus and true or false, run = function() q("focus") end },
+    { text = "Lock the board in place", on = ns.db.locked and true or false, run = function() q("lock") end },
+    { text = "No height limit", off = not ns.db.maxHeight, run = function() q("height off") end },
+    { text = "Reset the width", run = function() q("width reset") end },
+    { text = "Hide the board (/qb shows it)", run = function() q("") end },
+  }
+end
+
+local menu
+function ns.toggleMenu()
+  if menu and menu:IsShown() then menu:Hide() return end
+  if not menu then
+    menu = CreateFrame("Frame", "QuestBoardMenu", panel)
+    menu:SetFrameStrata("DIALOG")
+    local bg = menu:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.05, 0.05, 0.05, 0.92)
+    menu.buttons = {}
+    ns.menu = menu
+  end
+  local items = ns.menuItems()
+  local w, h = 200, ROW_H + 2
+  for i, it in ipairs(items) do
+    local b = menu.buttons[i]
+    if not b then
+      b = CreateFrame("Button", nil, menu)
+      b:SetHeight(h)
+      b.text = b:CreateFontString(nil, "OVERLAY", FONT)
+      b.text:SetPoint("LEFT", 20, 0)
+      b.check = b:CreateFontString(nil, "OVERLAY", FONT)
+      b.check:SetPoint("LEFT", 6, 0)
+      local hl = b:CreateTexture(nil, "HIGHLIGHT")
+      hl:SetAllPoints()
+      hl:SetColorTexture(1, 1, 1, 0.12)
+      menu.buttons[i] = b
+    end
+    b:ClearAllPoints()
+    b:SetPoint("TOPLEFT", 0, -4 - (i - 1) * h)
+    b:SetPoint("TOPRIGHT", 0, -4 - (i - 1) * h)
+    b.text:SetText(it.text)
+    if it.off then b.text:SetTextColor(0.45, 0.45, 0.45) else b.text:SetTextColor(0.92, 0.92, 0.92) end
+    b.check:SetText(it.on and "|cffffd040x|r" or "")
+    b.item = it
+    b:SetScript("OnClick", function(self)
+      if self.item.off then return end
+      menu:Hide()
+      self.item.run()
+    end)
+    b:Show()
+  end
+  for i = #items + 1, #menu.buttons do menu.buttons[i]:Hide() end
+  menu:SetSize(w, #items * h + 8)
+  menu:ClearAllPoints()
+  menu:SetPoint("TOPRIGHT", panel.menuBtn, "BOTTOMRIGHT", 0, -2)
+  menu:Show()
+end
+
 SLASH_QUESTBOARD1, SLASH_QUESTBOARD2 = "/qb", "/questboard"
 SlashCmdList.QUESTBOARD = function(text)
   local cmd, rest = (text or ""):match("^%s*(%S*)%s*(.-)%s*$")

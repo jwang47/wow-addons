@@ -111,7 +111,7 @@ function ns.stopPlace(s)
   return (ns.place(s.seed):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
 end
 
--- "0.4%/m  1 min" (XP per minute as a share of your level), "~" on a guess.
+-- "24%/h  1 min" (XP per minute as a share of your level per hour), "~" on a guess.
 function ns.stopStats(s)
   local parts = {}
   local rate = D.rate(s.xp, s.secs)
