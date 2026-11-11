@@ -167,10 +167,22 @@ function D.rate(xp, secs)
   return xp / (secs / 60)
 end
 
-function D.travelSecs(dist)
+-- The trip in seconds: on foot in a straight line, or with e (the quest,
+-- its place known) by flight when that is shorter (Spare2.lua). The second
+-- result is "fly" for a flight.
+function D.travelSecs(dist, e)
   local speed = plain(call(rawget(_G, "GetUnitSpeed"), "player")) or 0
   if speed < D.RUN_SPEED then speed = D.RUN_SPEED end
-  return (dist or 0) / speed
+  local run = (dist or 0) / speed
+  local fly = e and dist and D.flySecs and D.flySecs(e, speed)
+  if fly and fly < run then return fly, "fly" end
+  return run
+end
+-- Where you are in the world: x, y (yards), instance.
+function D.playerWorld()
+  local lib = hbd()
+  if not lib then return nil end
+  return call(lib.GetPlayerWorldPosition, lib)
 end
 
 ---------------------------------------------------------------------------
@@ -194,19 +206,75 @@ local function objectivesLeft(id)
   return left, all, count, all > 0 and sum / all or nil
 end
 
+-- A quest's tag: "D" dungeon, "R" raid, "G" group or elite, or nil. From the
+-- game (GetQuestTagInfo), else Questie, else the suggested group size.
+D.TAG_IDS = { [1] = "G", [62] = "R", [81] = "D", [85] = "D", [88] = "R", [89] = "R" }
+D.TAG_NAMES = { Group = "G", Elite = "G", Dungeon = "D", Heroic = "D", Raid = "R" }
+local tagCache = {}
+function D.questTag(id, suggested)
+  if not id then return nil end
+  if tagCache[id] ~= nil then return tagCache[id] or nil end
+  local tagID, tagName = call(rawget(_G, "GetQuestTagInfo"), id)
+  tagID, tagName = plain(tagID), plain(tagName)
+  if not tagID and not tagName then
+    local qdb = D.module("QuestieDB")
+    if qdb then
+      tagID, tagName = call(qdb.GetQuestTagInfo, id)
+      tagID, tagName = plain(tagID), plain(tagName)
+    end
+  end
+  local tag = (type(tagID) == "number" and D.TAG_IDS[tagID]) or (type(tagName) == "string" and D.TAG_NAMES[tagName]) or nil
+  -- Many Classic dungeon quests have no tag: Questie files them under the
+  -- dungeon (zoneOrSort is the dungeon's area id).
+  if not tag or tag == "G" then tag = D.instanceTag(id) or tag end
+  suggested = plain(suggested)
+  if not tag and type(suggested) == "number" and suggested > 1 then tag = "G" end
+  tagCache[id] = tag or false
+  return tag
+end
+function D.resetTags() tagCache = {} end
+
+-- Area ids of the Classic dungeons and raids, for when Questie's ZoneDB
+-- cannot say.
+D.DUNGEON_AREAS = {
+  [209] = true, [491] = true, [717] = true, [718] = true, [719] = true, [721] = true,
+  [722] = true, [796] = true, [1176] = true, [1337] = true, [1477] = true, [1581] = true,
+  [1583] = true, [1584] = true, [2017] = true, [2057] = true, [2100] = true, [2437] = true,
+  [2557] = true,
+}
+D.RAID_AREAS = {
+  [1977] = true, [2159] = true, [2677] = true, [2717] = true, [3428] = true, [3429] = true,
+  [3456] = true,
+}
+-- "D" or "R" when Questie files the quest under a dungeon or a raid.
+function D.instanceTag(id)
+  local qdb = D.module("QuestieDB")
+  if not (qdb and qdb.QueryQuestSingle) then return nil end
+  local area = plain(call(qdb.QueryQuestSingle, id, "zoneOrSort"))
+  if type(area) ~= "number" or area <= 0 then return nil end
+  if D.RAID_AREAS[area] then return "R" end
+  if D.DUNGEON_AREAS[area] then return "D" end
+  local zdb = D.module("ZoneDB")
+  if zdb and type(zdb.IsDungeonZone) == "function" and call(zdb.IsDungeonZone, zdb, area) then return "D" end
+  return nil
+end
+D.TAG_TEXT = { D = "dungeon quest", R = "raid quest", G = "group or elite quest" }
+-- Dungeon and raid quests (not plain group quests).
+function D.isDungeon(e) return e.tag == "D" or e.tag == "R" end
+
 -- One entry per quest in the log, headers skipped.
 function D.logQuests()
   local list, zone = {}, nil
   local n = call(api("C_QuestLog.GetNumQuestLogEntries")) or 0
   local title = rawget(_G, "GetQuestLogTitle")
   for i = 1, n do
-    local name, level, header, id, done
+    local name, level, header, id, done, suggested
     local info = call(api("C_QuestLog.GetInfo"), i)
     if type(info) == "table" then
-      name, level, header, id = info.title, info.level, info.isHeader, info.questID
+      name, level, header, id, suggested = info.title, info.level, info.isHeader, info.questID, info.suggestedGroup
     elseif title then
-      local t, l, _, h, _, c, _, q = call(title, i)
-      name, level, header, id, done = t, l, h, q, c == 1
+      local t, l, g, h, _, c, _, q = call(title, i)
+      name, level, header, id, done, suggested = t, l, h, q, c == 1, g
     end
     if header then zone = name
     elseif id and type(name) == "string" and name ~= "" and not (info and info.isHidden) then
@@ -216,7 +284,7 @@ function D.logQuests()
       local left, all, count, frac = objectivesLeft(id)
       -- A quest with objectives and none left is ready even if the flag lags.
       if all > 0 and #left == 0 then done = true end
-      table.insert(list, { id = id, name = name, level = plain(level), header = zone, done = done,
+      table.insert(list, { id = id, name = name, level = plain(level), header = zone, done = done, tag = D.questTag(id, suggested),
         left = left, objectives = all, count = count, frac = frac, index = i, kind = done and "turnin" or "log" })
     end
   end
@@ -312,7 +380,7 @@ end
 function D.placeItemStart(e, quest)
   local itemID = quest.Starts and quest.Starts.Item and quest.Starts.Item[1]
   local best, item = D.itemSource(itemID)
-  if item then e.item = item.name end
+  if item then e.startItem = item.name end
   if best then
     e.dropFrom, e.dropHow = best.name, best.how
     place(e, best.spawn, best.zone, best.name, best.dist)
@@ -361,19 +429,45 @@ function D.unitsLeft(e)
   return n
 end
 
--- Time for the work left on a quest: the kills or loots left times your
--- pace on this quest (drop rates included, since it is measured). Before
--- you make progress on it, the pace over all quests or UNIT_SECS, and the
--- second value says it is a guess.
+-- How much slower a quest over your level goes: tougher mobs, more deaths
+-- and rests. 5 or more over (red) counts as close to not doable alone. A
+-- quest 3 or more under goes a bit faster.
+D.LEVEL_SLOW = { [1] = 1.25, [2] = 1.6, [3] = 2.2, [4] = 3.2 }
+D.RED_SLOW, D.LOW_FAST = 6, 0.85
+function D.levelFactor(questLevel, level)
+  level = level or D.playerLevel()
+  if not (questLevel and level) or questLevel <= 0 then return 1 end
+  local diff = questLevel - level
+  if diff >= 5 then return D.RED_SLOW end
+  if diff >= 1 then return D.LEVEL_SLOW[diff] end
+  if diff <= -3 then return D.LOW_FAST end
+  return 1
+end
+
+-- The work left on a quest: kills or loot left at your pace on it (it
+-- already shows how hard the quest is for you), else at your pace over
+-- all quests (or a guess) times the level factor. Second value: a guess.
+-- A dungeon or raid quest takes a run, not a few kills: about this long,
+-- less the part you have done.
+D.RUN_SECS = { D = 45 * 60, R = 120 * 60 }
+function D.runSecs(e)
+  local run = D.RUN_SECS[e.tag]
+  if not run then return nil end
+  return run * math.max(0.25, 1 - (e.frac or 0))
+end
+
 function D.workSecs(e)
+  local run = D.runSecs(e)
+  if run then return run, true end
   local own = D.pace[e.id]
-  local pace = own or math.max(D.anyPace or 0, D.UNIT_SECS)
-  return D.unitsLeft(e) * pace, not own
+  if own then return D.unitsLeft(e) * own, false end
+  local pace = math.max(D.anyPace or 0, D.UNIT_SECS)
+  return D.unitsLeft(e) * pace * D.levelFactor(e.level), true
 end
 
 function D.logSecs(e)
-  if e.done then return D.travelSecs(e.dist) + D.PICKUP_SECS end
-  return D.travelSecs(e.dist) + D.workSecs(e) + D.RETURN_SECS
+  if e.done then return D.travelSecs(e.dist, e) + D.PICKUP_SECS end
+  return D.travelSecs(e.dist, e) + D.workSecs(e) + D.RETURN_SECS
 end
 
 ---------------------------------------------------------------------------
@@ -402,6 +496,66 @@ function D.availableIDs()
   return ids
 end
 
+-- Why a quest you can take is not on the board: nil when it fits, else
+-- a short reason.
+function D.unfitReason(quest, level, maxAbove)
+  level = level or D.playerLevel()
+  if quest.isHidden then return "Questie marks it hidden" end
+  if quest.requiredLevel and quest.requiredLevel > level then return "it needs level " .. quest.requiredLevel end
+  if D.difficulty(quest.level, level) == "grey" then return "it is grey for you (no XP), so Pick up leaves it out" end
+  if (quest.level or level) - level > (maxAbove or 3) then
+    return string.format("it is level %d, more than %d over you (/qb range %d shows it)", quest.level, maxAbove or 3, quest.level - level)
+  end
+  return nil
+end
+
+-- Finds a quest by name (part of it, any case) and says where it is on the
+-- board or why it is not there. st: the last pass; where: kind -> where
+-- the board shows it; maxAbove: the /qb range.
+function D.whyQuest(query, st, where, maxAbove)
+  local q = (query or ""):lower()
+  if q == "" then return "name a quest: /qb why Stopping the Cycle" end
+  local function hit(name) return type(name) == "string" and name:lower():find(q, 1, true) ~= nil end
+  for _, kind in ipairs({ "active", "nearby", "turnin", "log", "party", "pickup", "farPickup" }) do
+    for _, e in ipairs(st and st[kind] or {}) do
+      if hit(e.name) then
+        local place = e.dist and (", " .. D.yards(e.dist)) or (kind ~= "farPickup" and kind ~= "pickup" and ", no known place" or "")
+        return e.name .. place .. ": " .. ((where and where[kind]) or kind)
+      end
+    end
+  end
+  for _, e in ipairs(D.logQuests()) do
+    if hit(e.name) then return e.name .. " is in your log; the board shows it after its next update (a few seconds)" end
+  end
+  local qdb = D.module("QuestieDB")
+  if not qdb then return "no quest named \"" .. query .. "\" in your log, and Questie is not loaded to look for pick-ups" end
+  local level = D.playerLevel()
+  for _, id in ipairs(D.availableIDs()) do
+    local quest = call(qdb.GetQuest, id)
+    if type(quest) == "table" and hit(quest.name) then
+      local why = D.unfitReason(quest, level, maxAbove)
+      if why then return quest.name .. " is available, but " .. why end
+      local e = D.pickup(id, level, maxAbove)
+      if e and e.far then return quest.name .. " is available, but its giver is far away (another continent), so Pick up leaves it out" end
+      return quest.name .. " is available; it should show in Pick up after the next update"
+    end
+  end
+  for _, id in ipairs(D.ids and D.ids(qdb.QuestPointers) or {}) do
+    local name = call(qdb.QueryQuestSingle, id, "name")
+    if hit(name) then
+      local pre = D.preQuest and D.preQuest(id)
+      local f = api("C_QuestLog.IsQuestFlaggedCompleted") or rawget(_G, "IsQuestFlaggedCompleted")
+      if f and call(f, id) == true then return name .. ": you have done it already" end
+      if pre and not (f and call(f, pre) == true) then
+        local preName = call(qdb.QueryQuestSingle, pre, "name")
+        return name .. ": Questie says you cannot take it yet; do " .. (type(preName) == "string" and preName or ("quest " .. pre)) .. " first"
+      end
+      return name .. ": Questie does not show it as available to you (done, your class, race or faction, or the level)"
+    end
+  end
+  return "Questie has no quest named \"" .. query .. "\" (a quest new on Forever?); the board can show it only once it is in your log"
+end
+
 -- An entry for one available quest, or nil when it does not fit.
 -- kind "party": a quest a party member has; any level you can take.
 function D.pickup(id, level, maxAbove, kind)
@@ -413,7 +567,7 @@ function D.pickup(id, level, maxAbove, kind)
   elseif not D.fits(quest.level, quest.requiredLevel, level, maxAbove) then
     return nil
   end
-  local e = { id = id, name = quest.name or ("Quest " .. id), level = quest.level, req = quest.requiredLevel,
+  local e = { id = id, name = quest.name or ("Quest " .. id), level = quest.level, req = quest.requiredLevel, tag = D.questTag(id),
     kind = kind or "pickup", objectives = 0, left = {} }
   -- Raw objectives: [1] creatures, [2] objects, [3] items (lists of entries).
   local raw = type(quest.objectives) == "table" and quest.objectives or {}
@@ -520,8 +674,111 @@ function D.partyText(who)
   return table.concat(parts, ", ")
 end
 
+-- Where a party member is: map position (for a pin) and world position
+-- (for yards and the arrow). Nil when the game does not say (a dungeon,
+-- another continent, out of range).
+function D.unitPlace(unit)
+  local mapID = call(api("C_Map.GetBestMapForUnit"), unit)
+  local pos = mapID and call(api("C_Map.GetPlayerMapPosition"), mapID, unit)
+  if type(pos) ~= "table" or not pos.GetXY then return nil, mapID end
+  local ok, x, y = pcall(pos.GetXY, pos)
+  if not (ok and x and y) or (x == 0 and y == 0) then return nil, mapID end
+  local place = { mapID = mapID, x = x, y = y }
+  local lib = hbd()
+  if lib then place.wx, place.wy, place.inst = call(lib.GetWorldCoordinatesFromZone, lib, x, y, mapID) end
+  return place, mapID
+end
+
+-- Health in percent, or nil when the client hides it (secret values).
+local function healthPct(unit)
+  local h, m = D.plain(call(rawget(_G, "UnitHealth"), unit)), D.plain(call(rawget(_G, "UnitHealthMax"), unit))
+  if type(h) ~= "number" or type(m) ~= "number" or m <= 0 then return nil end
+  return math.floor(h / m * 100 + 0.5)
+end
+
+-- One row per party member: level, class colour, how they are (offline,
+-- dead, AFK, health), where (yards and arrow, or the zone), and the quests
+-- of yours they have with their progress. out: the pass so far (log lists
+-- and party pick-ups).
+function D.memberList(out, members, level)
+  local list = {}
+  local lib = hbd()
+  local px, py, pi
+  if lib then px, py, pi = call(lib.GetPlayerWorldPosition, lib) end
+  local myMap = call(api("C_Map.GetBestMapForUnit"), "player")
+  for i, m in ipairs(members) do
+    local u = m.unit
+    local lvl = D.plain(call(rawget(_G, "UnitLevel"), u))
+    local _, class = call(rawget(_G, "UnitClass"), u)
+    local colors = rawget(_G, "RAID_CLASS_COLORS")
+    local cc = type(class) == "string" and type(colors) == "table" and colors[class]
+    local e = { kind = "member", id = -1000 - i, unit = u, name = m.name, level = type(lvl) == "number" and lvl > 0 and lvl or nil, left = {},
+      classColor = type(cc) == "table" and { cc.r, cc.g, cc.b } or nil }
+    e.color = e.level and D.difficulty(e.level, level) or "white"
+    if call(rawget(_G, "UnitIsConnected"), u) == false then e.status = "Offline"
+    elseif call(rawget(_G, "UnitIsGhost"), u) then e.status = "Ghost"
+    elseif call(rawget(_G, "UnitIsDeadOrGhost"), u) then e.status = "Dead"
+    else
+      e.hp = healthPct(u)
+      e.status = (call(rawget(_G, "UnitIsAFK"), u) and "AFK" or nil)
+    end
+    local place, mapID = D.unitPlace(u)
+    if place then
+      e.spot = place
+      if px and place.wx and place.inst == pi then
+        local dx, dy = place.wx - px, place.wy - py
+        e.dist = math.sqrt(dx * dx + dy * dy)
+        e.wx, e.wy, e.inst = place.wx, place.wy, place.inst
+        e.angle = (call(lib.GetWorldVector, lib, pi, px, py, place.wx, place.wy))
+      end
+    end
+    if not e.dist then
+      local ok, d2, checked = pcall(rawget(_G, "UnitDistanceSquared") or error, u)
+      if ok and checked and type(d2) == "number" then e.dist = math.sqrt(d2) end
+    end
+    if mapID and mapID ~= myMap then
+      local info = call(api("C_Map.GetMapInfo"), mapID)
+      e.zoneName = type(info) == "table" and type(info.name) == "string" and info.name or nil
+    end
+    -- Your quests they have, and how far they are on each.
+    e.shared, e.behind = {}, 0
+    for _, kind in ipairs({ "active", "nearby", "turnin", "log" }) do
+      for _, q in ipairs(out[kind] or {}) do
+        for _, w in ipairs(q.party or {}) do
+          if w.name == m.name then
+            table.insert(e.shared, { id = q.id, name = q.name, progress = w.progress, mine = q.done and "done" or D.progress(q) })
+            if q.done and w.progress ~= "" and w.progress ~= "done" then e.behind = e.behind + 1 end
+          end
+        end
+      end
+    end
+    e.theirs = 0
+    for _, q in ipairs(out.party or {}) do
+      for _, w in ipairs(q.party or {}) do if w.name == m.name then e.theirs = e.theirs + 1 end end
+    end
+    table.insert(list, e)
+  end
+  return list
+end
+
+-- The status line of a member row: "92% hp, in Westfall, 3 quests with
+-- you (1 behind)". Behind: you can hand it in, they are not done.
+function D.memberText(e)
+  local parts = {}
+  if e.status then table.insert(parts, e.status) end
+  if e.hp and e.status ~= "Offline" then table.insert(parts, e.hp .. "% hp") end
+  if e.zoneName then table.insert(parts, "in " .. e.zoneName) end
+  local n = #(e.shared or {})
+  if n > 0 then
+    table.insert(parts, n .. " quest" .. (n == 1 and "" or "s") .. " with you" .. ((e.behind or 0) > 0 and (" (" .. e.behind .. " behind)") or ""))
+  end
+  if (e.theirs or 0) > 0 then table.insert(parts, e.theirs .. " you lack") end
+  return table.concat(parts, ", ")
+end
+
 function D.pickupSecs(e)
-  return D.travelSecs(e.dist) + D.PICKUP_SECS + math.max(1, e.objectives) * D.OBJECTIVE_SECS + D.RETURN_SECS
+  local work = D.runSecs(e) or math.max(1, e.objectives) * D.OBJECTIVE_SECS * D.levelFactor(e.level)
+  return D.travelSecs(e.dist, e) + D.PICKUP_SECS + work + D.RETURN_SECS
 end
 
 ---------------------------------------------------------------------------
@@ -554,9 +811,7 @@ end
 -- Finishes one entry: colour, estimate, direction.
 function D.finish(e, level)
   e.color = D.difficulty(e.level, level)
-  local secs = (e.kind == "pickup" or e.kind == "party") and D.pickupSecs(e) or D.logSecs(e)
-  e.secs = e.far and nil or secs
-  e.rate = (not e.far) and D.rate(e.xp, secs) or nil
+  -- The place first: the trip estimate needs it (a flight).
   if e.spot then
     -- Placed by where you last made progress: world position already known.
     local lib = hbd()
@@ -564,10 +819,17 @@ function D.finish(e, level)
     if lib then px, py, pi = call(lib.GetPlayerWorldPosition, lib) end
     e.wx, e.wy, e.inst = e.spot.wx, e.spot.wy, e.spot.inst
     e.angle = (px and pi == e.inst) and (call(lib.GetWorldVector, lib, pi, px, py, e.wx, e.wy)) or nil
-    return e
+  else
+    e.angle = e.dist and D.bearing(e.spawn, e.zone) or nil
+    if e.dist then e.wx, e.wy, e.inst = D.world(e.spawn, e.zone) end
   end
-  e.angle = e.dist and D.bearing(e.spawn, e.zone) or nil
-  if e.dist then e.wx, e.wy, e.inst = D.world(e.spawn, e.zone) end
+  local secs = (e.kind == "pickup" or e.kind == "party") and D.pickupSecs(e) or D.logSecs(e)
+  -- Another continent: a boat or zeppelin trip, a flat guess (Spare2.lua).
+  local trip = e.far and D.FAR_TRIP_SECS or nil
+  if e.far and trip then secs = secs + trip end
+  e.secs = (not e.far or trip) and secs or nil
+  e.rate = (not e.far or trip) and D.rate(e.xp, secs) or nil
+  e.by = e.dist and select(2, D.travelSecs(e.dist, e)) or nil
   return e
 end
 
@@ -630,7 +892,7 @@ function D.areas(out)
     for _, e in ipairs(out[kind] or {}) do
       -- Only real stops: not an item-started quest (no giver to visit; its
       -- place is a drop or the finisher), not a party quest you cannot take.
-      local stop = not (e.fromItem and (e.kind == "pickup" or e.kind == "party"))
+      local stop = not e.hiddenTag and not (e.fromItem and (e.kind == "pickup" or e.kind == "party"))
         and not (e.kind == "party" and not e.canTake)
       if stop and e.wx and e.dist then table.insert(pts, e) end
     end
@@ -654,7 +916,7 @@ function D.areas(out)
         end
       end
       if #a.stops >= 2 then
-        a.secs = D.travelSecs(a.dist) + a.work
+        a.secs = D.travelSecs(a.dist, seed) + a.work
         a.rate = a.xp > 0 and D.rate(a.xp, a.secs) or nil
         -- Inside it: say so, the stops can be anywhere within AREA_YARDS.
         a.name = (a.dist <= D.AREA_YARDS and "Around you, by " or "Near ") .. (seed.target or seed.name)
@@ -667,6 +929,67 @@ function D.areas(out)
     return #x.stops > #y.stops
   end)
   return list
+end
+
+---------------------------------------------------------------------------
+-- Zones: where to go next or swap to. Every stop you know of (your log,
+-- hand-ins, pick-ups near and far) by zone, scored by the XP there per
+-- minute of the trip and the work.
+---------------------------------------------------------------------------
+local function zoneWork(e)
+  if e.kind == "pickup" or e.kind == "party" then
+    return D.PICKUP_SECS + math.max(1, e.objectives or 0) * D.OBJECTIVE_SECS * D.levelFactor(e.level) + D.RETURN_SECS
+  end
+  return stopSecs(e)
+end
+
+function D.zones(out)
+  local by, list = {}, {}
+  for _, kind in ipairs({ "active", "nearby", "turnin", "log", "pickup", "farPickup" }) do
+    for _, e in ipairs(out[kind] or {}) do
+      local name = D.zoneName(e.zone) or (e.kind ~= "pickup" and e.header) or nil
+      if name and not e.hiddenTag then
+        local z = by[name]
+        if not z then
+          z = { kind = "zone", name = name, color = "white", stops = {}, counts = {}, xp = 0, work = 0, left = {}, id = "zone:" .. name }
+          by[name] = z
+          table.insert(list, z)
+        end
+        table.insert(z.stops, e)
+        local k = kind == "farPickup" and "pickup" or e.kind
+        z.counts[k] = (z.counts[k] or 0) + 1
+        z.xp = z.xp + (e.xp or 0)
+        z.work = z.work + zoneWork(e)
+        if e.dist and (not z.dist or e.dist < z.dist) then
+          z.dist, z.angle, z.spawn, z.zone, z.target, z.near = e.dist, e.angle, e.spawn, e.zone, e.target, e
+        end
+        z.zone = z.zone or e.zone
+      end
+    end
+  end
+  for _, z in ipairs(list) do
+    -- A zone on another continent: the boat or zeppelin trip counts.
+    z.secs = (z.dist and D.travelSecs(z.dist, z.near) or D.FAR_TRIP_SECS or 0) + z.work
+    z.rate = z.xp > 0 and D.rate(z.xp, z.secs) or nil
+    z.far = not z.dist
+  end
+  -- Zones you can reach first, best XP per minute; far ones after, most XP.
+  table.sort(list, function(a, b)
+    if a.far ~= b.far then return not a.far end
+    if a.far then return a.xp > b.xp end
+    return (a.rate or 0) > (b.rate or 0)
+  end)
+  return list
+end
+
+-- "3 in your log, 1 hand in, 4 pick up" for a zone.
+function D.zoneText(z)
+  local c, parts = z.counts, {}
+  local logN = (c.active or 0) + (c.nearby or 0) + (c.log or 0)
+  if logN > 0 then table.insert(parts, logN .. " in your log") end
+  if (c.turnin or 0) > 0 then table.insert(parts, c.turnin .. " hand in") end
+  if (c.pickup or 0) > 0 then table.insert(parts, c.pickup .. " pick up") end
+  return table.concat(parts, ", ")
 end
 
 -- "2 hand in, 1 objective, 1 pick up" for an area.
@@ -743,18 +1066,23 @@ function D.collect(opts)
       start = now()
     end
   end
-  local out = { active = {}, nearby = {}, turnin = {}, log = {}, party = {}, pickup = {}, questie = D.hasQuestie(), level = level }
+  local out = { active = {}, nearby = {}, turnin = {}, log = {}, party = {}, pickup = {}, farPickup = {}, questie = D.hasQuestie(), level = level }
   local inLog = {}
   local clock = opts.time or call(rawget(_G, "GetTime")) or 0
   for _, e in ipairs(D.logQuests()) do
     inLog[e.id] = true
     D.finish(D.placeLog(e), level)
+    -- /qb dungeons off: a dungeon quest stays in the Log tab only.
+    e.hiddenTag = opts.dungeons == false and D.isDungeon(e) or nil
     if D.questItem then e.item = D.questItem(e) end
     local pinned = opts.doing and opts.doing[e.id]
     e.pinned = pinned and true or nil
     local recent = D.noteProgress(e, clock)
-    if e.done and pinned then
-      table.insert(out.active, e)   -- a hand-in you pinned stays in Active
+    -- A hand-in you pinned, or one you were just working on, stays in Active
+    -- (Doing) until you hand it in: the next step is to take it back.
+    local held = D.heldAt[e.id]
+    if e.done and (pinned or (held and clock - held <= D.GRACE_SECS)) then
+      table.insert(out.active, e)
     elseif not e.done and D.isActive(e, recent, clock, pinned) then
       table.insert(out.active, e)
     elseif not e.done and e.dist and e.dist <= D.HERE_YARDS then
@@ -769,6 +1097,7 @@ function D.collect(opts)
   -- Your party: who shares each quest in your log, and the quests they have
   -- that you do not (Questie's party data), nearest giver first.
   local members = opts.party == false and {} or D.partyMembers()
+  out.members = {}
   if #members > 0 then
     for _, list in ipairs({ out.active, out.nearby, out.turnin, out.log }) do
       for _, e in ipairs(list) do e.party = D.partyOn(e.id, members) end
@@ -798,6 +1127,15 @@ function D.collect(opts)
     for _, id in ipairs(D.availableIDs()) do
       if not inLog[id] then
         local e = D.pickup(id, level, opts.maxAbove)
+        if e and opts.dungeons == false and D.isDungeon(e) then e = nil end
+        -- Started by an item that Questie cannot place (a world drop): you
+        -- cannot go and get it, so it is not offered. A pin keeps it.
+        if e and e.toFinisher and not (opts.doing and opts.doing[id]) then e = nil end
+        if e and e.far then
+          -- Far away: for Areas, or Doing when you pinned it (a zone you swap to).
+          e.pinned = opts.doing and opts.doing[id] and true or nil
+          table.insert(e.pinned and out.active or out.farPickup, D.finish(e, level))
+        end
         if e and not e.far then
           -- A pick-up you pinned waits in Active until you take it.
           e.pinned = opts.doing and opts.doing[id] and true or nil
@@ -806,13 +1144,13 @@ function D.collect(opts)
       end
       tick()
     end
-    -- Pins of quests you handed in (or can no longer take) go.
+    -- Pins of quests you handed in go. Only those: just after a login or
+    -- a /reload the log and Questie's list of quests you can take may still
+    -- be empty, and a pin must not go because of that.
     if opts.doing then
-      local party = {}
-      for _, e in ipairs(out.active) do if e.kind == "party" then party[e.id] = true end end
-      for _, e in ipairs(out.party) do party[e.id] = true end
+      local f = api("C_QuestLog.IsQuestFlaggedCompleted") or rawget(_G, "IsQuestFlaggedCompleted")
       for id in pairs(opts.doing) do
-        if not (inLog[id] or avail[id] or party[id]) then opts.doing[id] = nil end
+        if not inLog[id] and f and call(f, id) then opts.doing[id] = nil end
       end
     end
   end
@@ -827,6 +1165,9 @@ function D.collect(opts)
   D.sort(out.log, opts.sortLog or "near")
   D.sort(out.pickup, opts.sortPickup or "xp")
   out.area = D.areas(out)
+  out.zones = D.zones(out)
+  -- Your party: how each member is, where, and how far on your quests.
+  out.members = D.memberList(out, members, level)
   -- XP colours: each group's best third green, worst third grey.
   D.tier(out.turnin, "xp")
   D.tier(out.pickup, "rate")
