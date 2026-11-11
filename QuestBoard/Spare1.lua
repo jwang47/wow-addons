@@ -55,7 +55,7 @@ function ns.stopTotals(s)
     if e.secs and (not longest or e.secs > longest) then longest = e.secs end
     if e.dist and (not s.dist or e.dist < s.dist) then s.dist, s.angle, s.seed = e.dist, e.angle, e end
   end
-  s.hand, s.pick, s.todo = hand, pick, todo
+  s.hand, s.pick, s.todo, s.handXP = hand, pick, todo, handXP
   -- XP: what the stop pays when you get there (its hand-ins), else what
   -- its quests pay in the end.
   s.xp = hand > 0 and handXP or allXP
@@ -107,15 +107,61 @@ function ns.stopStats(s)
   return table.concat(parts, "  ")
 end
 
+ns.HAND_IN_YARDS = 600       -- a hand-in this close is in Doing, and its stop comes first
+
 -- The Doing tab as sections: one per stop, then the "+N more" line.
--- active: the quests you are on; way: the ones on the way, already capped.
-function ns.stopSections(active, way)
-  local quests, rest = {}, {}
-  for _, list in ipairs({ active or {}, way or {} }) do
-    for _, e in ipairs(list) do table.insert(e.kind == "more" and rest or quests, e) end
+-- active: the quests you are on; way: the ones on the way; handIns: every
+-- other quest ready to hand in.
+-- A quest you can hand in close by is always here, and so is one whose
+-- hand-in is at a stop already shown: you are there anyway. Only the other
+-- quests on the way count against the group's row limit.
+-- Order: the stops with a hand-in within HAND_IN_YARDS first, the best XP
+-- per minute of the run first (so two hand-ins in one place beat one);
+-- then the rest as the board ranked them. In a stop: hand-ins, quests to
+-- finish, pick-ups.
+function ns.stopSections(active, way, handIns)
+  local quests, capped, seen = {}, {}, {}
+  local function take(e) if not seen[e] then seen[e] = true table.insert(quests, e) end end
+  for _, e in ipairs(active or {}) do take(e) end
+  for _, e in ipairs(way or {}) do
+    if ns.stopRole(e) == "hand" then take(e) else table.insert(capped, e) end
   end
+  local rest = {}
+  for _, e in ipairs(ns.shownRows("onway", capped)) do
+    if e.kind == "more" then table.insert(rest, e) else take(e) end
+  end
+  local base = #quests
+  for _, e in ipairs(handIns or {}) do
+    if not seen[e] and not e.hiddenTag and ns.stopRole(e) == "hand" then
+      local join = e.dist and e.dist <= ns.HAND_IN_YARDS
+      for i = 1, base do
+        if join then break end
+        join = near(e, quests[i])
+      end
+      if join then take(e) end
+    end
+  end
+  local stops = ns.stops(quests)
+  local ORDER = { hand = 1, todo = 2, pick = 3 }
+  for i, s in ipairs(stops) do
+    s.index = i
+    local at = {}
+    for j, e in ipairs(s.list) do at[e] = j end
+    table.sort(s.list, function(a, b)
+      local ra, rb = ORDER[ns.stopRole(a)], ORDER[ns.stopRole(b)]
+      if ra ~= rb then return ra < rb end
+      return at[a] < at[b]
+    end)
+    s.first = s.hand > 0 and s.dist ~= nil and s.dist <= ns.HAND_IN_YARDS
+    s.handRate = s.first and s.handXP / math.max(20, D.travelSecs(s.dist)) or 0
+  end
+  table.sort(stops, function(a, b)
+    if a.first ~= b.first then return a.first end
+    if a.handRate ~= b.handRate then return a.handRate > b.handRate end
+    return a.index < b.index
+  end)
   local out = {}
-  for i, s in ipairs(ns.stops(quests)) do
+  for i, s in ipairs(stops) do
     table.insert(out, { key = "stop" .. i, stop = s, list = s.list, cap = math.huge })
   end
   if #rest > 0 then table.insert(out, { key = "stopmore", nohead = true, list = rest, cap = math.huge }) end

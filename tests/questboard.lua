@@ -1118,6 +1118,24 @@ check("stops: a quest with no place is its own stop", #ns.stops({ noPlace, q("Lo
 local moreRow = { kind = "more", group = "onway", name = "+2 more", left = {} }
 local ss = ns.stopSections({ camp1, bay1 }, { camp2, moreRow })
 check("stops: one section per stop, the +N more line last", #ss == 3 and ss[1].stop and #ss[1].list == 2 and ss[2].stop and ss[3].nohead and ss[3].list[1] == moreRow)
+-- The rules: a hand-in close by comes first, and joins Doing by itself.
+local work = q("Bloodscalp Ears", "log", 0, -200, 200, 2000, { left = { { text = "Ears: 3/15" } } })
+local farHand = q("Far hand-in", "turnin", 0, 3000, 3000, 900)
+local order = ns.stopSections({ work, thorsen }, {}, { camp1, camp2, bay1, farHand })
+check("rules: a hand-in within 600 yd joins Doing; a far one does not",
+  #order == 3 and order[1].list[1] == camp1 and order[1].list[2] == camp2)
+check("rules: the hand-in stop comes before the quest you are on", order[1].stop.hand == 2 and order[2].list[1] == work and order[3].list[1] == thorsen)
+local two = ns.stopSections({}, {}, { q("One", "turnin", 300, 0, 300, 1000), camp1, camp2 })
+check("rules: two hand-ins in one place beat one", two[1].stop.hand == 2 and two[2].list[1].name == "One")
+local joined = ns.stopSections({ bay2 }, {}, { bay1, farHand })
+check("rules: a far hand-in joins a stop you go to anyway, hand-ins first in the stop",
+  #joined == 1 and joined[1].list[1] == bay1 and joined[1].list[2] == bay2)
+local saveRows = QuestBoardDB.rows.onway
+QuestBoardDB.rows.onway = 1
+local capped = ns.stopSections({}, { camp1, thorsen, camp2, q("Third", "pickup", 900, 900, 1200, 100) }, {})
+QuestBoardDB.rows.onway = saveRows
+check("rules: hand-ins do not count against the row limit",
+  #capped == 3 and capped[1].stop.hand == 2 and capped[2].list[1] == thorsen and capped[3].list[1].kind == "more")
 -- On the board: the Doing tab draws stops; /qb stops goes back to one list.
 ns.refresh()
 ns.pickTab("doing")

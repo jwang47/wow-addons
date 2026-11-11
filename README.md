@@ -439,7 +439,10 @@ hand-in or a pick-up). It stays while you are within 600 yards
   of its quests ("~" is a guess). Each quest under it is one line with a
   mark: a gold "?" to hand in, a gold "!" to pick up, a grey "?" to
   finish, which keeps its objectives under it. A small square after the
-  name means gear; the tooltip names it. `/qb stops` goes back to one list
+  name means gear; the tooltip names it. Hand-ins lead: a quest you can
+  hand in within 600 yd is always in Doing and its stop is first (best XP
+  per minute of the run first), and a farther hand-in joins a stop already
+  shown at its place. `/qb stops` goes back to one list
   (the code is in `QuestBoard/Spare1.lua`).
 - A dungeon, raid or group quest has a tag after its level: 28D, 40R, 22G
   (`GetQuestTagInfo`, else Questie's `GetQuestTagInfo`, else the suggested

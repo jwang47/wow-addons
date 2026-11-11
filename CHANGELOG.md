@@ -50,6 +50,12 @@ the same, and a test checks that every `.toc` version has a section here.
   means it gives or leads to gear; the tooltip names it. Click a stop to
   show it on the map, Alt-click to pin all its quests. `/qb stops` goes
   back to the one list.
+- Hand in first. A quest you can hand in within 600 yd is always in the
+  Doing tab, and its stop is at the top; with several, the best XP per
+  minute of the run first, so two hand-ins in one place beat one. A
+  hand-in farther away joins a stop the board already shows at that
+  place. In a stop the hand-ins come first, then quests to finish, then
+  pick-ups. Hand-ins do not count against the "on the way" row limit.
 - A complete quest is clear at a glance: a full green bar under it, a
   green name, and "Complete" in green before "Hand in to ...".
 - Cleaner quest rows. Line 1: the name and how far. Line 2: what to do,

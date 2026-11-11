@@ -975,7 +975,7 @@ function ns.sections(st, tab)
     local way = ns.onWay(cand, st.active)
     if byStop then
       -- One group per stop: your quests and the ones on the way, by place.
-      for _, s in ipairs(ns.stopSections(st.active, ns.shownRows("onway", way))) do add(s) end
+      for _, s in ipairs(ns.stopSections(st.active, way, st.turnin)) do add(s) end
     else
       add({ key = "onway", head = "On the way", right = "within " .. ns.ON_WAY_YARDS .. " yd", list = way })
     end
@@ -983,6 +983,7 @@ function ns.sections(st, tab)
     local shown = {}
     for _, e in ipairs(st.active) do table.insert(shown, e) end
     for _, e in ipairs(way) do table.insert(shown, e) end
+    if byStop then for _, sec in ipairs(out) do if sec.stop then for _, e in ipairs(sec.list) do table.insert(shown, e) end end end end
     add(restLine(st, shown))
   elseif tab == "nearby" then
     local list = ns.nextList(st)
