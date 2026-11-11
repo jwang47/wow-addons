@@ -771,6 +771,16 @@ linked folder: it lists it as "dev copy" and ends with "In dev mode (not
 updated): ...". Switch a branch with `git checkout` in this checkout and
 `/reload`.
 
+**Spare files: no restart for a new file.** The client reads each `.toc`
+only when it starts, so a `.lua` file that the `.toc` does not list yet
+needs a full restart. Each addon's `.toc` therefore ends with empty
+`Spare1.lua` to `Spare5.lua` files. Put new code in the next free spare and
+it loads with `/reload`. The spares load last, after the addon's other
+files. Before a release you can rename a used spare to a real name and add
+a new empty spare in its place; that one change needs one restart. Keep at
+least one spare in every `.toc` (a test checks it), and give a new addon
+its spares from the start. A brand-new addon folder still needs a restart.
+
 ## Release
 
 1. In the PR: raise `## Version` in each changed addon's `.toc` and add its
