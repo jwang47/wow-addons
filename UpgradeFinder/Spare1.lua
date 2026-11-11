@@ -46,7 +46,8 @@ G.AOE_SURVIVAL = 2  -- Stamina and armor count this much more in AoE mode
 G.SPI_REGEN = { MAGE = 0.125, PRIEST = 0.125 }
 G.SPI_REGEN_OTHER = 0.1
 -- The stats the model works out, and the step used to measure each.
-G.DERIVED = { { "sp", 10 }, { "int", 10 }, { "spi", 10 }, { "mp5", 5 }, { "spcrit", 1 }, { "sphit", 1 } }
+G.DERIVED = { { "sp", 10 }, { "int", 10 }, { "spi", 10 }, { "mp5", 5 }, { "spcrit", 1 }, { "sphit", 1 },
+  { "mana", 50 } }
 
 function G.drinkRate(level)
   local rate = G.WATER[1][2]
@@ -106,7 +107,7 @@ function G.speed(st, d)
   local hit = math.min(0.99, 0.96 + ((st.hit or 0) + (d.sphit or 0)) / 100)
   local rot = G.rotation(st, st.sp + power, crit, hit)
   if not rot or rot.dps <= 0 then return nil end
-  local pool = math.max(1, st.mana + (d.int or 0) * st.manaPerInt)
+  local pool = math.max(1, st.mana + (d.int or 0) * st.manaPerInt + (d.mana or 0))
   local mp5 = ((st.mp5 or 0) + (d.mp5 or 0)) / 5
   local spirit = math.max(0, (st.spi or 0) + (d.spi or 0)) * st.spiRegen
   local drain = rot.mps - mp5 - (st.regenCast or 0)
@@ -162,6 +163,7 @@ function G.derive(st, base)
   if st.mode == "aoe" then
     for _, k in ipairs({ "sta", "armor" }) do if w[k] then w[k] = round(w[k] * G.AOE_SURVIVAL) end end
   end
+  w.hp = round((w.sta or 0) / 10) -- flat health: a tenth of Stamina
   return w, { unit = unit, parts = parts }
 end
 

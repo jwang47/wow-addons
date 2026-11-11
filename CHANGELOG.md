@@ -17,6 +17,14 @@ the same, and a test checks that every `.toc` version has a section here.
 - Fix: the DPS estimate no longer takes Blizzard or Frost Nova for a
   single-target spell, and it can use a crit bonus above +50%
   (`/uf critbonus`).
+- New: a gold star marks an item with an effect the score does not count
+  (a `Use:` or proc effect, a resistance, a set bonus, a caster's wand
+  damage). The row tooltip lists those lines under "Not in the score".
+- New: the row tooltip says how long an item lasts: the first better item
+  for the slot in the next 5 levels, from the AH scan, your bags and the
+  dungeon drops.
+- Flat health and mana lines ("+30 Mana") now count, as a share of
+  Stamina and Intellect.
 - New: crafting lines on recipes. Hover a pattern or other recipe item, or
   a recipe in your profession window, to see the cost to craft, what the
   made item sells for (AH, vendor or disenchant), the profit or loss, and

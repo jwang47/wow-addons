@@ -39,6 +39,9 @@ S.PATTERNS = {
   { "mp5", "[Rr]estores (%d+) [Mm]ana per 5 sec" },
   { "mp5", "%+(%d+) Mana Regeneration per 5 sec" },
   { "mp5", "^%+(%d+) [Mm]ana every 5 sec" },
+  -- Flat health and mana (enchants, some green items): worth a tenth of
+  -- Stamina and a twentieth of Intellect unless a weight says otherwise.
+  { "hp", "^%+(%d+) Health$" }, { "mana", "^%+(%d+) Mana$" },
 }
 
 -- Set bonuses ("(3) Set: +10 Intellect.", "Set: ...") need other pieces:
@@ -124,6 +127,8 @@ function S.weightsFor(class, custom, tab)
   local spec = S.SPECS[class] and S.SPECS[class][tab or 0]
   for k, v in pairs(spec and spec[2] or S.WEIGHTS[class] or S.WEIGHTS[S.DEFAULT_CLASS]) do w[k] = v end
   for k, v in pairs(custom or {}) do w[k] = v end
+  if w.hp == nil then w.hp = (w.sta or 0) / 10 end
+  if w.mana == nil then w.mana = (w.int or 0) / 20 end
   return w
 end
 

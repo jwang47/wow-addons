@@ -197,6 +197,15 @@ the price to buy the made item on the AH instead.
   armor and the stats outside the model keep the hand-set weights
   (MageMentor's for a mage). The water table, the Spirit regen and the area
   coefficient (a third) are Classic rules, not measured on Forever.
+- What the score leaves out (`UpgradeFinder/Spare2.lua`): the score is a
+  sum of stats, so a `Use:` or `Chance on hit:` effect, an `Equip:` line no
+  pattern reads, a resistance, a set bonus and a caster's wand damage count
+  for nothing. Such an item gets a gold star in the list, and its row
+  tooltip lists the lines under "Not in the score". The same file adds the
+  "Lasts" line: the first better item for the slot that needs one of your
+  next 5 levels (lowest level first), with its source; "nothing better
+  known" otherwise. It reads the rows of the last scan, so it knows only
+  the AH, your bags and the dungeon drops, not quest rewards.
 - Crafting lines (`UpgradeFinder/Craft.lua`): hover a recipe item (in your
   bags, at a vendor, on the AH) or a recipe in your profession window (the
   recipe list rows and the made item's icon) and the tooltip adds:

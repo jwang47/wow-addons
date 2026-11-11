@@ -93,7 +93,9 @@ function ns.paint()
       -- Free elsewhere (quest, dungeon, vendor): a short tag after the name.
       local tag = r.source ~= "dungeon" and ns.where.tag(ns.where.of(r.id)) or nil
       if r.recipe then tag = "craft" end -- a pattern: the row is the item it makes
-      row.name:SetText(tag and (r.name .. "  |cff8cc7ff" .. tag .. "|r") or r.name)
+      -- A gold star: the item has an effect the score does not count.
+      local name = r.extra and (r.name .. " |cffffd100*|r") or r.name
+      row.name:SetText(tag and (name .. "  |cff8cc7ff" .. tag .. "|r") or name)
       row.name:SetTextColor(qualityColor(r.id))
       local gain = string.format("+%.1f", r.gain)
       if (r.reqLevel or 0) > level then gain = "|cff9d9d9d" .. gain .. " @" .. r.reqLevel .. "|r" end
@@ -188,6 +190,19 @@ local function showDetails(row)
     section("Defense (change)", def)
     tt:AddLine(" ")
   end
+  -- Effects the score does not count (Spare2.lua).
+  if r.extra and S.unscored then
+    local lines = Scan.read(function(t) t:SetHyperlink("item:" .. r.id) end)
+    local list = lines and S.unscored(lines, r.loc, ns.weights()) or {}
+    if #list > 0 then
+      tt:AddLine("* Not in the score:", 1, 0.82, 0)
+      for _, l in ipairs(list) do tt:AddLine(l, 0.8, 0.8, 0.8, true) end
+      tt:AddLine(" ")
+    end
+  end
+  -- How long it lasts (Spare2.lua).
+  local lasts = ns.lasts and ns.lasts.lines(r) or {}
+  for _, l in ipairs(lasts) do tt:AddLine(l[1], l[2], l[3], l[4], true) end
   -- The "Get it:" lines come from the item tooltip hook (Where.lua).
   local where = ns.where.of(r.id)
   local drop = r.drop

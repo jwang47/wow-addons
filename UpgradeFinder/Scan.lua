@@ -189,7 +189,7 @@ function Scan.forget() for k in pairs(cache) do cache[k] = nil end end
 -- thousands of tooltips again. They are kept while the weights are the
 -- same: the key holds the weight set, VERSION (bump it when scoring
 -- changes), and for a mage with MageMentor a fingerprint of its weights.
-Scan.VERSION = 5 -- 3: recipes score as the item they make; 4: their reagents; 5: damage vs Undead
+Scan.VERSION = 6 -- 3: recipes score as the item they make; 4: their reagents; 5: damage vs Undead; 6: unscored effects, flat health and mana
 Scan.SKIP_FOR = 24 * 3600 -- items that never loaded are skipped this long
 local PROBE = { "int", "spi", "sta", "sp", "frost", "fire", "arcane", "crit", "hit", "mp5", "armor", "slay" }
 function Scan.cacheKey()
@@ -351,8 +351,15 @@ local function recipe(id)
   local body = {}
   for i = 2, #lines do table.insert(body, lines[i]) end
   cache[id] = { name = made, recipe = lines[1], loc = loc, value = ns.valueOf(body, Scan.w), unusable = unusable,
-    reqLevel = req, craft = craft and craft:gsub("^Requires ", "") or nil, reagents = reagents, bop = bop }
+    reqLevel = req, craft = craft and craft:gsub("^Requires ", "") or nil, reagents = reagents, bop = bop,
+    extra = Scan.extra(body, loc) }
   return true
+end
+
+-- How many lines of the item the score does not count (Spare2.lua), or nil.
+function Scan.extra(lines, loc)
+  local n = S.unscored and #S.unscored(lines, loc, Scan.w or ns.weights()) or 0
+  return n > 0 and n or nil
 end
 
 -- One item: fills cache[id]; returns false if it is still loading.
@@ -373,7 +380,8 @@ function Scan.item(id)
   if not cached(id) then return false end
   local lines, unusable, req = Scan.read(function(tt) tt:SetHyperlink("item:" .. id) end)
   if not lines then return false end
-  cache[id] = { name = lines[1], loc = loc, value = ns.valueOf(lines, Scan.w), unusable = unusable, reqLevel = req }
+  cache[id] = { name = lines[1], loc = loc, value = ns.valueOf(lines, Scan.w), unusable = unusable, reqLevel = req,
+    extra = Scan.extra(lines, loc) }
   local missing = ns.db().missing
   if missing then missing[id] = nil end
   return true
@@ -540,7 +548,7 @@ function Scan.rows(sources)
       local cost = c.recipe and Scan.craftCost(c, p) or nil
       if cost then p = cost.total > 0 and cost.total or nil end
       table.insert(rows, { id = id, name = c.name, loc = c.loc, gain = c.value - (base or 0), price = p, cost = cost,
-        reqLevel = c.reqLevel, unusable = c.unusable, source = src, note = note, value = c.value,
+        reqLevel = c.reqLevel, unusable = c.unusable, source = src, note = note, value = c.value, extra = c.extra,
         drop = Scan.dropOf(id), recipe = c.recipe, craft = c.craft })
     end
   end

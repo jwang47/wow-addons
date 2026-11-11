@@ -156,7 +156,7 @@ ns.DUNGEONS = {
   { "Shadowfang Keep", "SFK", 11, 30, { "Arugal", 111 } },
 }
 
-for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Craft.lua", "Stats.lua", "Calib.lua", "Spells.lua", "Build.lua", "UI.lua", "Weights.lua", "BuildUI.lua", "Spare1.lua" }) do
+for _, file in ipairs({ "Score.lua", "Scan.lua", "Where.lua", "Craft.lua", "Stats.lua", "Calib.lua", "Spells.lua", "Build.lua", "UI.lua", "Weights.lua", "BuildUI.lua", "Spare1.lua", "Spare2.lua" }) do
   assert(loadfile(root .. "UpgradeFinder/" .. file))("UpgradeFinder", ns)
 end
 local S = ns.score
@@ -914,6 +914,43 @@ SlashCmdList.UPGRADEFINDER("mode grind")
 check("mode: not for a warrior", G.mode() == "weights" and table.concat(chat, "|"):find("damage casters", 1, true) ~= nil)
 P.class, P.level = "MAGE", 22
 UnitPowerMax, UnitStat, GetSpellBonusDamage, GetSpellCritChance = nil, nil, nil, nil
+-- Flat health and mana ------------------------------------------------------------
+local flat = S.parse({ "+30 Mana", "+15 Health", "+4 Mana every 5 sec" })
+check("parse: flat health and mana", flat.mana == 30 and flat.hp == 15 and flat.mp5 == 4)
+check("flat health and mana: a share of Stamina and Intellect",
+  math.abs(S.weightsFor("MAGE").hp - 0.03) < 1e-9 and math.abs(S.weightsFor("MAGE").mana - 0.025) < 1e-9
+  and S.weightsFor("MAGE", { hp = 1 }).hp == 1)
+check("grind weights: flat mana and health", gw.mana > 0 and gw.mana < gw.int and gw.hp == 0.03)
+-- Effects the score does not count (Spare2.lua) ----------------------------------
+local trinket = { "Mana Charm", "Trinket", "+5 Intellect", "Use: Restores 375 to 625 mana.",
+  "Equip: Increases damage and healing done by magical spells and effects by up to 7.", "+10 Fire Resistance",
+  "(2) Set: +10 Intellect.", "Chance on hit: Blasts the enemy for 30 Frost damage." }
+local un = S.unscored(trinket, "INVTYPE_TRINKET", mw)
+check("unscored: Use, resistance, set and proc lines; not the stats", #un == 4 and un[1]:find("^Use:") and un[3]:find("Set:")
+  and un[4]:find("^Chance on hit"))
+check("unscored: a recipe's Teaches line is not an effect", #S.unscored({ "Pattern: Hood", "Use: Teaches you how to sew a hood." }, nil, mw) == 0)
+local wand = { "Fire Wand", "Wand", "20 - 38 Fire Damage", "(19.3 damage per second)", "+3 Intellect" }
+check("unscored: wand damage for a caster", S.unscored(wand, "INVTYPE_RANGEDRIGHT", mw)[1] == "Wand damage (19.3 damage per second)")
+check("unscored: a hunter's weights count the ranged weapon", #S.unscored(wand, "INVTYPE_RANGEDRIGHT", S.weightsFor("HUNTER")) == 0)
+check("scan: extra counts the lines", ns.scan.extra(trinket, "INVTYPE_TRINKET") == 4 and ns.scan.extra(hood, "INVTYPE_HEAD") == nil)
+-- How long an item lasts (Spare2.lua) ---------------------------------------------
+local Lx = ns.lasts
+local lrows = {
+  { id = 1, name = "Silk Hood", loc = "INVTYPE_HEAD", value = 5, reqLevel = 20, source = "AH" },
+  { id = 2, name = "Seer's Hood", loc = "INVTYPE_HEAD", value = 9, reqLevel = 24, source = "AH" },
+  { id = 3, name = "Mage Hat", loc = "INVTYPE_HEAD", value = 12, reqLevel = 26, source = "dungeon", drop = { short = "SM" } },
+  { id = 4, name = "Far Crown", loc = "INVTYPE_HEAD", value = 30, reqLevel = 40, source = "AH" },
+  { id = 5, name = "Big Ring", loc = "INVTYPE_FINGER", value = 20, reqLevel = 23, source = "AH" },
+  { id = 6, name = "Plate Helm", loc = "INVTYPE_HEAD", value = 20, reqLevel = 23, source = "AH", unusable = true },
+}
+check("lasts: the first better item for the slot", Lx.next(lrows[1], lrows, 22) == lrows[2])
+local ll = Lx.lines(lrows[1], lrows, 22)
+check("lasts: line names it", ll[1][1] == "Lasts 2 levels: Seer's Hood is better at level 24 (+4.0, on the AH)" and ll[1][2] == 1)
+check("lasts: a dungeon drop names the dungeon", Lx.lines(lrows[2], lrows, 24)[1][1]
+  == "Lasts 2 levels: Mage Hat is better at level 26 (+3.0, drops in SM)")
+check("lasts: nothing better within 5 levels", Lx.lines(lrows[3], lrows, 26)[1][1]
+  == "Lasts: nothing better known for this slot up to level 31")
+check("lasts: not for an item above your level", #Lx.lines(lrows[4], lrows, 26) == 0)
 -- The crit bonus measured from the combat log (Calib.lua).
 local Cal = ns.calib
 check("calib: crit bonus needs enough crits", Cal.critBonus({ n = 30, d = 3000, cn = 3, cd = 600 }) == nil)
