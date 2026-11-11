@@ -957,7 +957,8 @@ function ns.sections(st, tab)
     return out
   end
   -- Your pins sit at the top of every other tab.
-  if tab ~= "doing" then
+  -- Not in Log: it lists every quest once, and the star marks a pin there.
+  if tab ~= "doing" and tab ~= "log" then
     local pins = {}
     for _, e in ipairs(st.active) do if e.pinned then table.insert(pins, e) end end
     add({ key = "pinned", head = "Pinned", right = "Alt-click: unpin", list = pins, cap = ALL })
@@ -986,7 +987,9 @@ function ns.sections(st, tab)
     if byStop then for _, sec in ipairs(out) do if sec.stop then for _, e in ipairs(sec.list) do table.insert(shown, e) end end end end
     add(restLine(st, shown))
   elseif tab == "nearby" then
-    local list = ns.nextList(st)
+    -- A pinned quest is in Pinned above: not here again.
+    local list = {}
+    for _, e in ipairs(ns.nextList(st)) do if not e.pinned then table.insert(list, e) end end
     add({ key = "next", head = "Chain next", right = "best XP/min, Alt-click: pin all", list = list })
     members()
     local cap = ns.db.rows.next or 8

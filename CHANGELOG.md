@@ -41,6 +41,9 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.2.0
 
+- Fix: a pinned quest showed twice in Nearby (in Pinned and in Chain
+  next). It is now only in Pinned. The Log tab has no Pinned group: it
+  lists every quest once, with the star on your pins.
 - The Doing tab groups its quests by stop. Quests whose places are within
   150 yd of each other make one trip: the stop shows how far it is, what
   you do there ("3 hand-ins", "1 hand-in, 2 pick-ups") and what it pays,

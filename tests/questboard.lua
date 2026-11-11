@@ -367,6 +367,11 @@ local pinState = { active = { { id = 1, pinned = true, name = "p", kind = "log",
 local ps = ns.sections(pinState, "areas")
 check("pins: a Pinned list on top of the other tabs", ps[1] and ps[1].key == "pinned" and #ps[1].list == 1 and ps[1].list[1].id == 1)
 check("pins: not twice in Doing", ns.sections(pinState, "doing")[1].key == "active")
+check("pins: not twice in Log (the star marks them there)", ns.sections(pinState, "log")[1].key ~= "pinned")
+pinState.active[1].dist, pinState.active[2].dist = 100, 100
+local pn = ns.sections(pinState, "nearby")
+check("pins: not twice in Nearby", pn[1].key == "pinned" and pn[2].key == "next" and #pn[2].list == 1 and pn[2].list[1].id == 2)
+pinState.active[1].dist, pinState.active[2].dist = nil, nil
 ns.refresh()
 for _ = 1, 50 do ns.step() end
 local nextHead
@@ -1004,7 +1009,7 @@ local restRow
 for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and f.entry.tab == "log" then restRow = f end end
 check("on a job: one line counts the rest of the log", restRow and restRow.entry.name == "1 more in your log: Log tab")
 ns.click(restRow.entry)
-check("tabs: that line opens the Log tab with every quest (and your pin on top)", ns.tab() == "log" and countRows() == 4)
+check("tabs: that line opens the Log tab with every quest, each once", ns.tab() == "log" and countRows() == 3)
 ns.pickTab("areas")
 check("tabs: a click holds a tab", ns.tab() == "areas")
 QuestBoardDB.doing = {}
