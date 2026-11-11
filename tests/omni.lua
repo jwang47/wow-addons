@@ -1013,6 +1013,13 @@ do
     and strip(ns.actions.detail(g[1].entries[2])):find("^no skill%-up  %+3s 0c") ~= nil)
   check("trainer row: skill needed, cost to learn, profit",
     strip(ns.actions.detail(g[2].entries[1])):find("^Tailoring 145  learn 9s 0c  %+8s 0c") ~= nil)
+  KNOWN[1].confidence, KNOWN[1].profit = "thin", 9000
+  g = ns.sources.recipes({ list }, "tailoring bag")
+  check("an unsure profit sorts after a sure one", g[1].entries[1].name == "Small Silk Pack"
+    and g[1].entries[2].name == "Linen Bag")
+  check("an unsure profit is grey with ?", strip(ns.actions.detail(g[1].entries[2])):find("%+90s 0c %?") ~= nil,
+    strip(ns.actions.detail(g[1].entries[2])))
+  KNOWN[1].confidence, KNOWN[1].profit = nil, 300
   g = ns.sources.recipes({ list }, "mining")
   check("another profession: only its recipes", g[1].entries[1].name == "Copper Bar" and #g[1].entries == 1)
   g = ns.sources.recipes({ list }, "cooking")

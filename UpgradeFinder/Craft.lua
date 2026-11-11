@@ -282,6 +282,7 @@ function C.summary(id)
     local sale = C.sale(r.made, r.bop)
     if sale then
       out.sale, out.how = sale.best, sale.how
+      out.confidence = sale.how == "AH" and sale.quote and sale.quote.confidence or nil
       if cost.total > 0 or not out.unknown then out.profit = sale.best - cost.total end
     end
   end
@@ -542,6 +543,8 @@ local function priced(t, reagents, product, made)
   local sale = product and C.sale(product)
   if sale then
     t.sale, t.how = sale.best * (made or 1), sale.how
+    -- How sure an AH sale is (LootValue's quote): "ok", "thin" or "no scan".
+    t.confidence = sale.how == "AH" and sale.quote and sale.quote.confidence or nil
     if cost.total > 0 or not t.unknown then t.profit = t.sale - cost.total end
   end
   return t
