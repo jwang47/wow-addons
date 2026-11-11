@@ -54,9 +54,9 @@ function ns.itemList(st)
   if not st then return list end
   for _, kind in ipairs({ "active", "nearby", "log", "turnin" }) do
     for _, e in ipairs(st[kind] or {}) do
-      local it = e.item
+      local it = type(e.item) == "table" and e.item or nil
       local row = it and ns.rowFor(e)
-      if row and not seen[it.id] and #list < ns.ITEM_MAX then
+      if row and it.id and not seen[it.id] and #list < ns.ITEM_MAX then
         seen[it.id] = true
         it.quest, it.row = e, row
         table.insert(list, it)

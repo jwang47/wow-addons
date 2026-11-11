@@ -96,7 +96,37 @@ like) on the body. It is on by default; `/lv` shows the settings.
   Auto Loot option off (it can only choose when the game does not take
   everything first), and `off` puts your old setting back.
 
-Its functions are on the global `LootValue` table (`adviceLine`,
+### Clear your bags
+
+`/lv clear` opens a panel that acts on the tooltip advice for everything in
+your bags. It opens by itself at a merchant and at the Auction House when it
+has something for you (`/lv clear auto` turns that on and off).
+
+| List | What is in it | What you do |
+| --- | --- | --- |
+| Vendor | grey junk, and weapons and armor whose best option is the vendor | At a merchant, press **Sell** |
+| Disenchant | green and blue gear whose best option is to disenchant it (with Enchanting) | Press **Disenchant**, one click an item |
+| Auction House | unbound items the AH clearly pays more for (the tooltip rule) | At the AH, click a row: the item goes into Auctionator's Selling tab |
+
+- A ticked row ("+") will be sold or disenchanted. Gear whose item level is
+  at or above what you wear in that slot may be an upgrade, so it starts
+  unticked and says why ("item level 31, you wear 28"). Click a row to tick
+  or untick it. LootValue remembers that per item; `/lv clear reset` forgets.
+- It never lists quest items, epics, or locked slots. Cloth, potions,
+  recipes and other items that are not gear are never sold or disenchanted;
+  they can show in the Auction House list. Right-click an AH row to hide it.
+- One press of Sell sells every grey item and at most 12 others
+  (`BUYBACK`), so each item that is not junk is still on the merchant's
+  Buyback tab. Press again for the rest.
+- The game allows a cast only on a real click, so the Disenchant button
+  does one item a click. The panel hides when combat starts.
+- Leatrix Plus and other addons that sell grey junk work beside it: the
+  panel opens a moment after the merchant does and lists what is left.
+- The AH click uses Auctionator's own Selling-tab code (checked against
+  Auctionator 344). If a later Auctionator changes it, the click prints a
+  hint and you pick the item in the Selling tab yourself.
+
+Its functions are on the global `LootValue` table (`adviceLine`, `options`,
 `marketInfo`, `ahWins`, `money`, `scanText`). Another addon can set
 `LootValue.deferTo = "<its name>"` and draw the line itself; LootValue's own
 tooltip hook then stays quiet. (Jiahua's private MageMentor addon does this.)
@@ -139,7 +169,13 @@ nothing). Fuzzy hits rank below exact ones.
 Filters: `i:` items, `p:` places, `@` or `w:` people, `s:` spells, `n:` NPCs,
 `q:` quests (your log and Questie), `l:` your log only, `c:` commands,
 `d:` dungeons, `loot:` one dungeon's drops and quests (`loot: bfd`),
-`from:` where to get an item (`from: linen cloth`),
+`from:` where to get an item (`from: linen cloth`), `r:` or a recipe word
+anywhere ("bag recipes") recipes with the skill and the profit of one craft
+(with UpgradeFinder), a profession word ("tailoring bag") that profession's
+recipes: the ones you know, your trainer's and recipe items (UpgradeFinder
+learns them when you open the profession window and the trainer window),
+`ah:` your last full AH scan (`ah: silk`: cheapest, fair price, listed,
+sold in 2 days; LootValue's full scan; the last row opens Bazaar),
 `near:` or `nb:` nearby NPCs (alone: everything nearby, nearest first). The Nearby group always comes first. An empty box lists the 5 nearest NPCs, then what you used last.
 
 Ranking: a name that starts with the query first, then names where each
@@ -205,6 +241,20 @@ the price to buy the made item on the AH instead.
   in; other such recipes are read each time you open a profession window
   and saved in `UpgradeFinderDB.recipes`. `/uf craft` turns the lines off
   and on.
+- Shopping for several crafts: the profession window has a **Shop xN**
+  button beside "Reagents:". It takes N from the Create box, works out the
+  reagents for N crafts of the selected recipe less what is in your bags
+  and bank (`GetItemCount(id, true)`; the game counts the bank only after
+  you open it, and chat says so until then), and says in chat what to buy,
+  what you have enough of and the estimated cost (AH and vendor prices as
+  for the crafting lines). It also makes the Auctionator shopping list
+  "UpgradeFinder crafts" with each reagent's exact name and the amount to
+  buy (`Auctionator.API.v1.CreateShoppingList`); open it on Auctionator's
+  Shopping tab. A reagent a vendor sells for less stays off the list.
+  Shift-click adds the recipe to the list you have, so two recipes that
+  share a reagent count it once. `/uf shop [N]`, `/uf shop add [N]` and
+  `/uf shop clear` do the same from chat. The Enchanting window (a
+  different frame) has no button yet.
 - Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
   **Any price / Can afford**, and **All sources / AH only / Dungeons / Bags
@@ -339,6 +389,19 @@ shows or hides it. It is not in the release yet (not in `tools/release.py`
 | Kill XP in a group | Your share of the solo kill XP: in your group now (by level), or for a group of 2 to 5 at your level when you are solo. A warning when a member is so far above you that mobs at your level are grey for them (kill XP is worked out from the highest level in the group, so nobody gets XP). |
 | Your quests | Each open quest with what a group does for it: "needs a group" (an Elite, Group or Dungeon tag, or a suggested group size), "kills count for all" (kill objectives left), "drops or clicks" (only item or object objectives left) or "talk or explore". "+Name" shows the party members who have the quest too. |
 
+**Pinned quests.** When you pin quests in QuestBoard (Alt-click a row: "I'm
+doing this"), GroupUp judges only those. The top line says "for your pins",
+the list is "Your pinned quests (QuestBoard)", and one line counts the
+other quests in your log. A pinned quest that you have not taken yet shows
+"not taken yet" (or "needs a group" when it has a group tag). With no pins,
+GroupUp judges every quest in your log, as before.
+
+**From QuestBoard.** With both addons on, the tooltip of a QuestBoard quest
+row has a "Group: ..." line with the GroupUp verdict. Ctrl-click a quest row
+to open the GroupUp panel with that quest at the top ("Asked about");
+Ctrl-click it again to close the panel. GroupUp adds this from its side, so
+QuestBoard works the same without GroupUp.
+
 How it works, and what to keep in mind:
 
 - Classic splits kill XP: the group gets the kill XP times a bonus (1x for
@@ -373,11 +436,14 @@ turned off. It is not in the release yet (not in `tools/release.py`
 `ADDONS`); try it with `dev.ps1 Niceties`.
 
 `/nice` lists the features and their state. `/nice KEY` toggles one,
-`/nice KEY on|off` sets it. The state is in `NicetiesDB` (SavedVariables).
+`/nice KEY on|off` sets it (a feature with a list, such as `blocked`,
+shows the list on `/nice KEY`). The state is in `NicetiesDB` (SavedVariables).
 
 | Key | What it does |
 | --- | --- |
 | `zoom` | Max camera distance (on by default). Sets the `cameraDistanceMaxZoomFactor` CVar to the highest value the client keeps, at each login and loading screen, so you can scroll the camera out much further. The Options slider stops at 2.0; the addon tries 4.0, 3.4, 2.6 and 2.0 and keeps the first one the client takes (or the value the client clamps it to). Off puts back the value you had before. Moving the Options slider changes it until the next login. |
+| `cpu` | CPU tracker (on by default). The game's AddOn list shows only the total addon CPU and its peak since the last `/reload`. This feature reads the game's addon profiler (`C_AddOnProfiler`) once a second and saves a history in `NicetiesDB`: each **spike** (a frame where one addon ran 50 ms or more, or a new session peak of 50 ms or more) with the time, the zone, combat and the open windows (profession, auction house, vendor, map ...), and one line a minute with the busiest addons. Spikes in the first 15 s after a loading screen are marked "loading" (the 98% peak in the AddOn list is often the login frame). It keeps 300 spikes and 24 h of minutes. `/cpu` opens a window (addons now, then the last spikes); `/cpu top`, `/cpu spikes [N]`, `/cpu worst [hours]` (who spikes most, loading frames counted last), `/cpu history [minutes]` and `/cpu reset` print to chat. The game may reset its counters on `/reload`; the tracker handles that. |
+| `blocked` | Blocked-action report (on by default). The game prints only "Interface action failed because of an AddOn". Niceties listens for `ADDON_ACTION_BLOCKED` and `ADDON_ACTION_FORBIDDEN`, says once per session which addon it was and the call it refused (and if you were in combat), and keeps the last 20 in `NicetiesDB` (`/nice blocked` lists them). It also sets the `taintLog` CVar to 1, so the game writes `Logs\taint.log`; off puts the old value back. |
 
 To add a feature: put it in the next free `SpareN.lua` (the `.toc` already
 lists five empty ones, so the game loads it after `/reload`; a new file
@@ -389,37 +455,39 @@ the release that ships it.
 
 ## QuestBoard
 
-A small floating list, under the minimap, of the quests that matter now.
-`/qb` shows or hides it.
+A small floating board, under the minimap, of the quests that matter now.
+`/qb` shows or hides it. Four tabs follow what you are doing:
 
-| Group | What | Sorted by |
+| Tab | When | What |
 | --- | --- | --- |
-| Active | quests you are doing: the kill or loot count went up in the last 5 minutes (`ACTIVE_SECS`), or you Alt-clicked it (any quest, also a hand-in or a pick-up). It stays while you are within 600 yards (`STAY_YARDS`) or make progress, and 10 minutes after the last of either (`GRACE_SECS`) | most recent first, then nearest |
-| Nearby | other quests in your log whose open objective is within 300 yards (`HERE_YARDS`) | nearest |
-| Areas | places where 2 or more stops (objectives, hand-ins, givers) are within 250 yards of each other (`AREA_YARDS`), so one trip does several quests; the row says what is there ("2 hand in, 1 objective") | best XP per minute: the XP you earn there (hand-ins and objectives, not pick-ups) over the run there and the work |
-| Turn in | quests in your log that are complete | nearest quest giver |
-| In your log | the rest of your log, with the first open objective ("3/6") | nearest open objective (right-click the group: best XP) |
-| Party has | quests your party members have that you do not (Questie's party data, `QuestieComms.remoteQuestLogs`), with who and their progress ("Ann 2/8") | nearest giver |
-| Town | the nearest innkeeper and flight master friendly to your side (Questie's NPC data, `npcFlags`); click or `/qb town` pins it on the map. Addons cannot walk you there | nearest |
-| Pick up | quests Questie shows as available ("!") that give XP and are at most 3 levels over you (`/qb range N`) | best estimated XP per minute (right-click the group: nearest) |
+| Doing | picked by itself while a quest is Active | the quests you are on (each open objective, party, chain), then "On the way": hand-ins, pick-ups and party quests within 300 yards of you or of an Active quest (`ns.ON_WAY_YARDS`), then "Your party", then one line that counts the rest of your log ("11 more in your log: Log tab") |
+| Nearby | picked by itself when no quest is Active | "Chain next": one list of what to do next within 1000 yards (`ns.NEXT_YARDS`): hand-ins, open objectives, pick-ups, party quests you can take, and areas with 3 or more stops in place of those stops. Best XP per minute first, the walk counted; a hand-in within 600 yards (`ns.TURNIN_TOP_YARDS`) first. Then "Your party" and the line for the rest of your log |
+| Areas | click it | "Where to go": every zone with stops you know (your log, hand-ins, pick-ups near and far), the ones you can reach first by XP per minute with the trip counted, far ones after by XP; each row says what is there ("3 in your log, 4 pick up"). Then "Travel": the nearest innkeeper and flight master |
+| Log | click it, or the "more in your log" line | every quest in your log under its log zone, one line each, never cut. A quest with no known place says "no place" |
+
+Alt-click a list's heading (Chain next, On the way, a Log zone) to pin
+every quest you see in it, the stops of its areas too; they go to Doing
+together. Alt-click it again to unpin them. Alt-click a zone in Areas to
+pin every quest there (far pick-ups too), for a zone you swap to.
+
+A quest you finish stays in Doing as a hand-in: a pinned one until you
+hand it in, else for 10 minutes after your last progress. Pinned quests
+also sit in a "Pinned" list at the top of the other tabs.
+
+A tab you click holds until the board's own pick changes (you start or
+finish a quest). Active means: the kill or loot count went up in the last
+5 minutes (`ACTIVE_SECS`), or you Alt-clicked the quest (any quest, also a
+hand-in or a pick-up). It stays while you are within 600 yards
+(`STAY_YARDS`) or make progress, and 10 minutes after the last of either
+(`GRACE_SECS`).
 
 - A quest in your log that a party member also has says so under it ("with
   Ann 5/6"): the game's `IsUnitOnQuest`, plus Questie's party data for the
-  progress. Party members need Questie too for their progress and for the
-  Party has group.
+  progress. Party members need Questie too for their progress.
 - Focus (on by default): in combat and inside a dungeon or other instance,
-  the board shows only the Next line and the Active group. Move the mouse
-  over it and the whole board opens; it closes again a moment after the
-  mouse leaves. Out in the world the whole board shows. `/qb focus` shows
-  the whole board everywhere (again to undo).
-- On a job (a quest in Active, by progress or your pin), the board shows
-  only Active plus Turn in, Pick up and Party has rows within 300 yards
-  (`ns.ON_WAY_YARDS`) of you or of an Active quest. Mouse-over shows the
-  whole board, as in focus; `/qb focus` turns both off.
-- The top line says what to do next: the open objective of a quest you
-  are on now (Active), else the best area when it has 3 or more stops, else
-  the hand-in or quest with the best XP per minute from where you are
-  (travel included).
+  the board shows only the quests you are on. Move the mouse over it and
+  the whole tab opens; it closes again a moment after the mouse leaves.
+  `/qb focus` shows the whole tab everywhere (again to undo).
 - An item-started quest says where the item comes from (a mob that drops
   it, a chest or crate that holds it, or a vendor) and who takes it in.
   When Questie does not know (a world drop), the row says "drop unknown"
@@ -432,6 +500,29 @@ A small floating list, under the minimap, of the quests that matter now.
   Questie's nearest mob, object or NPC for it ("Underbelly Whelp Scale:
   3/6 (Underbelly Whelp)"), or who takes it in. `/qb compact` drops that
   line.
+- The Doing tab groups its quests by stop: quests whose places are within
+  150 yd of each other are one trip. A stop's line shows how far it is
+  (with the arrow), what you do there ("1 hand-in, 2 pick-ups") and what
+  it pays: the XP of its hand-ins and the run there, else the XP and time
+  of its quests ("~" is a guess). Each quest under it is one line with a
+  mark: a gold "?" to hand in, a gold "!" to pick up, a grey "?" to
+  finish, which keeps its objectives under it. A small square after the
+  name means gear; the tooltip names it. Hand-ins lead: a quest you can
+  hand in within 600 yd is always in Doing and its stop is first (best XP
+  per minute of the run first), and a farther hand-in joins a stop already
+  shown at its place. `/qb stops` goes back to one list
+  (the code is in `QuestBoard/Spare1.lua`).
+- Travel time is an estimate. Near places are a run in a straight line
+  at your speed. From 1500 yd, the trip is the shorter of the run and a
+  flight (run to the nearest flight master, a straight flight at 30 yd per
+  second plus 20 s, run from the flight master nearest the place); the
+  board assumes you have the flight path. Another continent counts a flat
+  15 minutes for the boat or zeppelin. The constants are in
+  `QuestBoard/Spare2.lua` and are not measured in the game yet.
+- A dungeon, raid or group quest has a tag after its level: 28D, 40R, 22G
+  (`GetQuestTagInfo`, else Questie's `GetQuestTagInfo`, else the suggested
+  group size). `/qb dungeons off` keeps dungeon and raid quests to the Log
+  tab (out of Doing, Nearby and Areas) and leaves their pick-ups out.
 - The level number is in the quest log colours (grey, green, yellow,
   orange, red). Each row shows the distance and an arrow that turns with
   you. The distance is green within 300 yards, yellow up to 1000 yards and
@@ -443,7 +534,7 @@ A small floating list, under the minimap, of the quests that matter now.
   Questie's `showPartyQuestObjectives` to off (its old value comes back
   with `/qb party on`).
 - Minimap pointers: when Glance is loaded, QuestBoard gives its minimap
-  edge arrows the Next quest's place, the nearest hand-in and the Town
+  edge arrows the best next stop's place, the nearest hand-in and the Town
   rows (`Glance.minimap.addPointerSource`, a list cached per refresh).
 - XP colours: in each group, the best third of the XP (Turn in) or XP per
   minute (Pick up, Party has, Areas) is green and the worst third grey
@@ -458,7 +549,7 @@ A small floating list, under the minimap, of the quests that matter now.
   another continent shows "far".
 - Time left: once you kill or loot for a quest, the board learns your pace
   (seconds per kill or loot, on that quest and over all quests; a break
-  over 5 minutes is not counted). An Active row and the Next line show
+  over 5 minutes is not counted). An Active row shows
   about how long the rest takes ("~4 min"): the run there plus the kills
   left at your pace. XP per minute uses the same estimate.
 - A quest in your log that is not done has a thin progress bar along the
@@ -471,11 +562,10 @@ A small floating list, under the minimap, of the quests that matter now.
   (`D.MID_YARDS`). Quests further away, in another zone or on another
   continent come after them, biggest XP first, because the travel guess
   counts for little there.
-- Group order follows what you do: when no quest is Active and a hand-in
-  is within 600 yards (`ns.TURNIN_TOP_YARDS`), Turn in comes first. Else
-  Active and Nearby come first.
-- Max height: drag the grip at the bottom right corner, or `/qb height N`.
-  The title and the Next line stay; the groups scroll with the mouse wheel,
+- Size: drag the grip at the bottom right corner: up and down sets the max
+  height, sideways the width (220 to 560, `/qb width N`). While you drag, a
+  gold outline shows the max size with its numbers. Or `/qb height N`.
+  The title and the tabs stay; the rows scroll with the mouse wheel,
   one line at a time, and a dim line says how many rows are above and
   below. Right-click the grip or `/qb height off` for no limit.
 - Click a row: open the world map (M) at the place, and set and track the
@@ -499,8 +589,19 @@ A small floating list, under the minimap, of the quests that matter now.
   they are placed by screen position (not anchored to the board, which
   would lock the board too), and a change made in combat waits for the
   fight to end.
+- In a group, "Your party" has a row per member: level, health or
+  offline / dead / AFK, yards and arrow (or zone), and your quests they
+  share ("1 behind": you can hand it in, they cannot yet). Point at it for
+  their progress on each one; click pins them on the map.
+- A list with more rows than it shows ends in a "+N more: ..." line that
+  names them (click it for the whole list). `/qb why NAME` says where a
+  quest is on the board, or why it is not there.
 - Point at a quest to see its whole chain in the tooltip: each step with
-  its level, marked done, `>>` (this one), log or `...` (later).
+  its level, marked done, `>>` (this one), log or `...` (later). Each step
+  not done shows its XP and minutes (the trip plus the work, a guess), and
+  `+gear` when it rewards gear. The heading sums what is left ("4 left:
+  6.2k xp, 25 min") and splits the time into travel and questing. The trip
+  goes from where the step before ends; `~` marks a step with no known place.
 - Alt-click any quest row: "I'm doing this" (it stays in Active until
   you Alt-click it again or hand it in). This works for hand-ins and
   pick-ups too: a pinned pick-up waits in Active until you take it.
@@ -516,6 +617,10 @@ A small floating list, under the minimap, of the quests that matter now.
   monsters and Questie's nameplate icons (`/questie`, Nameplates) show from
   further away. `/qb far off` puts the old settings back. Addons cannot mark
   monsters in the world or target them, so nameplates are the way.
+- Level weight: a quest over your level counts slower (`D.levelFactor`:
+  1.25x at +1, 1.6x at +2, 2.2x at +3, 3.2x at +4, 6x at +5 or more; 0.85x
+  at 3 or more under), in time left and XP per minute, until your own pace
+  on that quest is measured. The tooltip says so.
 - XP per minute is an estimate: the run to the place at 7 yards a second
   (or your speed when faster), 90 s per open objective, 30 s at the giver
   and 60 s back. The numbers are in `QuestBoard/Data.lua`.
@@ -568,6 +673,19 @@ small grid (`/buffs`). It is not in the release yet.
   from the last read before the fight: a buff counts as on until its end
   time. Drag the header to move the grid; `/buffs reset` moves it back,
   `/buffs` hides or shows it.
+- **Ready check**: when you leave a rest area (an inn or a city) or enter
+  a dungeon, one line in chat and in the middle of the screen says what
+  you are short of ("Before you go: no Rune of Teleportation, 8 conjured
+  water, gear at 22% (repair)"). It says nothing when all is well, and it
+  does not repeat the same line within 5 minutes. It checks:
+  reagents for spells you know (under 2 Rune of Teleportation, Rune of
+  Portals, Arcane Powder or Light Feather for a mage; `R.REAGENTS` in
+  `Ready.lua` has the other classes), conjured water under 20 and food
+  under 10 when you know the Conjure spell, the most worn item at 30%
+  durability or less, fewer than 5 free bag slots, and unspent talent
+  points. `/buffs ready` runs it now; `/buffs ready off` turns the automatic
+  line off. The reagent table and item IDs are from Classic: a reagent
+  counts only when you know one of its spells.
 - It replaces the third-party Manners addon: turn Manners off in the
   AddOns list so that the two do not both prompt you.
 
@@ -736,6 +854,12 @@ Item names the client has not seen yet load from the server and fill in.
   [Gethe/wow-ui-source](https://github.com/Gethe/wow-ui-source/tree/forever).
   `Blizzard_APIDocumentationGenerated/` documents the `C_` functions.
   Check every new call there first.
+- The profession window is the modern `ProfessionsFrame`
+  (`Blizzard_Professions`, `C_TradeSkillUI`), restyled. `TradeSkillFrame`
+  and the old `GetTradeSkill*` functions do not exist. The recipe pane is
+  `ProfessionsFrame.CraftingPage.SchematicForm` (`.Reagents.Label` is the
+  "Reagents:" text) and the Create box is
+  `ProfessionsFrame.CraftingPage.CreateMultipleInputBox`.
 - The Auction House window is the modern `AuctionHouseFrame`. It is
   load-on-demand, so it can be nil when an `AUCTION_HOUSE_SHOW` handler
   runs first: look again a moment later.
@@ -754,6 +878,10 @@ Item names the client has not seen yet load from the server and fill in.
 - Health (and sometimes power) is secret, but `AbbreviateLargeNumbers` takes
   secret values and the result can be joined into a string for `SetText`.
   Wrap it in `pcall` and fall back to the bare value.
+- `CheckInteractDistance` is blocked in combat: a call there raises
+  `ADDON_ACTION_BLOCKED` with the function name `UNKNOWN()` and the game
+  prints "Interface action failed because of an AddOn". Call it only when
+  `InCombatLockdown()` is false.
 - `UnitDistanceSquared` works only for party and raid members. For any
   other unit, bracket the distance with `C_Spell.IsSpellInRange` over the
   spellbook and `CheckInteractDistance` (out of combat).
@@ -801,6 +929,16 @@ release. It finds the WoW folder that `update.cmd` saved; give
 linked folder: it lists it as "dev copy" and ends with "In dev mode (not
 updated): ...". Switch a branch with `git checkout` in this checkout and
 `/reload`.
+
+**Spare files: no restart for a new file.** The client reads each `.toc`
+only when it starts, so a `.lua` file that the `.toc` does not list yet
+needs a full restart. Each addon's `.toc` therefore ends with empty
+`Spare1.lua` to `Spare5.lua` files. Put new code in the next free spare and
+it loads with `/reload`. The spares load last, after the addon's other
+files. Before a release you can rename a used spare to a real name and add
+a new empty spare in its place; that one change needs one restart. Keep at
+least one spare in every `.toc` (a test checks it), and give a new addon
+its spares from the start. A brand-new addon folder still needs a restart.
 
 ## Release
 
