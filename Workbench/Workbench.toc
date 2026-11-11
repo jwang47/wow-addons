@@ -1,0 +1,16 @@
+## Interface: 16001
+## Title: Workbench: Crafting Profit and Skill-ups
+## Notes: One window for your professions: every recipe by profit, and the cheapest next skill point. Needs UpgradeFinder (it reads the recipes and prices). /wb
+## Author: jwang47
+## Version: 0.1.0
+## Dependencies: UpgradeFinder
+## OptionalDeps: Auctionator, LootValue
+## SavedVariables: WorkbenchDB
+
+Logic.lua
+Workbench.lua
+Spare1.lua
+Spare2.lua
+Spare3.lua
+Spare4.lua
+Spare5.lua

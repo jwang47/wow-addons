@@ -134,7 +134,7 @@ local handlers, cvars, chat = {}, { autoLootDefault = "1" }, {}
 CreateFrame = function()
   local fr = {}
   function fr:RegisterEvent(e) handlers[e] = true end
-  function fr:SetScript(_, fn) fr.onEvent = fn end
+  function fr:SetScript(what, fn) if what == "OnEvent" then fr.onEvent = fn end end
   _G.LAST_FRAME = fr
   return fr
 end
@@ -263,6 +263,247 @@ do
   C_Item.GetItemInfo = realInfo
 end
 
+-- Sales: your own auctions, from posts and mails -----------------------------
+local hooks = {}
+hooksecurefunc = function(a, b, c)
+  if type(a) == "string" then hooks[a] = b else hooks[b] = c end
+end
+function PostAuction() end
+local SELL = { "Linen Cloth", nil, 20 }
+GetAuctionSellItemInfo = function() return unpack(SELL) end
+UnitName = function() return "Mage" end
+GetRealmName = function() return "Forever" end
+local INBOX = {} -- { subject, money, daysLeft, hasItem, invoiceCount, itemCount }
+GetInboxNumItems = function() return #INBOX end
+GetInboxHeaderInfo = function(i)
+  local m = INBOX[i]
+  return nil, nil, "Alliance Auction House", m[1], m[2], 0, m[3], m[4]
+end
+GetInboxInvoiceInfo = function(i)
+  local m = INBOX[i]
+  return "seller", "x", "Buyer", 0, 0, 0, 0, 0, 0, m[5]
+end
+GetInboxItem = function(i) return "x", 1, nil, INBOX[i][6] end
+assert(loadfile(root .. "LootValue/Sales.lua"))("LootValue", {})
+local SL = LV.sales
+local sframe = LAST_FRAME
+sframe.onEvent(sframe, "PLAYER_LOGIN")
+check("hooks posting", hooks.PostAuction ~= nil)
+hooks.PostAuction(100, 200, 1, 20, 3)
+local r = LootValueDB.sales["Linen Cloth"]
+check("counts posted stacks", r and r.posted == 3 and r.stack == 20)
+
+local k, n, c = SL.parseSubject("Auction successful: Linen Cloth (20)")
+check("parses a sold stack subject", k == "sold" and n == "Linen Cloth" and c == 20)
+k, n, c = SL.parseSubject("Auction expired: Bandit Cloak of the Monkey")
+check("parses an expired subject", k == "expired" and n == "Bandit Cloak of the Monkey" and c == nil)
+check("other mail is not an auction", SL.parseSubject("Auction won: Linen Cloth") == nil
+  and SL.parseSubject("Hello") == nil)
+
+INBOX = {
+  { "Auction successful: Linen Cloth", 2280, 29.5, false, 20 },
+  { "Auction successful: Linen Cloth", 2280, 29.5, false, nil }, -- same mail twice: a second sale
+  { "Auction expired: Linen Cloth", 0, 29.9, true, nil, 20 },
+}
+check("counts three new auction mails", SL.scanInbox() == 3)
+check("a second look counts nothing", SL.scanInbox() == 0)
+table.remove(INBOX, 1)
+check("taking a mail counts nothing", SL.scanInbox() == 0)
+check("sold counts and items", r.sold == 2 and r.expired == 1 and r.soldItems == 40 and r.net == 4560)
+local line = SL.line("|Hitem:2589:0|h[Linen Cloth]|h")
+check("tooltip line", has(line, "Your AH sales: sold 2 of 3 (67%), ~1s14c each, last just now"))
+check("no line for an item you never sold", SL.line("|Hitem:2592:0|h[Wool Cloth]|h") == nil)
+check("2 of 3 is not slow yet", SL.slowNote("Linen Cloth") == nil)
+for i = 1, 3 do table.insert(INBOX, { "Auction expired: Linen Cloth", 0, 20 + i, true, nil, 20 }) end
+SL.scanInbox()
+check("2 of 6 sold is slow", SL.slowNote("Linen Cloth") == "you sold 2 of 6")
+-- Item 9003 prices at 3s53c; name it Linen Cloth through its link.
+local m = LV.marketInfo("|Hitem:9003:0|h[Linen Cloth]|h")
+check("own slow sales make the market slow", m.slow and has(m.note, "you sold 2 of 6"))
+
+lines = {}
+local tip2 = { GetName = function() return "GameTooltip" end, NumLines = function() return 0 end,
+  GetItem = function() return "Linen Cloth", "|Hitem:2589:0|h[Linen Cloth]|h" end,
+  AddLine = function(_, l) table.insert(lines, l) end, Show = function() end }
+LV.deferTo = "MageMentor"
+hooked(tip2)
+check("sales line shows even when MageMentor draws the advice", #lines == 1 and has(lines[1], "Your AH sales"))
+LV.deferTo = nil
+AL.slash("sales")
+check("/lv sales lists items", has(chat[#chat], "Linen Cloth 2/6"))
+AL.slash("sales reset")
+check("/lv sales reset clears", next(LootValueDB.sales) == nil)
+
+-- Scan: two full scans, what sold between them -------------------------------
+local T = 1000000
+_G.time = function() return T end
+local timers = {}
+C_Timer = { After = function(_, fn) table.insert(timers, fn) end }
+local function runTimers()
+  local frames = 0
+  while #timers > 0 and frames < 1000 do
+    local q = timers
+    timers = {}
+    for _, fn in ipairs(q) do fn() end
+    frames = frames + 1
+  end
+  return frames
+end
+local ms = 0
+debugprofilestop = function() ms = ms + 20 return ms end
+local LIST = {} -- { itemID, owner, count, buyout, band }
+local listGone = false
+GetNumAuctionItems = function() local n = listGone and 0 or #LIST return n, n end
+GetAuctionItemInfo = function(_, i)
+  local a = LIST[i]
+  if not a or listGone then return nil end
+  return "x", nil, a[3], 1, true, 1, "", 0, 0, a[4], 0, nil, nil, a[2], nil, 0, a[1]
+end
+GetAuctionItemTimeLeft = function(_, i) return LIST[i] and LIST[i][5] end
+local canAll = true
+CanSendAuctionQuery = function() return true, canAll end
+local queried = 0
+QueryAuctionItems = function() queried = queried + 1 end
+-- Widgets for the AH panel: every method is a no-op that remembers text.
+local function widget()
+  local w = {}
+  return setmetatable(w, { __index = function(_, k)
+    if k == "CreateFontString" then return function() return widget() end end
+    if k == "SetText" then return function(self, t) self.text = t end end
+    if k == "SetScript" then return function(self, what, fn) self[what] = fn end end
+    if k == "RegisterEvent" then return function(self, e) self.events = self.events or {} self.events[e] = true end end
+    return function() end
+  end })
+end
+CreateFrame = function() local w = widget() LAST_FRAME = w return w end
+AuctionFrame = widget()
+assert(loadfile(root .. "LootValue/Scan.lua"))("LootValue", {})
+local SC = LV.scan
+local scanFrame = LAST_FRAME
+local function ev(e, ...) scanFrame.OnEvent(scanFrame, e, ...) end
+ev("PLAYER_LOGIN")
+check("scan: hooks the full scan request", hooks.QueryAuctionItems ~= nil)
+ev("AUCTION_HOUSE_SHOW")
+check("scan: status shows on the AH window", SC.statusText():find("no full scan yet", 1, true) ~= nil)
+
+LIST = {
+  { 2589, "Bob", 20, 2000, 4 }, { 2589, "Bob", 20, 2000, 4 }, -- one sells
+  { 2589, "Ann", 20, 2200, 2 },  -- gone, but could have expired
+  { 2589, "Cid", 20, 1800, 3 },  -- gone, could have expired
+  { 2589, "Eve", 20, 2100, 4 },  -- reposted cheaper: not a sale
+  { 2592, "Dan", 1, 500, 4 },    -- sells
+}
+check("scan: Scan button starts a full scan", SC.start() == true and queried == 1)
+hooks.QueryAuctionItems("", nil, nil, 0, false, -1, true)
+check("scan: waits for the server", SC.job.state == "waiting")
+SC.SLICE = 2
+ev("AUCTION_ITEM_LIST_UPDATE")
+local frames = runTimers()
+check("scan: reads in slices over frames", frames >= 3)
+check("scan: first snapshot saved", LootValueDB.snap and LootValueDB.snap.n == 6 and SC.job.state == "idle")
+check("scan: says when sales will show", has(chat[#chat], "Sales show after the next full scan"))
+canAll = false
+check("scan: throttled for 15 minutes", select(2, SC.start()) == "next full scan in 15m")
+canAll = true
+
+T = T + 6 * 3600
+LIST = {
+  { 2589, "Bob", 20, 2000, 4 },
+  { 2589, "Eve", 20, 1900, 4 },
+  { 2589, "Cid", 20, 1700, 4 },
+}
+SC.onRequest()
+ev("AUCTION_ITEM_LIST_UPDATE")
+runTimers()
+local c0 = SC.compare({}, {}, 0)
+check("scan: compare of nothing is zero", c0.sold == 0 and c0.gone == 0 and c0.listed == 0 and c0.posted == 0)
+local st = SC.stats(2589)
+check("scan: one sale, the rest expired or reposted", st and st.sold == 20 and st.gone == 80 and st.listed == 60)
+-- Compare rules from the review.
+local cc = SC.compare({ { "", 20, 2000, 4 } }, { { "Bob", 20, 2000, 4 } }, 3600)
+check("an owner the client did not know yet is the same auction", cc.sold == 0 and cc.posted == 0)
+cc = SC.compare({ { "Bob", 20, 0, 4 } }, {}, 3600)
+check("a bid-only auction gone early is not a sale", cc.sold == 0 and cc.gone == 20)
+cc = SC.compare({ { "Bob", 20, 2000, 4 } }, { { "Bob", 10, 900, 4 }, { "Bob", 10, 900, 4 } }, 3600)
+check("a stack split and reposted is not a sale", cc.sold == 0 and cc.posted == 20)
+cc = SC.compare({ { "Bob", 1, 100, 5 } }, {}, 3600)
+check("an unknown band is not a sale", cc.sold == 0)
+cc = SC.compare({ { "Mage", 1, 100, 4 } }, {}, 3600, "Mage")
+check("your own auctions are left out", cc.sold == 0 and cc.gone == 0)
+cc = SC.compare({ { "Bob", 1, 100, 4 } }, {}, 9 * 3600)
+check("a 9h gap sees nothing", cc.sold == 0 and cc.atRisk == 0)
+check("thin market: one cheap listing does not set the price",
+  SC.fairPrice({ { "a", 1, 10, 4 }, { "b", 1, 100, 4 }, { "c", 1, 105, 4 }, { "d", 1, 110, 4 }, { "e", 1, 120, 4 } }) == 103)
+check("thin market: a cheap big stack does not set the price",
+  SC.fairPrice({ { "a", 20, 20, 4 }, { "b", 1, 100, 4 }, { "c", 1, 100, 4 } }) == 100)
+check("one listing gives no fair price", SC.fairPrice({ { "a", 1, 100, 4 } }) == nil)
+check("scan: tooltip market line", has(SC.line("|Hitem:2589:0|h[Linen Cloth]|h"), "AH market: ~33 sold at ~1s in 6h, 60 listed, fair price ~93c"))
+-- Fair price: one cheap and one silly listing do not set it.
+local many = { { "a", 1, 1, 4 }, { "z", 1, 99999, 4 } }
+for i = 1, 30 do table.insert(many, { "s" .. i, 20, 20 * (1000 + i * 5), 4 }) end
+local fair = SC.fairPrice(many)
+check("fair price drops a 1c undercut", fair and fair >= 1000 and fair <= 1100)
+check("fair price of nothing is nil", SC.fairPrice({ { "a", 1, 0, 4 } }) == nil)
+check("weighted median", SC.wmedian({ { 5, 1 }, { 9, 10 }, { 1, 1 } }) == 9)
+check("advice uses the fresh fair price", LV.fairPrice(2589) == 93
+  and has(LV.adviceLine("|Hitem:2589:0|h[Linen Cloth]|h", false, CTX), "AH 88c"))
+check("poisson tail", math.abs(SC.tail(5, 5) - 0.5595) < 0.001 and SC.tail(0, 1) == 0 and SC.tail(3, 0) == 1
+  and math.abs(SC.tail(1000, 1000) - 0.5) < 0.02)
+local odds = LV.sellOdds("|Hitem:2589:0|h[Linen Cloth]|h")
+check("sell odds at the fair price", odds and odds.ahead == 1 and math.abs(odds.chance - 0.671) < 0.01)
+check("sell odds text", SC.oddsText(odds) == "67% sells in 24h, ~21h")
+local high = SC.odds(2589, 200)
+check("a higher price waits behind more auctions", high.ahead == 3 and high.chance < odds.chance)
+check("advice shows the odds", has(LV.adviceLine("|Hitem:2589:0|h[Linen Cloth]|h", false, CTX), "67% sells in 24h"))
+check("ahWins: an unsold listing keeps the sure option", LV.ahWins(1000, 0, 200, false, 0.2)
+  and not LV.ahWins(1000, 0, 200, false, 0.05))
+LootValueDB.sales["Linen Cloth"] = { posted = 10, sold = 0, expired = 10, cancelled = 0, soldItems = 0, net = 0 }
+check("your own expired auctions pull the odds down", SC.odds(2589, 93, "Linen Cloth").chance < 0.25)
+LootValueDB.sales["Linen Cloth"] = nil
+local qt = LV.marketQuote(2589, "|Hitem:2589:0|h[Linen Cloth]|h", 13, 13)
+check("market quote: fair price, odds, expected", qt and qt.price == 93 and qt.fresh and qt.expected
+  and qt.expected < qt.net and qt.auctions == 3 and has(qt.note, "3 listed") and has(qt.note, "sells in 24h"))
+check("market quote: no scan is unsure", LV.marketQuote(9003).confidence == "no scan")
+-- Bait: no scan odds, and you sold 0 of 2. The AH must not count as sure.
+LootValueDB.sales["Thing"] = { posted = 2, sold = 0, expired = 2, cancelled = 0, soldItems = 0, net = 0 }
+local bait = LV.marketQuote(9003, "|Hitem:9003:0|h[Thing]|h", 300, 300)
+check("bait: no odds and 0 of 2 sold pulls the value down", bait and math.abs(bait.chance - 1.4 / 6) < 0.001
+  and bait.expected < bait.net and has(bait.note, "you sold 0 of 2") and has(bait.note, "assumed 23% sells"))
+LootValueDB.sales["Thing"] = nil
+local T2 = T
+T = T + 2 * 86400
+check("an old scan's fair price is not used", LV.fairPrice(2589) == nil)
+T = T2
+check("scan: an item that left the AH counts too", SC.stats(2592) and SC.stats(2592).sold == 1)
+check("scan: chat summary", has(chat[#chat], "about 2 auctions sold"))
+
+-- A full scan nobody saw requested (another addon's) is read by its size.
+SC.FULL_ROWS = 2
+T = T + 3600
+local snapBefore = LootValueDB.snap
+ev("AUCTION_ITEM_LIST_UPDATE")
+runTimers()
+check("scan: an unrequested full scan is read too", LootValueDB.snap ~= snapBefore and SC.job.state == "idle")
+SC.FULL_ROWS = 1000
+
+-- The AH closes before the rows are read: the scan is dropped.
+T = T + 3600
+local before = LootValueDB.snap
+LIST = { { 2589, "Bob", 20, 2000, 4 }, { 2589, "Bob", 20, 2000, 4 }, { 2589, "Bob", 20, 2000, 4 },
+  { 2589, "Bob", 20, 2000, 4 }, { 2589, "Bob", 20, 2000, 4 } }
+SC.onRequest()
+ev("AUCTION_ITEM_LIST_UPDATE")
+listGone = true
+runTimers()
+listGone = false
+check("scan: AH closed while reading drops the scan", LootValueDB.snap == before and SC.job.state == "failed"
+  and has(SC.statusText(), "the AH closed at"))
+-- A market with 10+ listed and no sales is slow.
+LootValueDB.market[9003] = { string.format("%d,%d,0,0,0,40,0,0,0,40,40", T, 7 * 3600) }
+check("scan: none sold makes the market slow", has(LV.marketInfo("|Hitem:9003:0|h[Thing]|h").note, "none sold in 7h"))
+check("scan: thousands", SC.number(164749) == "164,749" and SC.number(100) == "100" and SC.number(1000000) == "1,000,000")
+AL.slash("scan")
+check("/lv scan prints the status", has(chat[#chat], "last full scan"))
 -- Clear bags ------------------------------------------------------------------
 do
   -- A frame that takes any call; scripts, attributes, text and shown are kept.

@@ -205,7 +205,9 @@ end
 -- How the AH market for an item looks, from Auctionator's history (today's
 -- listings, price trend) and price age: { listed, age, slow, note }.
 -- "slow" when many are listed (50+ items, or 50+ full stacks), the low fell 10% or more since the last
--- scan day, the price is 3+ days old, or today's full scan did not see the item.
+-- scan day, the price is 3+ days old, today's full scan did not see the item,
+-- under half of your own last 4+ finished auctions of it sold, or the
+-- LootValue full scans saw 10+ listed and none sold.
 function LV.marketInfo(link)
   local info = {}
   local db = Auctionator and Auctionator.Database
@@ -246,6 +248,12 @@ function LV.marketInfo(link)
   if not info.unlisted and info.age and info.age >= 3 then
     table.insert(notes, "price " .. info.age .. " days old")
   end
+  -- Your own auctions of it mostly expire (Sales.lua).
+  local own = LV.sales and LV.sales.slowNote(LV.sales.itemName(link))
+  if own then table.insert(notes, own) end
+  -- Your full scans saw it listed and none sold (Scan.lua).
+  local market = LV.scan and LV.scan.slowNote(link)
+  if market then table.insert(notes, market) end
   info.slow = #notes > 0
   info.note = #notes > 0 and table.concat(notes, ", ") or nil
   return info
@@ -255,9 +263,18 @@ end
 -- the 5% cut and the deposit you lose if it doesn't sell (about 30% of the
 -- vendor price for 24 h, as on the Classic AH), it pays 1.5x as much and at
 -- least 1s more (2x when the market looks slow). With no sure option it wins.
-function LV.ahWins(ah, vendor, sure, slow)
+-- With chance (0-1, from LootValue's full scans) the AH counts at its
+-- expected value: chance x the sale, else you get the item back and still
+-- have the sure option, less the lost deposit. It then needs 1.2x and 1s
+-- more, for the trouble.
+function LV.ahWins(ah, vendor, sure, slow, chance)
   if not sure or sure <= 0 then return true end
-  local net = math.floor(ah * 0.95) - math.floor((vendor or 0) * 0.3)
+  local deposit = math.floor((vendor or 0) * 0.3)
+  if chance then
+    local expected = chance * math.floor(ah * 0.95) + (1 - chance) * (sure - deposit)
+    return expected >= sure * 1.2 and expected - sure >= 100
+  end
+  local net = math.floor(ah * 0.95) - deposit
   return net >= sure * (slow and 2 or 1.5) and net - sure >= 100
 end
 
@@ -273,7 +290,10 @@ local OTHER = { Vendor = "vendor", AH = "AH", ["AH (if tradable)"] = "AH if trad
 function LV.options(link, isGear, ctx)
   local id = itemID(link)
   if not id or not LV.hasAuctionator() then return nil end
-  local ah = call("GetAuctionPriceByItemLink", link) or call("GetAuctionPriceByItemID", id)
+  -- The fair price from LootValue's own full scan (outliers dropped) when
+  -- it is fresh, else Auctionator's lowest price.
+  local ah = (LV.fairPrice and LV.fairPrice(id)) or call("GetAuctionPriceByItemLink", link)
+    or call("GetAuctionPriceByItemID", id)
   local options = {}
   -- Disenchant: gear only, when you know Enchanting. "disenchant: no price" when
   -- Auctionator has no price for it, so a missing price is visible.
@@ -294,8 +314,15 @@ function LV.options(link, isGear, ctx)
   table.sort(options, function(a, b) return a[2] > b[2] end)
   if ah and not (ctx and ctx.bound) then
     local market = LV.marketInfo(link)
-    local entry = { ctx and "AH" or "AH (if tradable)", math.floor(ah * 0.95), market.note }
-    if LV.ahWins(ah, vendor, options[1] and options[1][2] or 0, market.slow) then
+    -- How likely a listing at the fair price sells (Scan.lua).
+    local odds = LV.sellOdds and LV.sellOdds(link)
+    local note = market.note
+    if odds then
+      local text = LV.scan.oddsText(odds)
+      note = note and (text .. "; " .. note) or text
+    end
+    local entry = { ctx and "AH" or "AH (if tradable)", math.floor(ah * 0.95), note }
+    if LV.ahWins(ah, vendor, options[1] and options[1][2] or 0, market.slow, odds and odds.chance) then
       table.insert(options, 1, entry)
     else
       table.insert(options, 2, entry)
@@ -384,18 +411,28 @@ function LV.tooltipLink(tooltip, data)
   return nil
 end
 
--- MageMentor sets LootValue.deferTo = "MageMentor" and draws the line itself.
+-- MageMentor sets LootValue.deferTo = "MageMentor" and draws the advice
+-- line itself; the sales and market lines (Sales.lua, Scan.lua) show either way.
 function LV.onTooltipItem(tooltip, data)
-  if LV.deferTo or not tooltip.GetItem then return end
+  if not tooltip.GetItem then return end
   local name = tooltip.GetName and tooltip:GetName()
   if name and name:find("Scan") then return end
   local link = LV.tooltipLink(tooltip, data)
   if not link then return end
-  local line = LV.adviceLine(link, LV.isGear(link), readContext(tooltip))
+  local added = false
+  local line = not LV.deferTo and LV.adviceLine(link, LV.isGear(link), readContext(tooltip))
   if line then
     tooltip:AddLine(line)
-    tooltip:Show()
+    added = true
   end
+  for _, fn in ipairs({ LV.salesLine or false, LV.marketLine or false }) do
+    local extra = fn and fn(link)
+    if extra then
+      tooltip:AddLine(extra)
+      added = true
+    end
+  end
+  if added then tooltip:Show() end
 end
 
 local function guarded(tt, data)
