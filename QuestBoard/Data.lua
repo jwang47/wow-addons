@@ -829,6 +829,11 @@ function D.finish(e, level)
   if e.far and trip then secs = secs + trip end
   e.secs = (not e.far or trip) and secs or nil
   e.rate = (not e.far or trip) and D.rate(e.xp, secs) or nil
+  -- Red (5 or more levels over you): you cannot do it without a carry, so
+  -- it gets 0 XP per minute and counts for nothing in a zone or an area.
+  -- A red quest you can already hand in still counts.
+  e.red = (e.color == "red" and not e.done and e.kind ~= "turnin") or nil
+  if e.red then e.rate = 0 end
   e.by = e.dist and select(2, D.travelSecs(e.dist, e)) or nil
   return e
 end
@@ -881,7 +886,7 @@ end
 
 -- XP you earn at the stop itself (a pick-up earns it later, elsewhere).
 local function stopXP(e)
-  if e.kind == "pickup" or e.kind == "party" then return 0 end
+  if e.red or e.kind == "pickup" or e.kind == "party" then return 0 end
   return e.xp or 0
 end
 
@@ -958,8 +963,10 @@ function D.zones(out)
         table.insert(z.stops, e)
         local k = kind == "farPickup" and "pickup" or e.kind
         z.counts[k] = (z.counts[k] or 0) + 1
-        z.xp = z.xp + (e.xp or 0)
-        z.work = z.work + zoneWork(e)
+        if not e.red then
+          z.xp = z.xp + (e.xp or 0)
+          z.work = z.work + zoneWork(e)
+        end
         if e.dist and (not z.dist or e.dist < z.dist) then
           z.dist, z.angle, z.spawn, z.zone, z.target, z.near = e.dist, e.angle, e.spawn, e.zone, e.target, e
         end

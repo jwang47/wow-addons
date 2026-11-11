@@ -198,6 +198,7 @@ end
 -- coloured by how good the XP per minute is. "~" marks a guess.
 function ns.stats(e, kind)
   if e.toFinisher then return "" end
+  if e.red then return "|cffff55550 xp/m, red|r" end
   local secs, guess
   if e.kind == "turnin" then
     secs = e.dist and D.travelSecs(e.dist, e)
@@ -362,6 +363,8 @@ local function tooltip(r)
   local lvl = "Level " .. (e.level or "?")
   if e.req and e.req ~= e.level then lvl = lvl .. " (needs " .. e.req .. ")" end
   tip:AddLine(lvl, 0.8, 0.8, 0.8)
+  local red = ns.redNote and ns.redNote(e)   -- Spare4.lua
+  if red then tip:AddLine(red, 1, 0.4, 0.4) end
   if e.xp then tip:AddLine(D.short(e.xp) .. " XP", 0.6, 0.8, 1) end
   if e.kind == "turnin" and e.dist then
     tip:AddLine(string.format("About %s to %s, ~%s XP per minute of the trip", D.mins(D.travelSecs(e.dist, e)), e.by == "fly" and "fly there (if you have the flight path)" or "run there", D.short(e.rate)), 0.6, 0.8, 1)
@@ -1730,6 +1733,10 @@ SlashCmdList.QUESTBOARD = function(text)
   elseif cmd == "compact" then
     ns.db.compact = not ns.db.compact
     return ns.render()
+  elseif cmd == "red" and ns.listRed then
+    return ns.listRed()
+  elseif cmd == "abandon" and ns.abandonRed then
+    return ns.abandonRed()
   elseif cmd == "stops" then
     ns.db.stops = ns.db.stops == false
     say(ns.db.stops and "Doing: quests grouped by stop" or "Doing: one list, no stops")

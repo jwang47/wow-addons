@@ -1224,6 +1224,46 @@ mods.DistanceUtils.GetNearestSpawnForQuest = function() error("changed") end
 local rough = D.collect({})
 check("a failing Questie call is skipped", #rough.log == 2)
 
+-- Red quests (Spare4.lua): 0 XP per minute, and the safe ones can be dropped.
+assert(loadfile(root .. "QuestBoard/Spare4.lua"))("QuestBoard", ns);
+(function()
+  local red = D.finish({ kind = "log", id = 7001, name = "Too High", level = 40, xp = 3000, left = {}, objectives = 1 }, 30)
+  check("red: 0 XP per minute", red.red and red.rate == 0)
+  local doneRed = D.finish({ kind = "turnin", id = 7002, name = "Done High", level = 40, xp = 3000, done = true }, 30)
+  check("red: a hand-in still counts", not doneRed.red and doneRed.rate and doneRed.rate > 0)
+  check("red: row says 0 xp/m", strip(ns.stats(red)) == "0 xp/m, red")
+  local realGet = mods.QuestieDB.GetQuest
+  mods.QuestieDB.GetQuest = function(id)
+    if id == 7001 then return { Starts = { NPC = { 5 } } } end
+    if id == 7003 then return { Starts = { Item = { 9 } } } end
+  end
+  check("red: safe when an NPC gives it and no progress", D.safeToAbandon(red))
+  red.frac = 0.5
+  check("red: not safe with progress", not D.safeToAbandon(red))
+  red.frac = nil
+  local itemRed = { kind = "log", id = 7003, red = true, name = "From an item", level = 40 }
+  local ok, why = D.safeToAbandon(itemRed)
+  check("red: not safe when an item starts it", not ok and why:find("item", 1, true))
+  local shown, popups, dropped = {}, {}, {}
+  StaticPopupDialogs = {}
+  StaticPopup_Show = function(name, a1, a2, data) table.insert(popups, { name = name, data = data }) end
+  local realQL = { C_QuestLog.SetSelectedQuest, C_QuestLog.SetAbandonQuest, C_QuestLog.AbandonQuest }
+  local sel
+  C_QuestLog.SetSelectedQuest = function(id) sel = id end
+  C_QuestLog.SetAbandonQuest = function() end
+  C_QuestLog.AbandonQuest = function() table.insert(dropped, sel) end
+  local realState = ns.state
+  ns.state = function() return { log = { red, itemRed }, active = {}, nearby = {} } end
+  ns.abandonRed()
+  check("abandon: asks first, drops nothing yet", #popups == 1 and popups[1].data == red and #dropped == 0)
+  StaticPopupDialogs.QUESTBOARD_ABANDON.OnAccept(nil, popups[1].data)
+  check("abandon: Abandon drops that quest only", #dropped == 1 and dropped[1] == 7001)
+  ns.state = realState
+  C_QuestLog.SetSelectedQuest, C_QuestLog.SetAbandonQuest, C_QuestLog.AbandonQuest = realQL[1], realQL[2], realQL[3]
+  StaticPopup_Show, StaticPopupDialogs = nil, nil
+  mods.QuestieDB.GetQuest = realGet
+end)()
+
 if failures > 0 then
   print(failures .. " failed")
   os.exit(1)

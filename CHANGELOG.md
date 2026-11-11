@@ -86,6 +86,9 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.2.0
 
+- Red quests (5 or more levels over you) count as 0 XP per minute and add
+  nothing to a zone or an area. `/qb red` lists them and says which are safe
+  to drop; `/qb abandon` asks for each safe one with the game's confirm box.
 - The chain in a quest's tooltip shows what each step gives and how long
   it takes: XP and minutes on the right of each step, "+gear" when a step
   rewards gear, and the totals of what is left in the heading ("4 left:

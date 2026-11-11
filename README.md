@@ -519,6 +519,12 @@ hand-in or a pick-up). It stays while you are within 600 yards
   (`GetQuestTagInfo`, else Questie's `GetQuestTagInfo`, else the suggested
   group size). `/qb dungeons off` keeps dungeon and raid quests to the Log
   tab (out of Doing, Nearby and Areas) and leaves their pick-ups out.
+- A red quest (5 or more levels over you, not yet done) counts as 0 XP per
+  minute: you cannot do it without a carry. It adds nothing to a zone or an
+  area. `/qb red` lists the red quests in your log and says which are safe
+  to drop: an NPC or an object gives it again, and you have no progress.
+  `/qb abandon` shows the game's confirm box for each safe one, one by one;
+  only your Abandon click drops a quest (`QuestBoard/Spare4.lua`).
 - The level number is in the quest log colours (grey, green, yellow,
   orange, red). Each row shows the distance and an arrow that turns with
   you. The distance is green within 300 yards, yellow up to 1000 yards and
