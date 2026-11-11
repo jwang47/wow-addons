@@ -26,6 +26,11 @@ the same, and a test checks that every `.toc` version has a section here.
   craft gains or loses ("Make into Bolt of Silk Cloth (4 each)").
 - Reagents the client has not seen yet get their AH price too: UpgradeFinder
   learns the item names in the Auctionator scan once and saves them.
+- New: shop for several crafts. The **Shop xN** button in the profession
+  window (N is the Create box) lists the reagents for N crafts less what is
+  in your bags and bank, with the estimated cost, and makes the Auctionator
+  shopping list "UpgradeFinder crafts" with the amounts to buy.
+  Shift-click adds another recipe to the list. `/uf shop [N]` does the same.
 - Fix: an item that comes into your bags before the game has loaded it (a
   quest reward you just handed in) now shows in the list. Before, it was
   missing until the next full Rescan. UpgradeFinder now asks the game for
@@ -207,6 +212,10 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - New: a home for small nice-to-haves (`/nice`). The first one zooms the
   camera out as far as the game allows (`/nice zoom` toggles it).
+- Blocked-action report (`blocked`, on by default): when the game says
+  "Interface action failed because of an AddOn", Niceties says which addon
+  it was and the call the game refused. `/nice blocked` lists the last 20.
+  It also turns on the game's taint log (`Logs\taint.log`).
 
 ## Glance 0.1.0
 

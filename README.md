@@ -207,6 +207,20 @@ the price to buy the made item on the AH instead.
   in; other such recipes are read each time you open a profession window
   and saved in `UpgradeFinderDB.recipes`. `/uf craft` turns the lines off
   and on.
+- Shopping for several crafts: the profession window has a **Shop xN**
+  button beside "Reagents:". It takes N from the Create box, works out the
+  reagents for N crafts of the selected recipe less what is in your bags
+  and bank (`GetItemCount(id, true)`; the game counts the bank only after
+  you open it, and chat says so until then), and says in chat what to buy,
+  what you have enough of and the estimated cost (AH and vendor prices as
+  for the crafting lines). It also makes the Auctionator shopping list
+  "UpgradeFinder crafts" with each reagent's exact name and the amount to
+  buy (`Auctionator.API.v1.CreateShoppingList`); open it on Auctionator's
+  Shopping tab. A reagent a vendor sells for less stays off the list.
+  Shift-click adds the recipe to the list you have, so two recipes that
+  share a reagent count it once. `/uf shop [N]`, `/uf shop add [N]` and
+  `/uf shop clear` do the same from chat. The Enchanting window (a
+  different frame) has no button yet.
 - Five buttons: **Slot** (click for the next, right-click for the previous),
   **Usable now / Up to +2 lvl**, **Biggest gain / Per gold**,
   **Any price / Can afford**, and **All sources / AH only / Dungeons / Bags
@@ -388,12 +402,14 @@ turned off. It is not in the release yet (not in `tools/release.py`
 `ADDONS`); try it with `dev.ps1 Niceties`.
 
 `/nice` lists the features and their state. `/nice KEY` toggles one,
-`/nice KEY on|off` sets it. The state is in `NicetiesDB` (SavedVariables).
+`/nice KEY on|off` sets it (a feature with a list, such as `blocked`,
+shows the list on `/nice KEY`). The state is in `NicetiesDB` (SavedVariables).
 
 | Key | What it does |
 | --- | --- |
 | `zoom` | Max camera distance (on by default). Sets the `cameraDistanceMaxZoomFactor` CVar to the highest value the client keeps, at each login and loading screen, so you can scroll the camera out much further. The Options slider stops at 2.0; the addon tries 4.0, 3.4, 2.6 and 2.0 and keeps the first one the client takes (or the value the client clamps it to). Off puts back the value you had before. Moving the Options slider changes it until the next login. |
 | `cpu` | CPU tracker (on by default). The game's AddOn list shows only the total addon CPU and its peak since the last `/reload`. This feature reads the game's addon profiler (`C_AddOnProfiler`) once a second and saves a history in `NicetiesDB`: each **spike** (a frame where one addon ran 50 ms or more, or a new session peak of 50 ms or more) with the time, the zone, combat and the open windows (profession, auction house, vendor, map ...), and one line a minute with the busiest addons. Spikes in the first 15 s after a loading screen are marked "loading" (the 98% peak in the AddOn list is often the login frame). It keeps 300 spikes and 24 h of minutes. `/cpu` opens a window (addons now, then the last spikes); `/cpu top`, `/cpu spikes [N]`, `/cpu worst [hours]` (who spikes most, loading frames counted last), `/cpu history [minutes]` and `/cpu reset` print to chat. The game may reset its counters on `/reload`; the tracker handles that. |
+| `blocked` | Blocked-action report (on by default). The game prints only "Interface action failed because of an AddOn". Niceties listens for `ADDON_ACTION_BLOCKED` and `ADDON_ACTION_FORBIDDEN`, says once per session which addon it was and the call it refused (and if you were in combat), and keeps the last 20 in `NicetiesDB` (`/nice blocked` lists them). It also sets the `taintLog` CVar to 1, so the game writes `Logs\taint.log`; off puts the old value back. |
 
 To add a feature: put it in the next free `SpareN.lua` (the `.toc` already
 lists five empty ones, so the game loads it after `/reload`; a new file
@@ -762,6 +778,12 @@ your saved Key Bindings.
   [Gethe/wow-ui-source](https://github.com/Gethe/wow-ui-source/tree/forever).
   `Blizzard_APIDocumentationGenerated/` documents the `C_` functions.
   Check every new call there first.
+- The profession window is the modern `ProfessionsFrame`
+  (`Blizzard_Professions`, `C_TradeSkillUI`), restyled. `TradeSkillFrame`
+  and the old `GetTradeSkill*` functions do not exist. The recipe pane is
+  `ProfessionsFrame.CraftingPage.SchematicForm` (`.Reagents.Label` is the
+  "Reagents:" text) and the Create box is
+  `ProfessionsFrame.CraftingPage.CreateMultipleInputBox`.
 - The Auction House window is the modern `AuctionHouseFrame`. It is
   load-on-demand, so it can be nil when an `AUCTION_HOUSE_SHOW` handler
   runs first: look again a moment later.
