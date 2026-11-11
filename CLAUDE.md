@@ -17,6 +17,12 @@ To try a branch in the game, check it out in a wow-addons checkout and run
 `dev.ps1 <Addon>` there (README, "Dev mode"); `dev.ps1 -Off` goes back to the
 release.
 
+**New code goes in a spare file, not a new file.** Each `.toc` ends with
+empty `Spare1.lua` to `Spare5.lua`. A file that the `.toc` does not list
+needs a full game restart; a spare loads with `/reload`. Use the next free
+spare and say which one in the PR. Give a new addon five spares from the
+start. Do not remove the last spare (a test checks it).
+
 ## Rules
 
 - **Get explicit human confirmation before every publish**: a `release-*`
