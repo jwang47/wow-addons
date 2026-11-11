@@ -573,16 +573,21 @@ end
 ---------------------------------------------------------------------------
 S.RECIPE_CLASS = 9
 S.RECIPES_MAX = 40
-local recipeClass = {} -- [item id] = true / false
+-- [item id] = recipe subclass (the profession, from the item alone: no
+-- server data) or false for an item that is not a recipe.
+local recipeClass = {}
 local function isRecipe(id)
   if recipeClass[id] == nil then
     local instant = api("C_Item.GetItemInfoInstant") or rawget(_G, "GetItemInfoInstant")
-    local class = select(6, call(instant, id))
+    local _, _, _, _, _, class, sub = call(instant, id)
     if class == nil then return false end -- not known yet: ask again next time
-    recipeClass[id] = class == S.RECIPE_CLASS
+    recipeClass[id] = class == S.RECIPE_CLASS and (sub or 0) or false
   end
   return recipeClass[id]
 end
+-- Recipe item subclass -> profession.
+S.RECIPE_SUBCLASS = { [1] = "Leatherworking", [2] = "Tailoring", [3] = "Engineering", [4] = "Blacksmithing",
+  [5] = "Cooking", [6] = "Alchemy", [7] = "First Aid", [8] = "Enchanting", [9] = "Fishing" }
 
 -- Splits a profession word off q: ("Tailoring", "bag") from "tailoring bag".
 local function professionOf(q)
@@ -637,10 +642,14 @@ function S.recipes(lists, q)
   local items, seen, loading = {}, {}, false
   for _, src in ipairs(lists) do
     for _, e in ipairs(src) do
-      if e.kind == "item" and not seen[e.id] and isRecipe(e.id) then
+      local sub = e.kind == "item" and not seen[e.id] and isRecipe(e.id)
+      -- Filter on the name and the profession first: each recipe asked of
+      -- UpgradeFinder costs a tooltip read and a price lookup.
+      local skill = sub and S.RECIPE_SUBCLASS[sub]
+      if sub and (not prof or skill == prof)
+        and ns.match.allWords(e.lname .. (skill and (" " .. norm(skill)) or ""), words) then
         local sum = recipe and recipe(e.id)
-        local hay = e.lname .. (sum and sum.skill and (" " .. norm(sum.skill)) or "")
-        if ns.match.allWords(hay, words) and (not prof or not sum or sum.skill == prof) then
+        do
           seen[e.id] = true
           if recipe and not sum then loading = true end
           table.insert(items, entry("item", e.id, e.name, { where = e.where, owned = e.owned, recipe = sum or false }))

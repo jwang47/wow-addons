@@ -977,7 +977,7 @@ do
   local list = { E("item", 5000, "Pattern: Small Silk Pack"), E("item", 5001, "Pattern: Linen Bag"),
     E("item", 5002, "Pattern: Silk Robe"), E("item", 5003, "Linen Bag"), E("item", 5004, "Pattern: Red Linen Bag") }
   local instant = C_Item.GetItemInfoInstant
-  C_Item.GetItemInfoInstant = function(id) return id, "", "", "", 0, id == 5003 and 1 or 9 end
+  C_Item.GetItemInfoInstant = function(id) return id, "", "", "", 0, id == 5003 and 1 or 9, 2 end
   local SUM = { [5000] = { skill = "Tailoring", rank = 150, profit = 5000, cost = 3000 },
     [5001] = { skill = "Tailoring", rank = 45, profit = -200, cost = 400 },
     [5002] = { skill = "Tailoring", rank = 125, profit = 9000, cost = 100 } }
@@ -1020,6 +1020,12 @@ do
   check("an unsure profit is grey with ?", strip(ns.actions.detail(g[1].entries[2])):find("%+90s 0c %?") ~= nil,
     strip(ns.actions.detail(g[1].entries[2])))
   KNOWN[1].confidence, KNOWN[1].profit = nil, 300
+  local asked = 0
+  local ufRecipe = UpgradeFinderAPI.recipe
+  UpgradeFinderAPI.recipe = function(id) asked = asked + 1 return ufRecipe(id) end
+  ns.sources.recipes({ list }, "mining")
+  check("recipe items of another profession are not priced", asked == 0)
+  UpgradeFinderAPI.recipe = ufRecipe
   g = ns.sources.recipes({ list }, "mining")
   check("another profession: only its recipes", g[1].entries[1].name == "Copper Bar" and #g[1].entries == 1)
   g = ns.sources.recipes({ list }, "cooking")

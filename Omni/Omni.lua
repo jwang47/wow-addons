@@ -378,7 +378,10 @@ function ns.startSearch(text)
   if only == "recipe" then
     lootTries = {}
     return showLoot(text, q, function(query)
+      local clock = rawget(_G, "debugprofilestop")
+      local t0 = clock and clock()
       local groups, loading = S.recipes(lists, query)
+      if t0 then ns.perf = { text = text, ms = clock() - t0, frames = 1 } end
       if #groups == 0 then
         ns.emptyText = "No recipe matches. Omni knows the recipes from your profession and trainer windows, and recipe items in your bags, bank, mail and the AH scan."
       end
