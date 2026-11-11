@@ -343,6 +343,87 @@ function G.slash(cmd, a)
 end
 
 ---------------------------------------------------------------------------
+-- The score mode section at the bottom of the Weights panel: a button per
+-- mode, and boxes for the mobs in a pull and the crit bonus, so nothing
+-- here needs a slash command.
+---------------------------------------------------------------------------
+G.PANEL_H = 96
+local pui = { modes = {} }
+G.panelUI = pui
+
+function G.paintPanel()
+  if not pui.mobs then return end
+  local mode = G.mode()
+  for m, b in pairs(pui.modes) do
+    local label = m == "weights" and "Weights" or m == "grind" and "Single target" or "AoE pulls"
+    b:SetText(m == mode and ("|cffffd100" .. label .. "|r") or label)
+  end
+  if not call(pui.mobs.HasFocus, pui.mobs) then pui.mobs:SetText(tostring(G.mobs())) end
+  if not call(pui.crit.HasFocus, pui.crit) then pui.crit:SetText(tostring(math.floor(G.critBonus() * 100 + 0.5))) end
+  local lines = G.status()
+  pui.status:SetText(mode == "weights" and "Single target and AoE pulls rank gear by leveling speed."
+    or (lines[3] or lines[1] or ""))
+end
+
+function G.buildPanel(panel)
+  local function tip(frame, title, text)
+    frame:SetScript("OnEnter", function(self)
+      local tt = rawget(_G, "GameTooltip")
+      if not tt then return end
+      tt:SetOwner(self, "ANCHOR_RIGHT")
+      tt:AddLine(title)
+      tt:AddLine(text, 0.8, 0.8, 0.8, true)
+      tt:Show()
+    end)
+    frame:SetScript("OnLeave", function() local tt = rawget(_G, "GameTooltip") if tt then tt:Hide() end end)
+  end
+  local head = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  head:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 14, G.PANEL_H - 8)
+  head:SetText("Score mode")
+  local tips = {
+    weights = "The hand-set weight of each stat, above.",
+    grind = "Leveling speed with one target at a time: your damage times the share of the time you cast and do not drink. The weights come from the spells on your action bars, your mana and your level.",
+    aoe = "Leveling speed with pulls of several mobs and your area spell (Blizzard). Damage over time does not crit; Intellect, Stamina and armor count for more.",
+  }
+  for i, m in ipairs(G.MODES) do
+    local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    b:SetSize(88, 20)
+    b:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 12 + (i - 1) * 92, G.PANEL_H - 34)
+    b:SetScript("OnClick", function() G.set(m) if ns.paint then ns.paint() end G.paintPanel() end)
+    tip(b, m == "weights" and "Weights" or m == "grind" and "Single target" or "AoE pulls", tips[m])
+    pui.modes[m] = b
+  end
+  local function box(key, label, x, cmd, title, text)
+    local l = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    l:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", x, G.PANEL_H - 56)
+    l:SetText(label)
+    local e = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+    e:SetSize(36, 18)
+    e:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", x + 84, G.PANEL_H - 60)
+    e:SetAutoFocus(false)
+    e:SetFontObject("GameFontHighlightSmall")
+    local function commit(self)
+      local n = tonumber(((self:GetText() or ""):gsub("%s", "")))
+      local now = key == "mobs" and G.mobs() or math.floor(G.critBonus() * 100 + 0.5)
+      if n and n ~= now then G.slash(cmd, tostring(n)) if ns.paint then ns.paint() end end
+      G.paintPanel()
+    end
+    e:SetScript("OnEnterPressed", function(self) self:ClearFocus() commit(self) end)
+    e:SetScript("OnEscapePressed", function(self) self:ClearFocus() G.paintPanel() end)
+    e:SetScript("OnEditFocusLost", commit)
+    tip(e, title, text)
+    pui[key] = e
+  end
+  box("mobs", "Mobs per pull", 14, "mobs", "Mobs per pull", "How many mobs you gather for one AoE pull. More mobs: more damage for the same mana.")
+  box("crit", "Crit bonus %", 152, "critbonus", "Crit bonus",
+    "The extra damage of your spell crits: 50, or 100 with a talent that doubles them. It sets what crit on gear is worth.")
+  pui.status = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  pui.status:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 14, 8)
+  pui.status:SetWidth(272)
+  pui.status:SetJustifyH("LEFT")
+end
+
+---------------------------------------------------------------------------
 -- Hooks into the scan and the row tooltip
 ---------------------------------------------------------------------------
 -- The score of an item: the mode's weights when a mode is on.

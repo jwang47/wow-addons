@@ -339,6 +339,7 @@ local function build()
     tt:AddLine("Single: leveling speed, one target at a time.", 0.8, 0.8, 0.8)
     tt:AddLine("AoE: leveling speed with pulls and your area spell.", 0.8, 0.8, 0.8)
     for _, l in ipairs(ns.grind.status()) do tt:AddLine(l, 1, 0.82, 0, true) end
+    tt:AddLine("Mobs per pull and crit bonus: the Weights button.", 0.6, 0.6, 0.6)
     tt:Show()
   end)
   mbtn:SetScript("OnLeave", function() local tt = rawget(_G, "GameTooltip") if tt then tt:Hide() end end)

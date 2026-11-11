@@ -89,7 +89,8 @@ the same, and a test checks that every `.toc` version has a section here.
   weights come from your own spells, mana and level. AoE mode uses your
   area spell (Blizzard): crit counts for nothing there, Intellect and
   Stamina count for more. **Weights** is the old score. The row tooltip
-  shows the leveling speed change.
+  shows the leveling speed change. The Weights panel has a button per
+  mode and boxes for the mobs per pull and your crit bonus.
 - Fix: the DPS estimate no longer takes Blizzard or Frost Nova for a
   single-target spell, and it can use a crit bonus above +50%
   (`/uf critbonus`).

@@ -19,6 +19,7 @@ end
 
 function ns.paintWeights()
   if not panel then return end
+  if ns.grind and ns.grind.paintPanel then ns.grind.paintPanel() end
   local w, _, spec = ns.weights(), ns.weightKey()
   local name = ns.weightsName()
   ui.title:SetText("Weights |cff9d9d9d(" .. (spec or ns.class():lower()) .. ", " .. (name or "default") .. ")|r")
@@ -61,7 +62,7 @@ end
 local function build()
   local main = ns.frame
   panel = CreateFrame("Frame", "UpgradeFinderWeights", main, rawget(_G, "BackdropTemplateMixin") and "BackdropTemplate" or nil)
-  panel:SetSize(300, 430)
+  panel:SetSize(300, 430 + (ns.grind and ns.grind.PANEL_H or 0))
   panel:SetPoint("TOPLEFT", main, "TOPRIGHT", 4, 0)
   panel:EnableMouse(true)
   if panel.SetBackdrop then
@@ -194,6 +195,7 @@ local function build()
   help:SetJustifyH("LEFT")
   help:SetText("Click a preset to load it; x deletes it.")
   ns.weightsUI, ns.weightsBoxes = ui, boxes
+  if ns.grind and ns.grind.buildPanel then ns.grind.buildPanel(panel) end -- the score mode section (Spare1.lua)
 end
 
 -- Show or hide the panel; show = true keeps it open.

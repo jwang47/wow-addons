@@ -895,6 +895,21 @@ check("/uf mobs", G.mobs() == 8 and UpgradeFinderDB.grind["MAGE:aoe"].mobs == 8)
 SlashCmdList.UPGRADEFINDER("critbonus 100")
 check("/uf critbonus", G.critBonus() == 1)
 UpgradeFinderDB.opts.critBonus, UpgradeFinderDB.opts.mobs = nil, nil
+-- The same from the Weights panel: mode buttons and two boxes, no slash command.
+ns.toggleWeights(true)
+local pu = G.panelUI
+check("panel: a button per mode, the mode in use in gold", pu.modes.grind and pu.modes.aoe.text:find("AoE pulls", 1, true)
+  and strip(pu.modes.aoe.text) ~= pu.modes.aoe.text and strip(pu.modes.grind.text) == pu.modes.grind.text)
+pu.modes.grind.scripts.OnClick()
+check("panel: Single target button", G.mode() == "grind" and ns.modeButton.text == "Mode: Single")
+pu.mobs:SetText("6")
+pu.mobs.scripts.OnEditFocusLost(pu.mobs)
+pu.crit:SetText("100")
+pu.crit.scripts.OnEnterPressed(pu.crit)
+check("panel: mobs and crit bonus boxes", G.mobs() == 6 and G.critBonus() == 1 and pu.crit.text == "100")
+check("panel: says what a point is worth", pu.status.text:find("1 point is worth", 1, true) ~= nil)
+pu.modes.aoe.scripts.OnClick()
+UpgradeFinderDB.opts.critBonus, UpgradeFinderDB.opts.mobs = nil, nil
 -- A mage with MageMentor: its weights give Stamina and armor.
 MageMentorAPI = { parseStats = function() return {} end,
   score = function(st) return (st.sta or 0) * 0.7 + (st.armor or 0) * 0.05 + (st.sp or 0) + (st.frost or 0) end }

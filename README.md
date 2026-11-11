@@ -254,7 +254,9 @@ price is the craft cost: the pattern plus the reagents (from the line after
 lower; a "+" marks a reagent with no price. The tooltip lists the parts and
 the price to buy the made item on the AH instead.
 
-- Score modes (`UpgradeFinder/Spare1.lua`; the **Mode** button or
+- Score modes (`UpgradeFinder/Spare1.lua`; the **Mode** button, the
+  "Score mode" section at the bottom of the Weights panel (a button per
+  mode, boxes for the mobs per pull and the crit bonus), or
   `/uf mode weights|grind|aoe`). **Weights** is the hand-set weight per stat.
   **Single** and **AoE** score a damage caster's gear by leveling speed:
   damage per second times the share of the time you cast and do not drink.
