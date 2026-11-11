@@ -130,26 +130,7 @@ function D.chainSteps(id, inLog)
   return steps, at
 end
 
-D.CHAIN_SHOW = 8   -- chain lines in a tooltip
-D.STEP_MARK = { done = "|cff60d060done|r", here = "|cffffd200>>|r", log = "|cffffd200log|r", later = "|cff909090...|r" }
--- Tooltip lines for a chain: "Chain: 3 of 5", then one line per step
--- ("done", ">>" for this quest, "log", "..." for later ones), at most
--- CHAIN_SHOW around this quest.
-function D.chainLines(steps, at)
-  if not steps then return {} end
-  local lines = { string.format("Chain: quest %d of %d", at, #steps) }
-  local back = math.min(2, D.CHAIN_SHOW - 1)   -- steps shown before this one
-  local first = math.max(1, math.min(at - back, #steps - D.CHAIN_SHOW + 1))
-  local last = math.min(#steps, first + D.CHAIN_SHOW - 1)
-  if first > 1 then table.insert(lines, string.format("  (%d earlier)", first - 1)) end
-  for i = first, last do
-    local s = steps[i]
-    local lvl = s.level and ("[" .. s.level .. "] ") or ""
-    table.insert(lines, "  " .. D.STEP_MARK[s.state] .. "  " .. lvl .. s.name)
-  end
-  if last < #steps then table.insert(lines, string.format("  (%d more)", #steps - last)) end
-  return lines
-end
+-- D.chainLines (the tooltip lines of a chain) is in Spare3.lua.
 
 local function itemFacts(item)
   local qdb = D.module("QuestieDB")

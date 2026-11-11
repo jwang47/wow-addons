@@ -408,7 +408,11 @@ local function tooltip(r)
     end
   end
   if e.id and e.id > 0 and D.chainSteps then
-    for _, line in ipairs(D.chainLines(D.chainSteps(e.id, ns.inLog()))) do tip:AddLine(line, 0.85, 0.85, 0.85) end
+    local steps, at = D.chainSteps(e.id, ns.inLog())
+    for _, line in ipairs(D.chainLines(steps, at, e)) do
+      if type(line) == "table" then tip:AddDoubleLine(line[1], line[2], 0.85, 0.85, 0.85, 0.6, 0.8, 1)
+      else tip:AddLine(line, 0.85, 0.85, 0.85) end
+    end
   end
   if e.party and #e.party > 0 then
     tip:AddLine((e.kind == "party" and "Your party has it: " or "With ") .. D.partyText(e.party), 0.6, 0.8, 1)

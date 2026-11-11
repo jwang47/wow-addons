@@ -41,6 +41,7 @@ UIParent = widget("UIParent")
 GameTooltip = widget("GameTooltip")
 GameTooltip.lines = {}
 function GameTooltip:AddLine(t) table.insert(self.lines, t) end
+function GameTooltip:AddDoubleLine(l, r) table.insert(self.lines, l .. " | " .. r) end
 DEFAULT_CHAT_FRAME = { AddMessage = function(_, m) table.insert(chat, strip(m)) end }
 SlashCmdList = {}
 local timers = {}
@@ -139,7 +140,7 @@ function LibStub(name) if name == "HereBeDragonsQuestie-2.0" then return HBD end
 local ns = {}
 -- Quest 122 (log index 3) has a usable quest item.
 function GetQuestLogSpecialItemInfo(i) if i == 3 then return "|Hitem:5000|h[Vial]|h", 134400, 1 end end
-for _, file in ipairs({ "Data.lua", "Chain.lua", "QuestBoard.lua", "Items.lua" }) do
+for _, file in ipairs({ "Data.lua", "Chain.lua", "QuestBoard.lua", "Items.lua", "Spare3.lua" }) do
   local chunk = assert(loadfile(root .. "QuestBoard/" .. file))
   chunk("QuestBoard", ns)
 end
@@ -740,13 +741,35 @@ check("chain: walks back and on", table.concat(full, ",") == "124,125,126,128" a
 local steps = D.chainSteps(126, { [125] = true })
 check("chain: steps marked done, log, here, later", steps and steps[1].state == "done" and steps[2].state == "log"
   and steps[3].state == "here" and steps[4].state == "later" and steps[4].name == "End")
+-- Steps not done show their XP and minutes (the trip and the work); the
+-- heading sums what is left. Every place is at 100, 0; you are at 0, 0.
+QUESTS[126] = { level = 27, requiredLevel = 20, name = "Middle", place = { 100, "Giver" }, xp = 1000 }
+QUESTS[128] = { level = 27, requiredLevel = 20, name = "End", place = { 100, "Giver" }, xp = 500 }
+local realNPC = mods.QuestieDB.QueryNPCSingle
+mods.QuestieDB.QueryNPCSingle = function(id, key) if key == "spawns" then return { [44] = { { 50, 50 } } } end end
+local level0 = P.level
+P.level = 27
 local lines = D.chainLines(D.chainSteps(126, {}))
-check("chain: tooltip lines", strip(lines[1]) == "Chain: quest 3 of 4" and strip(lines[4]) == "  >>  [10] Middle" and #lines == 5)
+local work = D.PICKUP_SECS * 2 + D.OBJECTIVE_SECS + D.RETURN_SECS
+local stepMin = math.floor((100 / D.RUN_SPEED + work) / 60 + 0.5)
+check("chain: heading sums what is left", type(lines[1]) == "table" and strip(lines[1][1]) == "Chain: quest 3 of 4"
+  and lines[1][2] == string.format("2 left: 1.5k xp, %d min", math.floor((100 / D.RUN_SPEED + 2 * work) / 60 + 0.5)))
+check("chain: travel and questing time", strip(lines[2][2]) == string.format("1 min travel, %d min questing (a guess)", math.floor(2 * work / 60 + 0.5)))
+check("chain: done steps have no numbers", strip(lines[3]) == "  done  [10] Before" and strip(lines[4]) == "  done  [10] Start")
+check("chain: a step shows its XP and minutes", strip(lines[5][1]) == "  >>  [10] Middle" and lines[5][2] == "1.0k xp  " .. stepMin .. " min")
+check("chain: the next step starts where the last one ends; gear is marked", strip(lines[6][1]) == "  ...  [10] End  +gear"
+  and lines[6][2] == "500 xp  " .. math.floor(work / 60 + 0.5) .. " min" and #lines == 6)
+local hereLines = D.chainLines(D.chainSteps(126, {}), 3, { secs = 600, dist = 70 })
+check("chain: the hovered quest uses the board's time", hereLines[5][2] == "1.0k xp  10 min")
+mods.QuestieDB.QueryNPCSingle = function() end
+check("chain: no place, the time is a guess", D.chainLines(D.chainSteps(126, {}))[5][2]:find("~") ~= nil)
 check("chain: no chain, no lines", D.chainSteps(122, {}) == nil and #D.chainLines(nil) == 0)
 D.CHAIN_SHOW = 2
 local cut = D.chainLines(D.chainSteps(126, {}))
-check("chain: a long chain is cut around this quest", strip(cut[2]) == "  (1 earlier)" and strip(cut[#cut]) == "  (1 more)")
+check("chain: a long chain is cut around this quest", strip(cut[3]) == "  (1 earlier)" and strip(cut[#cut][1]) == "  (1 more)"
+  and cut[#cut][2]:find("^500 xp") ~= nil)
 D.CHAIN_SHOW = 8
+mods.QuestieDB.QueryNPCSingle, QUESTS[126], QUESTS[128], P.level = realNPC, nil, nil, level0
 GameTooltip.lines = {}
 turnRow.scripts.OnEnter(turnRow)
 mods.QuestieDB.QueryQuestSingle = function(id, key) if key == "nextQuestInChain" then return NEXT[id] or 0 end end

@@ -41,6 +41,12 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.2.0
 
+- The chain in a quest's tooltip shows what each step gives and how long
+  it takes: XP and minutes on the right of each step, "+gear" when a step
+  rewards gear, and the totals of what is left in the heading ("4 left:
+  6.2k xp, 25 min", then the travel and questing minutes). The minutes are
+  a guess: the trip from where the step before ends, by run or flight, and
+  the work, the same model as the board.
 - The zone of a place: a quest's tooltip names it ("Turn in at Viktori
   Prism'Antras, Dustwallow Marsh"), a stop's tooltip too, and a stop in
   another zone than yours shows it on its line.
