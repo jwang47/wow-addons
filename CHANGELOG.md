@@ -65,7 +65,10 @@ the same, and a test checks that every `.toc` version has a section here.
   sells in 24 hours, from your full scans. A line under "Sells for" says
   how many are listed, how many sell a day and the chance. A thin market
   (under 3 listed, or no sales seen) or a price with no LootValue scan
-  today is marked in red, and the profit gets "?".
+  today is marked in red, and the profit gets "?". Without scan odds the
+  AH counts as a 35% chance, moved by your own sold and expired mails for
+  the item (you sold 0 of 2: about 23%), so an unproven market is never
+  counted as a sure sale.
 
 ## LootValue 0.2.1
 

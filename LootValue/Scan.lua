@@ -639,6 +639,7 @@ function S.ahead(id, price)
   return n
 end
 
+S.UNKNOWN = 0.35       -- the chance a sale is assumed to have with no scan odds
 S.PRIOR = 12 * 3600    -- smoothing: half a sale over 12 h of seen time
 S.MAIL_WEIGHT = 4      -- your own finished auctions count against 4 "virtual" ones
 
@@ -655,11 +656,18 @@ function S.odds(id, price, name)
   local rate = (s.soldN + 0.5) / (s.seen + S.PRIOR) -- auctions a second
   local need = math.floor(ahead + 0.5) + 1
   local o = { ahead = ahead, chance = S.tail(rate * S.LISTING, need), hours = need / rate / 3600 }
+  o.chance = S.withMails(o.chance, name)
+  return o
+end
+
+-- Moves a chance toward your own sell-through for the item: your sold and
+-- expired mails count against MAIL_WEIGHT "virtual" auctions at chance.
+function S.withMails(chance, name)
   local own = name and LV.sales and LV.sales.stats(name)
   if own and own.finished > 0 then
-    o.chance = (S.MAIL_WEIGHT * o.chance + own.sold) / (S.MAIL_WEIGHT + own.finished)
+    return (S.MAIL_WEIGHT * chance + own.sold) / (S.MAIL_WEIGHT + own.finished)
   end
-  return o
+  return chance
 end
 
 -- "80% in 24h, ~5h" for the AH entry, or nil.
@@ -697,7 +705,8 @@ end
 -- craft profit). sure: what you get without the AH (vendor, disenchant),
 -- in copper. Returns nil without any AH price, else
 -- { price, net (after the cut), expected (net weighed by the chance, an
--- unsold listing coming back as sure less the deposit; nil without odds),
+-- unsold listing coming back as sure less the deposit; with no scan odds
+-- the chance is S.UNKNOWN moved by your own mails),
 -- chance, hours, auctions, perDay (items sold a day, nil unknown),
 -- fresh (from a LootValue scan under a day old), confidence ("ok",
 -- "thin", "no scan"), note (short text) }.
@@ -717,12 +726,16 @@ function S.quote(id, link, sure, vendor)
   local st = S.stats(id)
   q.auctions = S.listedNow(id)
   q.perDay = st and st.rate and st.rate * 86400 or nil
-  local o = fair and S.odds(id, fair, link and LV.sales and LV.sales.itemName(link))
-  if o then
-    q.chance, q.hours = o.chance, o.hours
-    local deposit = math.floor((vendor or 0) * 0.3)
-    q.expected = math.floor(o.chance * q.net + (1 - o.chance) * math.max(0, (sure or 0) - deposit) + 0.5)
-  end
+  local name = link and LV.sales and LV.sales.itemName(link)
+  local o = fair and S.odds(id, fair, name)
+  -- No scan odds: an unknown market is not a sure sale. Assume a low
+  -- chance, moved by your own sold and expired mails for the item.
+  q.chance = o and o.chance or S.withMails(S.UNKNOWN, name)
+  q.hours = o and o.hours
+  local deposit = math.floor((vendor or 0) * 0.3)
+  q.expected = math.floor(q.chance * q.net + (1 - q.chance) * math.max(0, (sure or 0) - deposit) + 0.5)
+  local own = name and LV.sales and LV.sales.stats(name)
+  q.own = own and own.finished > 0 and own or nil
   local parts = {}
   if not q.fresh then
     q.confidence = "no scan"
@@ -735,6 +748,8 @@ function S.quote(id, link, sure, vendor)
     if o then table.insert(parts, math.floor(o.chance * 100 + 0.5) .. "% sells in 24h") end
     if not o then table.insert(parts, "no sales seen yet") end
   end
+  if not o then table.insert(parts, "assumed " .. math.floor(q.chance * 100 + 0.5) .. "% sells") end
+  if q.own then table.insert(parts, "you sold " .. q.own.sold .. " of " .. q.own.finished) end
   q.note = table.concat(parts, ", ")
   return q
 end
