@@ -18,6 +18,8 @@ Classic clients with the same APIs, but we test them only on Forever.
 - **Glance** (in testing, not in the releases yet): a lighter HUD with a
   keyboard-shaped action bar, a square minimap and small floating unit
   frames (`/glance`).
+- **Bazaar** (in testing, not in the releases yet): an AH browser for your
+  last full AH scan, anywhere in the world (`/bazaar`).
 
 Download page: https://jwang47.github.io/wow-addons/ (Windows installer).
 Releases: [GitHub releases](https://github.com/jwang47/wow-addons/releases)
@@ -789,6 +791,35 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
 The bar uses the game's secure action buttons and override bindings
 (`SetOverrideBindingClick`), so it only reads bindings; it never changes
 your saved Key Bindings.
+
+## Bazaar (in testing)
+
+Bazaar is a window like the AH's Browse tab, but it works away from the
+AH. It shows your last full AH scan: every item with the cheapest buyout
+per item, the items listed, the fair price and how many sold in the last
+2 days. `/bazaar` (or `/ahb`) opens it; `/bazaar silk` opens it with a
+search. Esc closes it.
+
+- Categories on the left come from the items in the scan (Armor, Container,
+  Trade Goods...). Click a category to filter; click it again to close its
+  types.
+- Search words, a level range (the level the item needs) and a highest
+  price in gold filter the list.
+- Click a column header to sort by it; click again to turn the order
+  round. The default is most sold first: what moves.
+- The Profit column estimates what one item earns. For a recipe (with
+  UpgradeFinder loaded) it is the profit of one craft. For other items it
+  is buying the cheapest and selling again at the fair price after the 5%
+  AH cut, or to a vendor when that pays more. The row tooltip says which.
+- Hover a row for the item tooltip; Shift+click links it in chat.
+
+The data comes from LootValue's full scan (LootValue's Scan button above
+the AH window, or Auctionator's Full Scan with LootValue loaded): LootValue
+keeps every auction, its fair price (outliers dropped) and the sales it
+saw between scans. Without a LootValue scan, Bazaar lists the items in
+Auctionator's price database with their last price only. Bazaar reads the
+scan a few milliseconds a frame, so a big scan does not freeze the game.
+Item names the client has not seen yet load from the server and fill in.
 
 ## Forever client notes
 
