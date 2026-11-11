@@ -344,7 +344,7 @@ for _, f in ipairs(frames) do
 end
 check("Nearby: every stop within 1000 yd", shownRows == 4 and ns.tab() == "nearby")
 check("first row is the turn-in", firstRow.entry.id == 127 and firstRow.name.text == "Murloc Poachers")
-check("row shows what to do", firstRow.sub.text == "Hand in to Wiley")
+check("row shows what to do, marked complete", strip(firstRow.sub.text) == "Complete  Hand in to Wiley")
 -- Alt-click a list's heading: pin every quest in it (an area's stops too).
 local setList = { { id = 501, kind = "log", name = "x" }, { kind = "area", stops = { { id = 502, kind = "pickup", name = "y" }, { id = 501, kind = "log", name = "x" } } },
   { kind = "more", name = "+1 more" } }
@@ -988,7 +988,7 @@ check("progress: half way", barRow.entry.frac == 0.5)
 check("progress: the bar shows", barRow.bar.shown and barRow.fill.shown)
 local turnBar
 for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown and f.entry.id == 127 then turnBar = f end end
-check("progress: no bar on a hand-in", not turnBar.bar.shown)
+check("progress: a hand-in has a full green bar", turnBar.bar.shown and turnBar.fill.shown and ns.complete(turnBar.entry))
 -- On a job: Active plus hand-ins and pick-ups on the way; the rest on hover.
 local shownIDs = {}
 for _, f in ipairs(frames) do if f.kind == "Button" and f.entry and f.shown then table.insert(shownIDs, f.entry.id) end end

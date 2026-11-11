@@ -36,6 +36,8 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.2.0
 
+- A complete quest is clear at a glance: a full green bar under it, a
+  green name, and "Complete" in green before "Hand in to ...".
 - Cleaner quest rows. Line 1: the name and how far. Line 2: what to do,
   and at the right the same two numbers on every quest ("625 xp  3 min",
   coloured by XP per minute; "~" is a guess). A gear line comes only when

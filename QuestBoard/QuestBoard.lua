@@ -826,8 +826,19 @@ ns.MIN_HEIGHT = 80
 ns.BAR_W = W - 2 * PAD - 26 - 16
 -- The board width: ns.db.width within MIN_W..MAX_W.
 function ns.width() return math.max(ns.MIN_W, math.min(ns.MAX_W, (ns.db and ns.db.width) or 270)) end
+-- A quest you can hand in: done in the log, or a hand-in row.
+function ns.complete(e) return e.kind == "turnin" or (e.kind == "log" and e.done) or false end
+
 function ns.setBar(r, e, kind)
-  if e.kind ~= "log" or e.done or not e.frac then r.bar:Hide() r.fill:Hide() return end
+  if ns.complete(e) then
+    -- Complete: a full green bar, on every tab.
+    r.bar:Show()
+    r.fill:SetColorTexture(0.35, 0.85, 0.35, 0.9)
+    r.fill:SetWidth(ns.BAR_W)
+    r.fill:Show()
+    return
+  end
+  if e.kind ~= "log" or not e.frac then r.bar:Hide() r.fill:Hide() return end
   r.bar:Show()
   if kind == "active" then r.fill:SetColorTexture(1, 0.82, 0.25, 0.9) else r.fill:SetColorTexture(0.45, 0.7, 1, 0.7) end
   local w = math.floor(ns.BAR_W * math.max(0, math.min(1, e.frac)) + 0.5)
@@ -995,7 +1006,7 @@ end
 function ns.render()
   if not panel then return end
   W = ns.width()
-  ns.BAR_W = W - 2 * PAD - 26 - 16
+  ns.BAR_W = W - 2 * PAD - TEXT_X - 16
   panel:SetWidth(W)
   local y = -PAD
   local level = state and state.level or D.playerLevel()
@@ -1058,7 +1069,7 @@ function ns.render()
           r.lvl:SetTextColor(rgb(e.color))
           r.name:SetText(e.name)
           if e.kind == "more" then r.name:SetTextColor(0.6, 0.6, 0.6)
-          elseif e.kind == "turnin" then r.name:SetTextColor(0.55, 0.9, 0.55)
+          elseif ns.complete(e) then r.name:SetTextColor(0.55, 0.9, 0.55)
           elseif e.classColor then r.name:SetTextColor(e.classColor[1], e.classColor[2], e.classColor[3])
           else r.name:SetTextColor(0.92, 0.92, 0.92) end
           -- Your Alt-click mark: a gold star before the name.
@@ -1080,6 +1091,7 @@ function ns.render()
             local reward = ns.rewardLine(e)
             if reward then table.insert(lines, reward) end
             todo = lines[1] or ""
+            if ns.complete(e) then todo = "|cff66dd66Complete|r  " .. todo end
             lines[1] = todo
           else
             todo = full and ns.todo(e) or nil
