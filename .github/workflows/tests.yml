@@ -19,6 +19,7 @@ jobs:
       - run: lua5.1 tests/glance.lua
       - run: lua5.1 tests/niceties.lua
       - run: lua5.1 tests/groupup.lua
+      - run: lua5.1 tests/bazaar.lua
       - run: lua5.1 tests/workbench.lua
       - run: python3 -m unittest tests/test_release.py
   updater:

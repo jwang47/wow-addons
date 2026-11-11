@@ -5,6 +5,18 @@ adds a section here, newest first. `tools/release.py check` refuses an
 addon whose files changed since the live release while its version stayed
 the same, and a test checks that every `.toc` version has a section here.
 
+
+## Bazaar 0.1.0
+
+- New addon (in testing): an AH browser for your last full AH scan, away
+  from the AH. Categories, search, level and price filters, and sortable
+  columns: cheapest buyout, items listed, fair price, sold in 2 days,
+  estimated profit. Profit is one craft for a recipe (with UpgradeFinder),
+  else buying the cheapest and selling again at the fair price after the
+  5% AH cut, or to a vendor when that pays more.
+  `/bazaar`, `/ahb`. It reads LootValue's full scan, or Auctionator's
+  prices without one.
+
 ## Workbench 0.1.0
 
 - New addon: one window for crafting (`/wb`). It lists every recipe of your
@@ -91,6 +103,11 @@ the same, and a test checks that every `.toc` version has a section here.
   at the object and pins it.
 - The item tooltip says "AH full scan 3h ago" like LootValue, and "not in
   today's full scan" next to an old price.
+- `ah:` searches your last full AH scan from anywhere ("ah: silk"): the
+  items LootValue's full scan saw, with the cheapest buyout, the fair
+  price, the items listed and the sales in 2 days, most sold first.
+  Without a LootValue scan it uses Auctionator's prices. With Bazaar
+  loaded, the last row opens the same search in the Bazaar AH browser.
 
 ## QuestBoard 0.2.0
 
