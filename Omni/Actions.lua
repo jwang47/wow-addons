@@ -210,6 +210,7 @@ function A.hint(e)
   elseif k == "person" then return "Enter: whisper   Shift+Enter: invite"
   elseif k == "spell" then return "Enter: put on the cursor   Shift+Enter: link"
   elseif k == "command" then return "Enter: run"
+  elseif k == "bazaar" then return "Enter: open the AH browser with this search"
   elseif k == "npc" or k == "near" then return "Enter: show on the map"
   elseif k == "quest" then
     if A.questStatus(e.id) == "log" then return "Enter: open in the quest log   Shift+Enter: where it starts" end
@@ -269,6 +270,9 @@ function A.run(e, alt)
     return true
   elseif k == "command" then
     call(api("SlashCmdList.MAGEMENTOR"), e.args)
+    return true
+  elseif k == "bazaar" then
+    call(api("Bazaar.open"), e.query ~= "" and e.query or nil)
     return true
   elseif k == "npc" then
     return showNpc(e.id, e.name)
@@ -380,6 +384,15 @@ function A.detail(e)
       else
         table.insert(parts, "|cff9d9d9dno sale price|r")
       end
+    end
+    local ah = e.ahRow
+    if ah then
+      -- An AH search row: cheapest, fair price, listed, sold in 2 days.
+      if ah.min then table.insert(parts, "from " .. ns.money(ah.min)) end
+      if ah.fair then table.insert(parts, "|cff9d9d9dfair|r " .. ns.money(ah.fair)) end
+      if ah.listed then table.insert(parts, ah.listed .. " listed") end
+      if ah.sold then table.insert(parts, (ah.sold > 0 and "|cff40ff40" or "|cff9d9d9d") .. ah.sold .. " sold/2d|r") end
+      return table.concat(parts, "  ")
     end
     for _, w in ipairs({ "bags", "bank", "mail" }) do
       if e.where and e.where[w] then table.insert(parts, w .. " " .. e.where[w]) end

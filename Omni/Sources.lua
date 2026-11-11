@@ -688,6 +688,86 @@ function S.recipes(lists, q)
 end
 
 ---------------------------------------------------------------------------
+-- AH search ("ah: bag"): items in LootValue's last full AH scan
+-- (LootValueDB.snap, every auction), from anywhere. Each row has the
+-- cheapest buyout per item, the items listed, the fair price and what sold
+-- in the last 2 days (LootValue.scan.stats). Most sold first: what moves.
+-- Without a LootValue full scan, items with an Auctionator price.
+---------------------------------------------------------------------------
+S.AH_MAX = 60
+
+-- { min (buyout per item), listed (items), auctions } from a snapshot string.
+function S.ahListing(scan, snap, id)
+  local str = snap.items and snap.items[id]
+  if type(str) ~= "string" or type(scan.decode) ~= "function" then return nil end
+  local ok, list = pcall(scan.decode, str, snap.owners or {})
+  if not ok or type(list) ~= "table" then return nil end
+  local out = { listed = 0, auctions = #list }
+  for _, a in ipairs(list) do
+    local count, buyout = a.count or a[2], a.buyout or a[3]
+    if type(count) == "number" and count > 0 then
+      out.listed = out.listed + count
+      if type(buyout) == "number" and buyout > 0 then
+        local each = buyout / count
+        if not out.min or each < out.min then out.min = each end
+      end
+    end
+  end
+  return out
+end
+
+function S.ah(lists, q)
+  local lv = rawget(_G, "LootValue")
+  local scan = type(lv) == "table" and type(lv.scan) == "table" and lv.scan or nil
+  local lvdb = rawget(_G, "LootValueDB")
+  local snap = scan and type(lvdb) == "table" and type(lvdb.snap) == "table" and lvdb.snap or nil
+  local price = api("Auctionator.API.v1.GetAuctionPriceByItemID")
+  local hits, seen = {}, {}
+  for _, src in ipairs(lists) do
+    for _, e in ipairs(src) do
+      if e.kind == "item" and not seen[e.id] and ns.match.allWords(e.lname, q) then
+        local listing = snap and S.ahListing(scan, snap, e.id)
+        local ah
+        if listing then
+          local stats = type(scan.stats) == "function" and call(scan.stats, e.id)
+          ah = { min = listing.min, listed = listing.listed, auctions = listing.auctions,
+            fair = type(scan.price) == "function" and call(scan.price, e.id) or nil,
+            sold = type(stats) == "table" and stats.sold or nil }
+        elseif not snap then
+          local p = call(price, "Omni", e.id)
+          if type(p) == "number" and p > 0 then ah = { min = p } end
+        end
+        if ah then
+          seen[e.id] = true
+          table.insert(hits, entry("item", e.id, e.name, { where = e.where, owned = e.owned, ahRow = ah }))
+        end
+      end
+    end
+  end
+  table.sort(hits, function(a, b)
+    local sa, sb = a.ahRow.sold or 0, b.ahRow.sold or 0
+    if sa ~= sb then return sa > sb end
+    local la, lb = a.ahRow.listed or 0, b.ahRow.listed or 0
+    if la ~= lb then return la > lb end
+    return a.name < b.name
+  end)
+  local bazaar = rawget(_G, "Bazaar")
+  local open = type(bazaar) == "table" and type(bazaar.open) == "function"
+    and { kind = "bazaar", title = "Bazaar", entries = { entry("bazaar", "open", "Open in Bazaar, the AH browser", { query = q }) } }
+  if #hits == 0 then return open and { open } or {} end
+  local title
+  if snap then
+    local age = snap.t and ns.actions and ns.actions.ago and ns.actions.ago(snap.t)
+    title = "AH scan" .. (age and (" " .. age) or "") .. ", most sold first"
+  else
+    title = "Auctionator prices (a LootValue full scan adds listings and sales)"
+  end
+  local g = { kind = "ah", title = title, entries = {}, more = math.max(0, #hits - S.AH_MAX) }
+  for i = 1, math.min(#hits, S.AH_MAX) do g.entries[i] = hits[i] end
+  return open and { g, open } or { g }
+end
+
+---------------------------------------------------------------------------
 -- Dungeons: ns.DUNGEONS (Dungeons.lua), found by name or short name ("bfd").
 -- Enter opens "loot: <short>", which lists each boss's drops as items.
 ---------------------------------------------------------------------------

@@ -1036,6 +1036,36 @@ do
   C_Item.GetItemInfoInstant = instant
 end
 
+-- "ah: silk": items in LootValue's last full scan, most sold first; Bazaar opens the browser.
+do
+  local E = ns.sources.entry
+  local list = { E("item", 6000, "Silk Cloth"), E("item", 6001, "Small Silk Pack"), E("item", 6002, "Silk Robe") }
+  check("ah: filter", select(1, ns.match.parse("ah: silk")) == "ah")
+  LootValueDB = { snap = { t = 0, owners = { "Ann" }, items = { [6000] = "1,20,2000,4;1,10,1500,2", [6001] = "1,1,30000,4" } } }
+  LootValue = { scan = {
+    decode = function(str, owners)
+      local out = {}
+      for o, c, b, t in str:gmatch("(%d+),(%d+),(%d+),(%d+)") do
+        table.insert(out, { owners[tonumber(o)], tonumber(c), tonumber(b), tonumber(t) })
+      end
+      return out
+    end,
+    price = function(id) return id == 6000 and 120 or nil end,
+    stats = function(id) return id == 6000 and { sold = 60 } or nil end,
+  } }
+  local opened
+  Bazaar = { open = function(q) opened = q end }
+  local g = ns.sources.recipes and ns.sources.ah({ list }, "silk")
+  check("ah: listed items only, most sold first", g[1].entries[1].name == "Silk Cloth" and #g[1].entries == 2
+    and g[1].title:find("^AH scan") ~= nil)
+  check("ah row: cheapest, fair, listed, sold",
+    strip(ns.actions.detail(g[1].entries[1])) == "from 1s 0c  fair 1s 20c  30 listed  60 sold/2d",
+    strip(ns.actions.detail(g[1].entries[1])))
+  check("ah: a row opens Bazaar with the search", g[2].entries[1].kind == "bazaar" and ns.actions.run(g[2].entries[1])
+    and opened == "silk")
+  LootValue, LootValueDB, Bazaar = nil, nil, nil
+end
+
 -- Omni's dungeon table is a copy of UpgradeFinder's: the two must match.
 do
   local function body(path)

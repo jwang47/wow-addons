@@ -56,6 +56,7 @@ function ns.search(text)
   if only == "loot" then return (S.dungeonLoot(q)) end
   if only == "from" then return ns.sourcesFor(q) end
   if only == "recipe" then return (S.recipes(lists, q)) end
+  if only == "ah" then return (S.ah(lists, q)) end
   return (M.search(lists, text, ns.db().recent))
 end
 
@@ -374,6 +375,14 @@ function ns.startSearch(text)
   if only == "from" then
     job = nil
     return show(ns.sourcesFor(q))
+  end
+  if only == "ah" then
+    job = nil
+    local groups = S.ah(lists, q)
+    if #groups == 0 then
+      ns.emptyText = "No AH match. Run a full scan at the AH (LootValue's Scan button or Auctionator's Full Scan)."
+    end
+    return show(groups)
   end
   if only == "recipe" then
     lootTries = {}

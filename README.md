@@ -172,6 +172,8 @@ anywhere ("bag recipes") recipes with the skill and the profit of one craft
 (with UpgradeFinder), a profession word ("tailoring bag") that profession's
 recipes: the ones you know, your trainer's and recipe items (UpgradeFinder
 learns them when you open the profession window and the trainer window),
+`ah:` your last full AH scan (`ah: silk`: cheapest, fair price, listed,
+sold in 2 days; LootValue's full scan; the last row opens Bazaar),
 `near:` or `nb:` nearby NPCs (alone: everything nearby, nearest first). The Nearby group always comes first. An empty box lists the 5 nearest NPCs, then what you used last.
 
 Ranking: a name that starts with the query first, then names where each
