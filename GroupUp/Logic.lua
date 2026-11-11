@@ -266,7 +266,7 @@ function M.verdict(q)
   return "same"
 end
 
-M.RANK = { need = 1, faster = 2, maybe = 3, same = 4, done = 5 }
+M.RANK = { need = 1, faster = 2, maybe = 3, same = 4, pickup = 5, done = 6 }
 
 -- Every quest in your log, best reason to group first.
 function M.quests(units)
@@ -304,8 +304,64 @@ function M.quests(units)
   return out
 end
 
+---------------------------------------------------------------------------
+-- QuestBoard pins
+---------------------------------------------------------------------------
+-- The quests you pinned in QuestBoard (Alt-click, "I'm doing this"), as a
+-- set of quest IDs, or nil when QuestBoard is not there or nothing is
+-- pinned. QuestBoard keeps them in QuestBoardDB.doing.
+function M.pins()
+  local db = rawget(_G, "QuestBoardDB")
+  local doing = type(db) == "table" and db.doing
+  if type(doing) ~= "table" then return nil end
+  local set, n = {}, 0
+  for id, on in pairs(doing) do
+    if on and type(id) == "number" then set[id] = true n = n + 1 end
+  end
+  if n == 0 then return nil end
+  return set
+end
+
+-- The name of a quest you do not have yet (a pinned pick-up).
+function M.questName(id)
+  local name = text(call(api("C_QuestLog.GetTitleForQuestID"), id))
+  if name then return name end
+  local qdb = M.module("QuestieDB")
+  if qdb and type(qdb.QueryQuestSingle) == "function" then
+    name = text(call(qdb.QueryQuestSingle, id, "name"))
+  end
+  return name or ("Quest " .. id)
+end
+
+-- Splits your log by the pins: the pinned quests in your log, pinned quests
+-- you have not taken yet (verdict "need" when tagged for a group, else
+-- "pickup"), and the rest of your log. Without pins, every quest is in
+-- `focus` and `pinned` is false.
+function M.focus(quests, pins)
+  if not pins then return { focus = quests, rest = {}, pinned = false } end
+  local out = { focus = {}, rest = {}, pinned = true }
+  local seen = {}
+  for _, q in ipairs(quests) do
+    if pins[q.id] then table.insert(out.focus, q) seen[q.id] = true
+    else table.insert(out.rest, q) end
+  end
+  local later = {}
+  for id in pairs(pins) do
+    if not seen[id] then
+      local q = { id = id, name = M.questName(id), notTaken = true, shared = {},
+        obj = { kills = 0, drops = 0, clicks = 0, other = 0, total = 0, lines = {} } }
+      q.tag = M.tag(id)
+      q.verdict = q.tag and "need" or "pickup"
+      table.insert(later, q)
+    end
+  end
+  table.sort(later, function(a, b) return a.name < b.name end)
+  for _, q in ipairs(later) do table.insert(out.focus, q) end
+  return out
+end
+
 function M.count(quests)
-  local c = { need = 0, faster = 0, maybe = 0, same = 0, done = 0, shared = 0 }
+  local c = { need = 0, faster = 0, maybe = 0, same = 0, pickup = 0, done = 0, shared = 0 }
   for _, q in ipairs(quests) do
     c[q.verdict] = c[q.verdict] + 1
     if #q.shared > 0 and q.verdict ~= "done" then c.shared = c.shared + 1 end
@@ -362,15 +418,17 @@ function M.splitLine(myLevel, levels)
 end
 
 -- A short summary for chat: the quest counts and the measured rates.
-function M.summary(quests, solo, grouped)
+-- pinned: the quests are your QuestBoard pins.
+function M.summary(quests, solo, grouped, pinned)
   local c = M.count(quests)
   local parts = {}
   if c.need > 0 then table.insert(parts, c.need .. " need a group") end
   if c.faster > 0 then table.insert(parts, c.faster .. " go faster (shared kills)") end
   if c.maybe > 0 then table.insert(parts, c.maybe .. " drops or clicks") end
+  if c.pickup > 0 then table.insert(parts, c.pickup .. " not taken yet") end
   if c.shared > 0 then table.insert(parts, c.shared .. " shared with your group") end
   local q = #parts > 0 and table.concat(parts, ", ") or "no open quests"
-  return "Quests: " .. q .. ".", "XP: " .. M.rateLine(solo, grouped) .. "."
+  return (pinned and "Pinned quests: " or "Quests: ") .. q .. ".", "XP: " .. M.rateLine(solo, grouped) .. "."
 end
 
 return M
