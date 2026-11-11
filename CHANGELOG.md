@@ -194,6 +194,10 @@ the same, and a test checks that every `.toc` version has a section here.
 
 - New: a home for small nice-to-haves (`/nice`). The first one zooms the
   camera out as far as the game allows (`/nice zoom` toggles it).
+- Blocked-action report (`blocked`, on by default): when the game says
+  "Interface action failed because of an AddOn", Niceties says which addon
+  it was and the call the game refused. `/nice blocked` lists the last 20.
+  It also turns on the game's taint log (`Logs\taint.log`).
 
 ## Glance 0.1.0
 
