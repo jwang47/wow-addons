@@ -325,6 +325,21 @@ check("staff with an imbue: on", st.rows[1].cells[scrollCol].state == "on")
 check("a level 25 imbue waits", ns.logic.bagScrolls({ "Scroll of Imbue Flame" },
   { class = "MAGE", ids = { ["Scroll of Imbue Flame"] = 277497 }, level = 18, weapon = 10 }).Imbue == nil)
 
+-- The game blocks CheckInteractDistance in combat: no call there.
+do
+  local old, calls = CheckInteractDistance, 0
+  CheckInteractDistance = function(u) calls = calls + 1 return old(u) end
+  W.combat = false
+  ns.refresh()
+  check("out of combat it asks how near players are", calls > 0)
+  calls, W.combat = 0, true
+  ns.refresh()
+  check("in combat it never calls CheckInteractDistance", calls == 0)
+  W.combat = false
+  CheckInteractDistance = old
+  ns.refresh()
+end
+
 -- Ready check ---------------------------------------------------------------
 do
   load("Ready.lua")

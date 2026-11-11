@@ -736,6 +736,10 @@ your saved Key Bindings.
 - Health (and sometimes power) is secret, but `AbbreviateLargeNumbers` takes
   secret values and the result can be joined into a string for `SetText`.
   Wrap it in `pcall` and fall back to the bare value.
+- `CheckInteractDistance` is blocked in combat: a call there raises
+  `ADDON_ACTION_BLOCKED` with the function name `UNKNOWN()` and the game
+  prints "Interface action failed because of an AddOn". Call it only when
+  `InCombatLockdown()` is false.
 - `UnitDistanceSquared` works only for party and raid members. For any
   other unit, bracket the distance with `C_Spell.IsSpellInRange` over the
   spellbook and `CheckInteractDistance` (out of combat).

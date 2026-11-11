@@ -221,9 +221,12 @@ local function manaShare()
 end
 
 -- Players near you who are not in your group (nameplates, your target and
--- mouseover), by full name.
+-- mouseover), by full name. The game blocks CheckInteractDistance in combat
+-- ("Interface action failed because of an AddOn"), so in a fight nobody
+-- counts as near; Next offers nothing in combat anyway.
 local function strangers()
   local seen, list = {}, {}
+  local combat = inCombat()
   local function add(unit)
     if not call(G("UnitExists"), unit) or not call(G("UnitIsPlayer"), unit) then return end
     if call(G("UnitIsUnit"), unit, "player") or inGroup(unit) then return end
@@ -234,7 +237,7 @@ local function strangers()
     seen[name] = true
     list[#list + 1] = {
       name = name, unit = unit, class = classOf(unit), auras = ns.readAuras(unit),
-      near = plain(call(G("CheckInteractDistance"), unit, 2)) == true,
+      near = not combat and plain(call(G("CheckInteractDistance"), unit, 2)) == true,
     }
   end
   add("target")
