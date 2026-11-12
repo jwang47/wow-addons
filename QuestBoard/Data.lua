@@ -829,6 +829,11 @@ function D.finish(e, level)
   if e.far and trip then secs = secs + trip end
   e.secs = (not e.far or trip) and secs or nil
   e.rate = (not e.far or trip) and D.rate(e.xp, secs) or nil
+  -- Red (5 or more levels over you): you cannot do it without a carry, so
+  -- it gets 0 XP per minute and counts for nothing in a zone or an area.
+  -- A red quest you can already hand in still counts.
+  e.red = (e.color == "red" and not e.done and e.kind ~= "turnin") or nil
+  if e.red then e.rate = 0 end
   e.by = e.dist and select(2, D.travelSecs(e.dist, e)) or nil
   return e
 end
@@ -881,7 +886,7 @@ end
 
 -- XP you earn at the stop itself (a pick-up earns it later, elsewhere).
 local function stopXP(e)
-  if e.kind == "pickup" or e.kind == "party" then return 0 end
+  if e.red or e.kind == "pickup" or e.kind == "party" then return 0 end
   return e.xp or 0
 end
 
@@ -958,8 +963,10 @@ function D.zones(out)
         table.insert(z.stops, e)
         local k = kind == "farPickup" and "pickup" or e.kind
         z.counts[k] = (z.counts[k] or 0) + 1
-        z.xp = z.xp + (e.xp or 0)
-        z.work = z.work + zoneWork(e)
+        if not e.red then
+          z.xp = z.xp + (e.xp or 0)
+          z.work = z.work + zoneWork(e)
+        end
         if e.dist and (not z.dist or e.dist < z.dist) then
           z.dist, z.angle, z.spawn, z.zone, z.target, z.near = e.dist, e.angle, e.spawn, e.zone, e.target, e
         end
@@ -1236,6 +1243,32 @@ function D.short(n)
   if n >= 10000 then return string.format("%dk", math.floor(n / 1000 + 0.5)) end
   if n >= 1000 then return string.format("%.1fk", n / 1000) end
   return tostring(math.floor(n + 0.5))
+end
+
+-- XP as a share of your level, so you need not work it out: "1.2%" for a
+-- quest, "24%/h" for XP per minute (as a share per hour). Raw XP when the game gives no level
+-- size (the top level).
+function D.levelPct(xp)
+  local max = D.plain(call(rawget(_G, "UnitXPMax"), "player"))
+  if not (xp and type(max) == "number" and max > 0) then return nil end
+  return xp * 100 / max
+end
+local function pctText(p)
+  if p <= 0 then return "0%" end
+  if p < 0.1 then return "<0.1%" end
+  if p < 10 then return string.format("%.1f%%", p) end
+  return string.format("%d%%", math.floor(p + 0.5))
+end
+function D.xpText(xp)
+  local p = D.levelPct(xp)
+  if p then return pctText(p) end
+  return D.short(xp) .. " xp"
+end
+-- XP per minute in, the share of your level per hour out: "24%/h".
+function D.rateText(rate)
+  local p = D.levelPct(rate and rate * 60)
+  if p then return pctText(p) .. "/h" end
+  return D.short(rate) .. " xp/m"
 end
 
 -- Compass point for an angle (0 = north, counter-clockwise).

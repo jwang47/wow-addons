@@ -150,7 +150,7 @@ local function mins(secs) return math.max(1, math.floor(secs / 60 + 0.5)) end
 -- "1.7k xp  6 min" for a step, grey; "" when nothing is known.
 function D.stepRight(s)
   local parts = {}
-  if s.xp then table.insert(parts, D.short(s.xp) .. " xp") end
+  if s.xp then table.insert(parts, D.xpText(s.xp)) end
   if s.work then table.insert(parts, (s.travel and "" or "~") .. mins((s.travel or 0) + s.work) .. " min") end
   return table.concat(parts, "  ")
 end

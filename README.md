@@ -625,6 +625,17 @@ hand-in or a pick-up). It stays while you are within 600 yards
   (`GetQuestTagInfo`, else Questie's `GetQuestTagInfo`, else the suggested
   group size). `/qb dungeons off` keeps dungeon and raid quests to the Log
   tab (out of Doing, Nearby and Areas) and leaves their pick-ups out.
+- XP shows as a share of your level (`UnitXPMax`): a row shows the rate as
+  a share of a level per hour ("24%/h") and the time; the tooltip has the
+  quest's XP as a percent and in raw XP.
+- The "..." button right of the tabs opens the options menu. Each option
+  runs the same code as its `/qb` command.
+- A red quest (5 or more levels over you, not yet done) counts as 0 XP per
+  minute: you cannot do it without a carry. It adds nothing to a zone or an
+  area. `/qb red` lists the red quests in your log and says which are safe
+  to drop: an NPC or an object gives it again, and you have no progress.
+  `/qb abandon` shows the game's confirm box for each safe one, one by one;
+  only your Abandon click drops a quest (`QuestBoard/Spare4.lua`).
 - The level number is in the quest log colours (grey, green, yellow,
   orange, red). Each row shows the distance and an arrow that turns with
   you. The distance is green within 300 yards, yellow up to 1000 yards and
@@ -828,7 +839,8 @@ once. The design mockups are in [docs/glance.md](docs/glance.md).
     Bartender bars you no longer need in Bartender's options.
 - **Unit frames**: small player and target bars under your character and a
   cast bar below them. They replace Blizzard's player, target and cast
-  frames (`/glance blizzard on` keeps those).
+  frames (`/glance blizzard on` keeps those). A blue "Zzz" on your own
+  frame shows that you are resting (in an inn or a city).
 - **Edge pointers**: arrows on the minimap's rim for things off the map,
   with the name and yards: party members (class colours), your map pin and
   your corpse. Other addons add points with

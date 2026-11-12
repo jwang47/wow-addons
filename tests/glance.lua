@@ -158,6 +158,15 @@ fire("PLAYER_LOGIN")
 fire("PLAYER_ENTERING_WORLD")
 for _, line in ipairs(chat) do check("no error at login", not line:match("failed"), line) end
 
+-- Resting: Zzz on the player frame.
+check("no zzz when not resting", ns.rest.mark and not ns.rest.mark.shown)
+IsResting = function() return true end
+fire("PLAYER_UPDATE_RESTING")
+check("zzz while resting", ns.rest.mark.shown and ns.rest.mark.text == "Zzz")
+IsResting = function() return false end
+fire("PLAYER_UPDATE_RESTING")
+check("zzz hides when you leave", not ns.rest.mark.shown)
+
 -- Pure classification.
 local K = ns.keys
 check("slot ACTIONBUTTON3", K.slotOf("ACTIONBUTTON3") == 3)

@@ -179,6 +179,17 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## QuestBoard 0.2.0
 
+- XP shows as a share of your level, so you need not work it out: each
+  quest row and stop shows the rate as a share of a level per hour ("24%/h",
+  about 4 hours a level) next to the time, and the tooltips give the
+  quest's XP as "1.2% of your level". Raw XP when the game gives no level
+  size.
+- An options menu: the "..." button right of the tabs has every option
+  (drop safe red quests, dungeon quests, stops, compact, lock, size), so
+  you need no /qb commands.
+- Red quests (5 or more levels over you) count as 0 XP per minute and add
+  nothing to a zone or an area. `/qb red` lists them and says which are safe
+  to drop; `/qb abandon` asks for each safe one with the game's confirm box.
 - The chain in a quest's tooltip shows what each step gives and how long
   it takes: XP and minutes on the right of each step, "+gear" when a step
   rewards gear, and the totals of what is left in the heading ("4 left:
@@ -362,7 +373,7 @@ the same, and a test checks that every `.toc` version has a section here.
   every key with another command (except Tab, the bag keys and the character pane) on the bar. In edit mode the
   bar can be dragged to another place (`/glance reset` puts it back).
 - Small player and target bars under your character (health and mana as
-  numbers), and a cast bar below them. They hide Blizzard's player, target and cast frames
+  numbers, "Zzz" while you rest), and a cast bar below them. They hide Blizzard's player, target and cast frames
   (`/glance blizzard on` brings those back).
 - A square minimap in the top-right corner: mouse-wheel zoom, the zone,
   coordinates and clock under it, and the addon buttons in one drawer.

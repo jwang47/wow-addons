@@ -708,8 +708,8 @@ check("turn-in: no item says so", D.rewardTag({ steps = 0, count = 0 }) == "no i
 -- Two-line quest rows: line 1 how far, line 2 the same two numbers on
 -- every quest, then a gear line only when there is gear.
 check("row: line 1 has only the distance", strip(ns.place(q127)) == "300 yd" and strip(ns.place({ kind = "log", left = {} })) == "no place")
-check("row: a hand-in shows its XP and the run", strip(ns.stats(q127)) == "1.5k xp  <1 min")
-check("row: a pick-up shows XP and a guessed time", strip(ns.stats({ kind = "pickup", xp = 625, secs = 180 })):match("^625 xp  ~3 min$") ~= nil)
+check("row: a hand-in shows XP per minute and the run", strip(ns.stats(q127)) == "1.2k xp/m  <1 min")
+check("row: a pick-up shows a guessed XP per minute", strip(ns.stats({ kind = "pickup", xp = 625, secs = 180 })) == "~208 xp/m  3 min")
 check("row: a hand-in names its reward", strip(ns.rewardLine(q127)) == "Reward: [Murloc Charm] or 1 more")
 check("row: a chain names the gear and how far on", strip(ns.rewardLine(q125)) == "Leads to [Ironforge Gladius], 2 quests on")
 check("row: XP only gets no gear line", ns.rewardLine(q122) == nil)
@@ -1144,7 +1144,7 @@ check("stops: a stop in another zone names it", strip(ns.stopWhat(stops[1])) == 
 GetRealZoneText = function() return "Dustwallow Marsh" end
 check("stops: not when you are in that zone", strip(ns.stopWhat(stops[1])) == "3 hand-ins" and ns.zoneOf(camp1) == "Dustwallow Marsh")
 D.zoneName, GetRealZoneText, camp1.zone = realZoneName, realZoneText, nil
-check("stops: the head's numbers", ns.stopStats(stops[1]) == "4.0k xp  <1 min" and ns.stopStats(stops[2]) == "1.3k xp  ~4 min" and ns.stopPlace(stops[3]) == "2.8k yd")
+check("stops: the head's numbers", ns.stopStats(stops[1]) == "17k xp/m  <1 min" and ns.stopStats(stops[2]) == "~325 xp/m  4 min" and ns.stopPlace(stops[3]) == "2.8k yd")
 check("stops: ? to hand in, ! to pick up, a grey ? to finish",
   ns.stopMark(camp1) == "|cffffd100?|r" and ns.stopMark(thorsen) == "|cffffd100!|r" and ns.stopMark(crystal) == "|cff909090?|r")
 check("stops: only a quest to finish has lines under it", #ns.stopLines(camp1) == 0 and #ns.stopLines(thorsen) == 0 and ns.stopLines(crystal)[1]:find("Pendant", 1, true) ~= nil)
@@ -1222,7 +1222,69 @@ questieOn = true
 D.resetModules()
 mods.DistanceUtils.GetNearestSpawnForQuest = function() error("changed") end
 local rough = D.collect({})
-check("a failing Questie call is skipped", #rough.log == 2)
+check("a failing Questie call is skipped", #rough.log == 2);
+
+-- The "..." menu: every option without a /qb command.
+(function()
+  check("menu: a button right of the tabs", QuestBoardFrame.menuBtn ~= nil)
+  QuestBoardFrame.menuBtn.scripts.OnClick()
+  local m = QuestBoardMenu
+  check("menu: opens with the options", m and m.shown and #m.buttons >= 8)
+  local dun
+  for _, b in ipairs(m.buttons) do if b.text.text == "Show dungeon and raid quests" then dun = b end end
+  local before = QuestBoardDB.dungeons ~= false
+  dun.scripts.OnClick(dun)
+  check("menu: a click runs the option and closes the menu", (QuestBoardDB.dungeons ~= false) ~= before and not m.shown)
+  SlashCmdList.QUESTBOARD(before and "dungeons on" or "dungeons off")
+end)()
+
+-- XP as a share of the level, so the player need not work it out.
+UnitXPMax = function() return 50000 end
+check("percent: a quest's XP", D.xpText(600) == "1.2%" and D.xpText(10) == "<0.1%" and D.xpText(6000) == "12%")
+check("percent: XP per minute", D.rateText(250) == "30%/h" and D.rateText(10) == "1.2%/h" and D.rateText(0) == "0%/h")
+check("percent: a row shows it", strip(ns.stats({ kind = "pickup", xp = 600, secs = 180 })) == "~24%/h  3 min")
+UnitXPMax = nil
+check("percent: raw XP when the game gives no level size", D.xpText(625) == "625 xp" and D.rateText(250) == "250 xp/m")
+
+-- Red quests (Spare4.lua): 0 XP per minute, and the safe ones can be dropped.
+assert(loadfile(root .. "QuestBoard/Spare4.lua"))("QuestBoard", ns);
+(function()
+  local red = D.finish({ kind = "log", id = 7001, name = "Too High", level = 40, xp = 3000, left = {}, objectives = 1 }, 30)
+  check("red: 0 XP per minute", red.red and red.rate == 0)
+  local doneRed = D.finish({ kind = "turnin", id = 7002, name = "Done High", level = 40, xp = 3000, done = true }, 30)
+  check("red: a hand-in still counts", not doneRed.red and doneRed.rate and doneRed.rate > 0)
+  check("red: row says 0 xp/m", strip(ns.stats(red)) == "0 xp/m, red")
+  local realGet = mods.QuestieDB.GetQuest
+  mods.QuestieDB.GetQuest = function(id)
+    if id == 7001 then return { Starts = { NPC = { 5 } } } end
+    if id == 7003 then return { Starts = { Item = { 9 } } } end
+  end
+  check("red: safe when an NPC gives it and no progress", D.safeToAbandon(red))
+  red.frac = 0.5
+  check("red: not safe with progress", not D.safeToAbandon(red))
+  red.frac = nil
+  local itemRed = { kind = "log", id = 7003, red = true, name = "From an item", level = 40 }
+  local ok, why = D.safeToAbandon(itemRed)
+  check("red: not safe when an item starts it", not ok and why:find("item", 1, true))
+  local shown, popups, dropped = {}, {}, {}
+  StaticPopupDialogs = {}
+  StaticPopup_Show = function(name, a1, a2, data) table.insert(popups, { name = name, data = data }) end
+  local realQL = { C_QuestLog.SetSelectedQuest, C_QuestLog.SetAbandonQuest, C_QuestLog.AbandonQuest }
+  local sel
+  C_QuestLog.SetSelectedQuest = function(id) sel = id end
+  C_QuestLog.SetAbandonQuest = function() end
+  C_QuestLog.AbandonQuest = function() table.insert(dropped, sel) end
+  local realState = ns.state
+  ns.state = function() return { log = { red, itemRed }, active = {}, nearby = {} } end
+  ns.abandonRed()
+  check("abandon: asks first, drops nothing yet", #popups == 1 and popups[1].data == red and #dropped == 0)
+  StaticPopupDialogs.QUESTBOARD_ABANDON.OnAccept(nil, popups[1].data)
+  check("abandon: Abandon drops that quest only", #dropped == 1 and dropped[1] == 7001)
+  ns.state = realState
+  C_QuestLog.SetSelectedQuest, C_QuestLog.SetAbandonQuest, C_QuestLog.AbandonQuest = realQL[1], realQL[2], realQL[3]
+  StaticPopup_Show, StaticPopupDialogs = nil, nil
+  mods.QuestieDB.GetQuest = realGet
+end)()
 
 if failures > 0 then
   print(failures .. " failed")
