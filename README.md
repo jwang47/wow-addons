@@ -254,6 +254,35 @@ price is the craft cost: the pattern plus the reagents (from the line after
 lower; a "+" marks a reagent with no price. The tooltip lists the parts and
 the price to buy the made item on the AH instead.
 
+- Score modes (`UpgradeFinder/Spare1.lua`; the **Mode** button, the
+  "Score mode" section at the bottom of the Weights panel (a button per
+  mode, boxes for the mobs per pull and the crit bonus), or
+  `/uf mode weights|grind|aoe`). **Weights** is the hand-set weight per stat.
+  **Single** and **AoE** score a damage caster's gear by leveling speed:
+  damage per second times the share of the time you cast and do not drink.
+  One mana pool is emptied by your rotation (the spells on your action bars,
+  with their mana costs) and filled again by water and Spirit; a fixed
+  overhead per pool covers sitting, looting and, for AoE, gathering the pull.
+  The weight of a stat is what one point adds to that speed, in units of one
+  point of spell damage on the single-target rotation, so it follows your
+  level, gear and spells (worked out again when you pick the mode or gain a
+  level; `/uf mode` prints the weights). In AoE mode the area spell is your
+  channel (Blizzard) on `/uf mobs N` mobs: damage over time does not crit,
+  Intellect counts for more, and Stamina and armor count double. Spell hit
+  is worth nothing once your gear has 3% (mobs of your level).
+  `/uf critbonus 100` tells the model your crits do double damage. Stamina,
+  armor and the stats outside the model keep the hand-set weights
+  (MageMentor's for a mage). The water table, the Spirit regen and the area
+  coefficient (a third) are Classic rules, not measured on Forever.
+- What the score leaves out (`UpgradeFinder/Spare2.lua`): the score is a
+  sum of stats, so a `Use:` or `Chance on hit:` effect, an `Equip:` line no
+  pattern reads, a resistance, a set bonus and a caster's wand damage count
+  for nothing. Such an item gets a gold star in the list, and its row
+  tooltip lists the lines under "Not in the score". The same file adds the
+  "Lasts" line: the first better item for the slot that needs one of your
+  next 5 levels (lowest level first), with its source; "nothing better
+  known" otherwise. It reads the rows of the last scan, so it knows only
+  the AH, your bags and the dungeon drops, not quest rewards.
 - Crafting lines (`UpgradeFinder/Craft.lua`): hover a recipe item (in your
   bags, at a vendor, on the AH) or a recipe in your profession window (the
   recipe list rows and the made item's icon) and the tooltip adds:

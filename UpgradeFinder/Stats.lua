@@ -13,6 +13,7 @@ St.NAMES = {
   frost = "Frost dmg", fire = "Fire dmg", arcane = "Arcane dmg", shadow = "Shadow dmg", nature = "Nature dmg",
   holy = "Holy dmg", crit = "Crit", hit = "Hit", spcrit = "Spell crit", sphit = "Spell hit", mp5 = "Mp5",
   armor = "Armor", def = "Defense", block = "Block", dps = "Weapon DPS", slay = "Dmg vs type",
+  hp = "Health", mana = "Mana",
 }
 -- Full names, for the one-stat-per-line tooltip.
 St.LONG = {
@@ -22,7 +23,7 @@ St.LONG = {
   slay = "Spell damage vs one creature type",
 }
 St.ORDER = { "str", "agi", "sta", "int", "spi", "ap", "sp", "heal", "frost", "fire", "arcane", "shadow", "nature",
-  "holy", "slay", "crit", "hit", "spcrit", "sphit", "mp5", "dps", "armor", "def", "block" }
+  "holy", "slay", "crit", "hit", "spcrit", "sphit", "mp5", "dps", "armor", "def", "block", "hp", "mana" }
 St.PCT = { crit = true, hit = true, spcrit = true, sphit = true }
 local SCHOOLS = { "frost", "fire", "arcane", "shadow", "nature", "holy" }
 -- Spell school index for GetSpellBonusDamage / GetSpellCritChance.
@@ -221,7 +222,7 @@ function St.derive(d, ctx, w, loc)
     table.insert(off, { (role == "healer" and "Est. healing" or "Est. DPS"), fmt(est * 100, true), est > 0 })
   end
 
-  local hp = (d.sta or 0) * (ctx.hpPerSta or 10)
+  local hp = (d.sta or 0) * (ctx.hpPerSta or 10) + (d.hp or 0)
   add(def, "Health", hp)
   local armor = (d.armor or 0) + (d.agi or 0) * 2
   local armorNow = ctx.armor or level * 20
@@ -240,7 +241,7 @@ function St.derive(d, ctx, w, loc)
   add(def, "Defense", d.def)
   add(def, "Block", d.block)
   if class ~= "WARRIOR" and class ~= "ROGUE" then
-    n.mana = (d.int or 0) * (ctx.manaPerInt or 15)
+    n.mana = (d.int or 0) * (ctx.manaPerInt or 15) + (d.mana or 0)
     add(def, "Mana", n.mana)
   end
   add(def, "Mp5", d.mp5)

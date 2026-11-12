@@ -83,6 +83,25 @@ the same, and a test checks that every `.toc` version has a section here.
 
 ## UpgradeFinder 0.2.0
 
+- New: score modes for damage casters (the Mode button, or `/uf mode`).
+  **Single** and **AoE** rank gear by leveling speed (damage times the share
+  of the time you cast and do not drink) and not by burst damage. The stat
+  weights come from your own spells, mana and level. AoE mode uses your
+  area spell (Blizzard): crit counts for nothing there, Intellect and
+  Stamina count for more. **Weights** is the old score. The row tooltip
+  shows the leveling speed change. The Weights panel has a button per
+  mode and boxes for the mobs per pull and your crit bonus.
+- Fix: the DPS estimate no longer takes Blizzard or Frost Nova for a
+  single-target spell, and it can use a crit bonus above +50%
+  (`/uf critbonus`).
+- New: a gold star marks an item with an effect the score does not count
+  (a `Use:` or proc effect, a resistance, a set bonus, a caster's wand
+  damage). The row tooltip lists those lines under "Not in the score".
+- New: the row tooltip says how long an item lasts: the first better item
+  for the slot in the next 5 levels, from the AH scan, your bags and the
+  dungeon drops.
+- Flat health and mana lines ("+30 Mana") now count, as a share of
+  Stamina and Intellect.
 - `UpgradeFinderAPI.recipe(itemID)` gives other addons a recipe's skill,
   craft cost, sale price and profit (Omni uses it to list recipes).
 - UpgradeFinder now remembers the recipes you know (when you open a
