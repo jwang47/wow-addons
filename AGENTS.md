@@ -32,6 +32,15 @@ start. Do not remove the last spare (a test checks it).
 - A change to an addon's files raises its `.toc` `## Version` and adds a
   `CHANGELOG.md` section in the same PR, once that version is live.
 - Work on a branch and open a pull request.
+- **Copy first, then change the client folders.** `WTF\` and
+  `Interface\AddOns\` are not in git, and nothing may back them up. Before
+  an agent edits, moves or deletes any file there (SavedVariables, `.wtf`
+  files, an installed addon), copy each file it touches to
+  `<client>\agent-backups\<yyyyMMdd-HHmmss>-<task>\` with the same
+  relative path, and say that path in the reply and the PR. Close the game
+  first: it writes SavedVariables on logout and `/reload`. `dev.ps1` and
+  `update.cmd` keep their own copies and need no extra step. Procedure:
+  README, "Copy before you change WTF or AddOns".
 - Never ask a human to paste a secret into a chat or a PR.
 - Keep the account email out of everything you send: commits, issues, PRs,
   request headers. Commit as `jwang47@users.noreply.github.com` or the
