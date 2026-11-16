@@ -1054,6 +1054,37 @@ a new empty spare in its place; that one change needs one restart. Keep at
 least one spare in every `.toc` (a test checks it), and give a new addon
 its spares from the start. A brand-new addon folder still needs a restart.
 
+### Copy before you change WTF or AddOns
+
+The client folders `WTF\` (settings, key bindings, SavedVariables) and
+`Interface\AddOns\` are not in git. Before you, or an agent, edit, move or
+delete a file there by hand, copy it out first. `dev.ps1` (it parks the
+release copy in `wow-addons-prod\`) and `update.cmd` (it keeps a backup
+until the new copy is in place) already do this for their own changes.
+
+1. Close the game. It writes SavedVariables on logout and on `/reload`, so
+   it overwrites an edit made while it runs, and a copy taken then can be
+   half written.
+2. Copy each file or folder that you will touch, with its path below the
+   client folder, to a new folder `<client>\agent-backups\<yyyyMMdd-HHmmss>-<task>\`.
+   From PowerShell, in the client folder (the `_forever_` folder):
+
+   ```
+   $b = "agent-backups\$(Get-Date -Format yyyyMMdd-HHmmss)-mytask"; robocopy WTF "$b\WTF" /E /COPY:DAT /R:1 /W:1 /NFL /NDL
+   ```
+
+   That copies all of `WTF\` (about 8 MB, 140 files, in November 2026).
+   `Interface\AddOns\` is much larger (about 450 MB), so copy only the
+   addon folder you touch:
+   `robocopy Interface\AddOns\Omni "$b\Interface\AddOns\Omni" /E`.
+   Robocopy exit codes 0 to 7 mean success.
+3. Check the copy (same file count), then make the change.
+4. Say the backup folder in the reply and in the PR. To undo, close the game
+   and copy the files back.
+
+Keep the last few backups and delete older ones by hand; nothing deletes
+them on its own.
+
 ## Release
 
 1. In the PR: raise `## Version` in each changed addon's `.toc` and add its
