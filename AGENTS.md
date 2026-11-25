@@ -2,9 +2,11 @@
 
 > **`AGENTS.md` and `CLAUDE.md` must be byte-identical.** Edit one, copy it
 > over the other, and check with `cmp AGENTS.md CLAUDE.md`.
+> `GEMINI.md` imports this file (`@./AGENTS.md`) for Gemini, so Claude,
+> Codex and Gemini read the same rules. Keep every rule here, not there.
 
 LootValue, Omni, UpgradeFinder, QuestBoard, BuffCheck, Workbench, Glance and Bazaar (in testing), WoW addons for the Forever client (interface 16001).
-Read `README.md` first. Claude and Codex both work here, so durable facts
+Read `README.md` first. Claude, Codex and Gemini all work here, so durable facts
 live in this repository, not in agent memory. This repo is public: keep
 personal details (names of other people, machine paths, emails) out of it.
 
@@ -31,6 +33,14 @@ start. Do not remove the last spare (a test checks it).
   target. A general "go ahead" confirms nothing.
 - A change to an addon's files raises its `.toc` `## Version` and adds a
   `CHANGELOG.md` section in the same PR, once that version is live.
+- **Reviewer order** (Jiahua, 2026-11-25: Gemini 4 Neon "is the best
+  model now"). Gemini 4 Neon is the preferred reviewer, but no review
+  round can run it yet: the shared `review.yml` in `jwhex00/runners`
+  accepts only `codex` and `claude`, and `/gemini` (`gemini-work.yml`)
+  does work, not reviews, and stays off until its sandbox gate passes.
+  This repository has no `/review` caller yet, so until a Gemini round
+  exists a fresh Opus 5.5 agent (not the author) reviews, and Fable 5.2
+  only a high-risk change. Say in the PR which model reviewed.
 - Work on a branch and open a pull request.
 - **Copy first, then change the client folders.** `WTF\` and
   `Interface\AddOns\` are not in git, and nothing may back them up. Before
