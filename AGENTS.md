@@ -33,6 +33,11 @@ Claude Code reads `CLAUDE.md` and `.claude/skills/`.
 
 - `AGENTS.md` is the source; `CLAUDE.md` is a byte-identical copy. Do not
   add a `GEMINI.md`: `agy` reads `AGENTS.md`, and a third copy can drift.
+  (Source: the Antigravity CLI page in the Flutter docs,
+  https://docs.flutter.dev/ai/antigravity-cli: `agy` reads `AGENTS.md`,
+  keeps `GEMINI.md` only as a legacy name, and loads skills from
+  `.agents/skills/`. `agy inspect` lists what it loaded; check it on the
+  first run on a machine.)
 - A skill lives in `.agents/skills/<name>/`, with a byte-identical copy in
   `.claude/skills/<name>/`.
 - `python3 -m unittest tests/test_agent_context.py` fails when a copy is missing or different.
@@ -83,8 +88,9 @@ try another model instead of another round.
 - Put each addon action on a button in its window, not only on a slash
   command.
 - After each step, install the branch in the game client with `dev.ps1`
-  (through a session on that machine), so the owner can try it with
-  `/reload`.
+  (through a session on that machine), so the owner can try it: `/reload`
+  for a change in a spare, a full game restart for a new addon folder or a
+  `.toc` change.
 - Never automate keys or read the game screen (ban risk); addons may only
   use what the game API allows.
 - Use ASD-STE100 Simplified Technical English for explanations and PR
