@@ -26,6 +26,12 @@ class AgentContext(unittest.TestCase):
             self.assertEqual(agents.read_bytes(), claude.read_bytes(),
                              f"{claude.relative_to(ROOT)} differs from AGENTS.md: copy AGENTS.md over it")
 
+    def test_every_claude_md_has_agents_md(self):
+        for claude in walk(ROOT):
+            if claude.name == "CLAUDE.md":
+                self.assertTrue(claude.with_name("AGENTS.md").exists(),
+                                f"no AGENTS.md beside {claude.relative_to(ROOT)}: AGENTS.md is the source")
+
     def test_skill_copies_match(self):
         for source, copy in ((".agents", ".claude"), (".claude", ".agents")):
             for skills in ROOT.rglob(f"{source}/skills"):
